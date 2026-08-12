@@ -1,0 +1,24 @@
+{
+  "short_name": "MESA",
+  "name": "MESA - Food Delivery Casalingo",
+  "description": "Ordina piatti autentici fatti in casa dai migliori cuochi locali certificati HACCP.",
+  "icons": [
+    {
+      "src": "/images/mesa_app_icon.jpg",
+      "type": "image/jpeg",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/mesa_logo_type.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#ea580c",
+  "background_color": "#ffffff"
+}

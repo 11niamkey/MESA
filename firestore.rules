@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // NOTE: temporary open rules to support the current client-side auth model.
+    // Tighten once Firebase Authentication is integrated.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

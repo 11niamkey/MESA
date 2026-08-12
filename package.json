@@ -1,0 +1,31 @@
+{
+  "name": "mesa-food-delivery",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MESA - Food Delivery Casalingo su Prenotazione",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^0.4.0",
+    "firebase": "^11.0.0",
+    "lucide-react": "^0.460.0",
+    "motion": "^11.11.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
