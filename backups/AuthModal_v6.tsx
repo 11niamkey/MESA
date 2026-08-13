@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
 import { X, User, ChefHat, LogIn, ShieldCheck, MapPin, Eye, EyeOff } from 'lucide-react';
 import { AppUser, UserAddress } from '../types';
-import { auth, isFirebaseConfigured } from '../firebase';
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider,
-} from 'firebase/auth';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -40,195 +33,70 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [zip, setZip] = useState('');
   
   const [errorMsg, setErrorMsg] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  // Map Firebase Auth error codes to friendly Italian messages
-  const translateAuthError = (err: unknown): string => {
-    const code = (err as { code?: string })?.code || '';
-    switch (code) {
-      case 'auth/user-not-found':
-        return 'Nessun account trovato con questa email. Registrati per iniziare!';
-      case 'auth/wrong-password':
-      case 'auth/invalid-credential':
-        return 'La password inserita non è corretta. Riprova.';
-      case 'auth/email-already-in-use':
-        return 'Questa email è già registrata su MESA.';
-      case 'auth/invalid-email':
-        return 'Indirizzo email non valido. Controlla e riprova.';
-      case 'auth/weak-password':
-        return 'Password troppo debole: usa almeno 6 caratteri.';
-      case 'auth/network-request-failed':
-        return 'Errore di rete. Controlla la connessione e riprova.';
-      case 'auth/popup-closed-by-user':
-        return 'Accesso con Google annullato.';
-      case 'auth/account-exists-with-different-credential':
-        return 'Esiste già un account con questa email usando un altro metodo di accesso.';
-      default:
-        return 'Si è verificato un errore. Riprova.';
-    }
-  };
-
-  // Build an AppUser record from a Firebase Auth user
-  const buildUserFromFirebase = (
-    fbUser: { uid: string; email?: string | null; displayName?: string | null },
-    role: 'client' | 'chef' | 'admin'
-  ): AppUser => {
-    const displayName = fbUser.displayName || '';
-    const [fbName, ...fbLastNameParts] = displayName.split(' ');
-    return {
-      id: `usr-${fbUser.uid.slice(0, 6).toUpperCase()}`,
-      name: fbName.trim() || 'Utente',
-      lastName: fbLastNameParts.join(' ').trim() || 'Mesa',
-      email: (fbUser.email || email).trim(),
-      role,
-      addresses: [],
-      createdAt: new Date().toLocaleDateString('it-IT'),
-      password: undefined
-    };
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    setIsSubmitting(true);
 
-    try {
-      if (mode === 'login') {
-        // 1) Try Firebase Auth first (real accounts)
-        if (isFirebaseConfigured) {
-          try {
-            const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
-            const existing = registeredUsers.find(
-              u => u.email.toLowerCase() === (cred.user.email || email).toLowerCase()
-            );
-            if (existing) {
-              onLoginSuccess(existing);
-            } else {
-              const newUser = buildUserFromFirebase(cred.user, role);
-              onRegisterUser(newUser);
-              onLoginSuccess(newUser);
-            }
-            onClose();
-            return;
-          } catch (err) {
-            const code = (err as { code?: string })?.code || '';
-            const isDemoFallback =
-              code === 'auth/user-not-found' ||
-              code === 'auth/wrong-password' ||
-              code === 'auth/invalid-credential' ||
-              code === 'auth/invalid-email';
-            if (!isDemoFallback) {
-              setErrorMsg(translateAuthError(err));
-              return;
-            }
-            // fall through to demo/local account check
-          }
-        }
+    if (mode === 'login') {
+      const match = registeredUsers.find(
+        u => u.email.toLowerCase() === email.toLowerCase() && u.role === role
+      );
 
-        // 2) Demo / local account fallback (pre-seeded users)
-        const match = registeredUsers.find(
-          u => u.email.toLowerCase() === email.toLowerCase() && u.role === role
-        );
-        if (match) {
-          const expectedPassword = match.password || 'demo123';
-          if (password !== expectedPassword) {
-            setErrorMsg('La password inserita non è corretta. Riprova.');
-            return;
-          }
-          onLoginSuccess(match);
-          alert(`Accesso effettuato con successo!\nBenvenuto, ${match.name}!`);
-          onClose();
+      if (match) {
+        const expectedPassword = match.password || 'demo123';
+        if (password !== expectedPassword) {
+          setErrorMsg('La password inserita non è corretta. Riprova.');
           return;
         }
-        setErrorMsg(`Account ${role === 'chef' ? 'Cuoco' : 'Cliente'} non trovato con questa email. Registrati per iniziare!`);
-      } else {
-        // Register logic
-        const exists = registeredUsers.some(u => u.email.toLowerCase() === email.toLowerCase());
-        if (exists) {
-          setErrorMsg('Questa email è già registrata su MESA.');
-          return;
-        }
-
-        let firebaseUid = '';
-        if (isFirebaseConfigured) {
-          try {
-            const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-            firebaseUid = cred.user.uid;
-          } catch (err) {
-            setErrorMsg(translateAuthError(err));
-            return;
-          }
-        }
-
-        const generatedId = firebaseUid
-          ? `usr-${firebaseUid.slice(0, 6).toUpperCase()}`
-          : `usr-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-
-        const addresses: UserAddress[] = [];
-        if (street.trim() && city.trim() && zip.trim()) {
-          addresses.push({
-            id: `addr-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
-            street: street.trim(),
-            city: city.trim(),
-            zip: zip.trim(),
-            isVerified: false // Admin must verify it
-          });
-        }
-
-        const newUser: AppUser = {
-          id: generatedId,
-          name: name.trim() || 'Utente',
-          lastName: lastName.trim() || 'Mesa',
-          email: email.trim(),
-          role: role,
-          addresses: addresses,
-          createdAt: new Date().toLocaleDateString('it-IT'),
-          password: firebaseUid ? undefined : password
-        };
-
-        onRegisterUser(newUser);
-        onLoginSuccess(newUser);
-
-        alert(
-          `Registrazione completata!\nBenvenuto ${newUser.name}.` +
-          (role === 'chef' && addresses.length > 0 ? `\nL'indirizzo inserito è stato registrato ed è in attesa di verifica nella dashboard dell'amministratore.` : '')
-        );
+        onLoginSuccess(match);
+        alert(`Accesso effettuato con successo!\nBenvenuto, ${match.name}!`);
         onClose();
+      } else {
+        setErrorMsg(`Account ${role === 'chef' ? 'Cuoco' : 'Cliente'} non trovato con questa email. Registrati per iniziare!`);
       }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setErrorMsg('');
-    if (!isFirebaseConfigured) {
-      setErrorMsg('Accesso con Google non disponibile in questa configurazione.');
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      const cred = await signInWithPopup(auth, provider);
-      const fbEmail = cred.user.email || '';
-      let user = registeredUsers.find(u => u.email.toLowerCase() === fbEmail.toLowerCase());
-      if (!user) {
-        const targetRole = role === 'admin' ? 'client' : role;
-        user = buildUserFromFirebase(cred.user, targetRole);
-        onRegisterUser(user);
-      }
-      onLoginSuccess(user);
-      onClose();
-    } catch (err) {
-      const code = (err as { code?: string })?.code || '';
-      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+    } else {
+      // Register logic
+      const exists = registeredUsers.some(u => u.email.toLowerCase() === email.toLowerCase());
+      if (exists) {
+        setErrorMsg('Questa email è già registrata su MESA.');
         return;
       }
-      setErrorMsg(translateAuthError(err));
-    } finally {
-      setIsSubmitting(false);
+
+      const generatedId = `usr-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      
+      const addresses: UserAddress[] = [];
+      if (street.trim() && city.trim() && zip.trim()) {
+        addresses.push({
+          id: `addr-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+          street: street.trim(),
+          city: city.trim(),
+          zip: zip.trim(),
+          isVerified: false // Admin must verify it
+        });
+      }
+
+      const newUser: AppUser = {
+        id: generatedId,
+        name: name.trim() || 'Utente',
+        lastName: lastName.trim() || 'Mesa',
+        email: email.trim(),
+        role: role,
+        addresses: addresses,
+        createdAt: new Date().toLocaleDateString('it-IT'),
+        password: password
+      };
+
+      onRegisterUser(newUser);
+      onLoginSuccess(newUser);
+      
+      alert(
+        `Registrazione completata!\nBenvenuto ${newUser.name}.` + 
+        (role === 'chef' && addresses.length > 0 ? `\nL'indirizzo inserito è stato registrato ed è in attesa di verifica nella dashboard dell'amministratore.` : '')
+      );
+      onClose();
     }
   };
 
@@ -424,36 +292,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               
               <button 
                 type="submit" 
-                disabled={isSubmitting}
-                className={`w-full py-4.5 font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95 text-xs ${role === 'admin' ? 'bg-orange-600 text-black' : 'bg-black text-white hover:bg-orange-600'} disabled:opacity-60 disabled:cursor-not-allowed`}
+                className={`w-full py-4.5 font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95 text-xs ${role === 'admin' ? 'bg-orange-600 text-black' : 'bg-black text-white hover:bg-orange-600'}`}
               >
-                {isSubmitting ? 'Attendere...' : role === 'admin' ? 'Entra nella Dashboard' : mode === 'login' ? 'Accedi' : 'Registrati'}
+                {role === 'admin' ? 'Entra nella Dashboard' : mode === 'login' ? 'Accedi' : 'Registrati'}
               </button>
             </form>
-
-            {role !== 'admin' && (
-              <div className="mt-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-px flex-1 bg-gray-200" />
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">oppure</span>
-                  <div className="h-px flex-1 bg-gray-200" />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={isSubmitting}
-                  className="w-full py-4 font-black uppercase tracking-widest rounded-2xl border-2 border-gray-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 transition-all active:scale-95 text-xs flex items-center justify-center gap-2 bg-white disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
-                    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
-                    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
-                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571.001-.001.002-.001.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
-                  </svg>
-                  Accedi con Google
-                </button>
-              </div>
-            )}
 
             {role !== 'admin' && (
               <div className="mt-8 text-center text-sm font-medium text-gray-500">

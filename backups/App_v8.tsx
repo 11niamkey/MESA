@@ -1,8 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { db, auth, isFirebaseConfigured } from './firebase';
+import { db, isFirebaseConfigured } from './firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
 import { Header } from './components/Header';
 import { AddressGateModal } from './components/AddressGateModal';
 import { ChefCard } from './components/ChefCard';
@@ -1012,7 +1011,6 @@ function App() {
           <PersonalArea 
             currentUser={currentUser}
             onLogout={() => {
-              if (auth) signOut(auth).catch(() => {});
               setCurrentUser(null);
               navigateTo(ViewState.LANDING);
               showNotification("Sconnesso dall'Area Personale MESA. A presto! 👋");
