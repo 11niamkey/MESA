@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ShoppingBag, UtensilsCrossed, Home, PlusCircle, User, ChefHat, Globe, Heart, ClipboardList, Share2, Layout, PlayCircle, Compass, Globe2, ShieldCheck } from 'lucide-react';
 import { ViewState, AppUser } from '../types';
@@ -69,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
             {activeAddress && (
               <button 
                 onClick={onChangeAddress}
-                className="flex flex-col text-left ml-1 sm:ml-3 py-0.5 md:py-1 px-2 sm:px-3 bg-neutral-900 hover:bg-neutral-800 border border-white/5 hover:border-orange-500/40 rounded-xl cursor-pointer transition-all shrink text-ellipsis whitespace-nowrap overflow-hidden max-w-[70px] xs:max-w-[110px] sm:max-w-[210px]"
+                className="flex flex-col text-left ml-1 sm:ml-3 py-0.5 md:py-1 px-2.5 sm:px-3 bg-neutral-900 hover:bg-neutral-800 border border-white/5 hover:border-orange-500/40 rounded-xl cursor-pointer transition-all shrink text-ellipsis whitespace-nowrap overflow-hidden max-w-[85px] xs:max-w-[130px] sm:max-w-[210px]"
                 title="Cambia indirizzo di consegna"
               >
                 <div className="flex items-center gap-1 text-orange-500">
@@ -83,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          <div className="flex items-center space-x-2 md:space-x-4 shrink-0">
+          <div className="flex items-center space-x-2 md:space-x-4">
             <nav className="hidden md:flex items-center space-x-4 lg:space-x-6 mr-2 lg:mr-4">
               <button 
                 onClick={() => onNavigate(ViewState.HOME)}
@@ -124,11 +123,11 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </nav>
 
-            <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 md:gap-5 lg:gap-6 shrink-0">
+            <div className="flex items-center space-x-1 md:space-x-2">
               {onShareClick && (
                 <button 
                   onClick={onShareClick}
-                  className="hidden xs:flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2.5 bg-neutral-900 sm:bg-orange-600 border border-white/10 sm:border-transparent text-white sm:text-black rounded-full sm:rounded-xl transition-all shadow hover:bg-neutral-800 sm:hover:bg-white active:scale-95 hover:scale-105 shrink-0"
+                  className="flex items-center gap-1 px-2.5 py-1.5 sm:px-4 sm:py-2.5 bg-neutral-900 sm:bg-orange-600 border border-white/10 sm:border-transparent text-white sm:text-black rounded-full sm:rounded-xl transition-all shadow hover:bg-neutral-800 sm:hover:bg-white active:scale-95"
                   title="Condividi MESA"
                 >
                   <Share2 className="w-4 h-4 text-orange-400 sm:text-black" />
@@ -138,7 +137,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               <button 
                 onClick={() => onNavigate(ViewState.FAVORITES)}
-                className={`hidden sm:flex items-center justify-center p-2.5 rounded-full transition-all duration-300 hover:scale-105 active:scale-95 shrink-0 ${currentView === ViewState.FAVORITES ? 'text-red-500 bg-white/10 shadow-sm ring-1 ring-white/10' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                className={`hidden sm:block p-2 rounded-full transition-colors ${currentView === ViewState.FAVORITES ? 'text-red-500 bg-white/10' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
                 title="Preferiti"
               >
                 <Heart className={`w-5 h-5 ${currentView === ViewState.FAVORITES ? 'fill-current' : ''}`} />
@@ -147,7 +146,7 @@ export const Header: React.FC<HeaderProps> = ({
               {currentUser?.role === 'admin' && (
                 <button
                   onClick={() => onNavigate(ViewState.ADMIN_DASHBOARD)}
-                  className="flex px-2 py-1.5 sm:px-3.5 sm:py-2 border leading-none font-black uppercase tracking-widest rounded-xl transition-all shadow-md hover:scale-105 active:scale-95 items-center gap-1 sm:gap-1.5 bg-orange-500 hover:bg-orange-600 border-orange-600 text-black text-[9px] sm:text-[10px] shrink-0"
+                  className="flex px-2 py-1.5 sm:px-3 sm:py-2 border leading-none font-black uppercase tracking-widest rounded-xl transition-all shadow-md hover:scale-105 active:scale-95 items-center gap-1 bg-orange-500 hover:bg-orange-600 border-orange-600 text-black text-[9px] sm:text-[10px]"
                   title="Vai alla Dashboard Amministratore"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-black" />
@@ -158,16 +157,16 @@ export const Header: React.FC<HeaderProps> = ({
 
               <button 
                 onClick={currentUser ? () => onNavigate(ViewState.PROFILE) : onAuthClick}
-                className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-1.5 shrink-0 ${
+                className={`p-1.5 rounded-full transition-all flex items-center justify-center gap-2 ${
                   currentUser 
-                    ? 'text-orange-500 bg-white/5 border border-orange-500/20 hover:bg-white/10 px-2 py-1 sm:px-3.5 sm:py-1.5' 
+                    ? 'text-orange-500 bg-white/5 border border-orange-500/20 hover:bg-white/10 px-3 py-1.5' 
                     : 'text-gray-400 hover:text-white hover:bg-white/10'
                 }`}
                 title={currentUser ? "Area Personale MESA" : "Accedi o Registrati"}
               >
                 {currentUser ? (
                   <>
-                    <span className="w-6 h-6 rounded-lg bg-orange-600 text-black text-[10px] font-black flex items-center justify-center uppercase leading-none shadow-md shrink-0">
+                    <span className="w-6 h-6 rounded-lg bg-orange-600 text-black text-[10px] font-black flex items-center justify-center uppercase leading-none shadow-md">
                       {currentUser.name[0]}{currentUser.lastName[0]}
                     </span>
                     <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest text-[#FFF]">
@@ -180,7 +179,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
               <button 
-                className="relative p-2 sm:p-3 bg-white hover:bg-orange-50 rounded-full text-black transition-all duration-300 shadow-md hover:scale-105 active:scale-95 shrink-0"
+                className="relative p-2.5 bg-white hover:bg-orange-50 rounded-full text-black transition-all shadow-md transform active:scale-95"
                 onClick={onCartClick}
                 title="Carrello"
               >

@@ -118,20 +118,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         
         <div className="relative bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-up">
-          <button 
-            onClick={onClose} 
-            className={`absolute top-3 right-3 sm:top-3.5 sm:right-3.5 p-2 rounded-full z-30 transition-all shadow-md active:scale-95 flex items-center justify-center border ${
-              role === 'admin'
-                ? 'bg-neutral-900/90 hover:bg-neutral-800 text-gray-300 hover:text-white border-white/20'
-                : 'bg-white/90 hover:bg-gray-100 text-gray-500 hover:text-gray-900 border-gray-200'
-            }`}
-            title="Chiudi"
-          >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+          <button onClick={onClose} className="absolute top-8 right-8 text-gray-400 hover:text-gray-600 z-10 transition-colors">
+            <X className="w-6 h-6" />
           </button>
 
           {/* Switch dei Ruoli */}
-          <div className="flex border-b border-gray-100 bg-gray-50 pr-14 sm:pr-16 relative">
+          <div className="flex border-b border-gray-100 bg-gray-50">
             <button
               type="button"
               onClick={() => { setRole('client'); setMode('login'); setErrorMsg(''); }}
