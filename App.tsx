@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { db, auth, isFirebaseConfigured } from './firebase';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, getDoc, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { Header } from './components/Header';
 import { AddressGateModal } from './components/AddressGateModal';
@@ -203,30 +203,39 @@ const firestoreDelete = async (collectionName: string, id: string) => {
 const seedFirestoreDefaults = async () => {
   if (!isFirebaseConfigured) return;
   try {
-    const [chefsSnap, usersSnap, appsSnap] = await Promise.all([
+    const [chefsSnap, usersSnap, appsSnap, catalogSnap] = await Promise.all([
       getDocs(collection(db, 'chefs')),
       getDocs(collection(db, 'users')),
-      getDocs(collection(db, 'chefApplications'))
+      getDocs(collection(db, 'chefApplications')),
+      getDoc(doc(db, 'settings', 'catalog'))
     ]);
+    const deletedChefIds = new Set<string>(
+      catalogSnap.exists() ? (catalogSnap.data().deletedChefIds || []) : []
+    );
     const writes: Promise<void>[] = [];
-    if (chefsSnap.empty) {
-      MOCK_CHEFS.map(normalizeChef).forEach(c => writes.push(setDoc(doc(db, 'chefs', c.id), c)));
-    }
+    const existingChefIds = new Set(chefsSnap.docs.map(d => d.id));
+    MOCK_CHEFS.map(normalizeChef).forEach(c => {
+      if (!existingChefIds.has(c.id) && !deletedChefIds.has(c.id)) {
+        writes.push(setDoc(doc(db, 'chefs', c.id), c));
+      }
+    });
     if (usersSnap.empty) {
       DEFAULT_USERS.forEach(u => writes.push(setDoc(doc(db, 'users', u.id), u)));
     }
     if (appsSnap.empty) {
       DEFAULT_APPLICATIONS.forEach(a => writes.push(setDoc(doc(db, 'chefApplications', a.id), a)));
     }
-    await Promise.all(writes);
+    if (writes.length > 0) {
+      await Promise.all(writes);
+    }
   } catch (err) {
     console.error('Seeding Firestore defaults failed', err);
   }
 };
 
 function App() {
-  const [currentView, setCurrentView] = useState<ViewState>(ViewState.LANDING);
-  const [verifiedAddress, setVerifiedAddress] = useState<string>('');
+  const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
+  const [verifiedAddress, setVerifiedAddress] = useState<string>('Milano (MI), Centro');
   const [isAddressGateOpen, setIsAddressGateOpen] = useState(false);
   const [selectedChef, setSelectedChef] = useState<Chef | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -406,6 +415,48 @@ function App() {
     });
     firestoreWrite('chefs', newChef.id, newChef);
     showNotification(`Chef ${newChef.name} registrato con successo nel database partner MESA! 🎉`);
+  };
+
+  const handleDeleteChef = async (chefId: string, deleteLinkedUser = false) => {
+    const targetChef = chefs.find(c => c.id === chefId);
+    const chefName = targetChef?.name || chefId;
+
+    await firestoreDelete('chefs', chefId);
+    if (isFirebaseConfigured) {
+      try {
+        await setDoc(doc(db, 'settings', 'catalog'), { deletedChefIds: arrayUnion(chefId) }, { merge: true });
+      } catch (err) {
+        console.error('Failed to record deleted chef id', err);
+      }
+    }
+
+    setChefs(prev => prev.filter(c => c.id !== chefId));
+    setCart(prev => prev.filter(item => item.chefId !== chefId));
+    if (selectedChef && selectedChef.id === chefId) {
+      setSelectedChef(null);
+      if (currentView === ViewState.CHEF_PROFILE || currentView === ViewState.PUBLIC_STOREFRONT) {
+        setCurrentView(ViewState.HOME);
+      }
+    }
+
+    if (deleteLinkedUser && targetChef) {
+      const linkedUser = registeredUsers.find(u =>
+        u.role === 'chef' && (
+          u.id === chefId.replace('chef-', '') ||
+          (targetChef.email && u.email.trim().toLowerCase() === targetChef.email.trim().toLowerCase()) ||
+          `${u.name} ${u.lastName}`.trim().toLowerCase() === targetChef.name.trim().toLowerCase()
+        )
+      );
+      if (linkedUser) {
+        await firestoreDelete('users', linkedUser.id);
+        setRegisteredUsers(prev => prev.filter(u => u.id !== linkedUser.id));
+        if (currentUser && currentUser.id === linkedUser.id) {
+          setCurrentUser(null);
+        }
+      }
+    }
+
+    showNotification(`Cuoco "${chefName}" eliminato definitivamente dal catalogo.`);
   };
 
   const handleChefSubmitApplication = async (newApp: ChefApplication) => {
@@ -1031,6 +1082,7 @@ function App() {
           <AdminDashboard 
             chefs={chefs} 
             onUpdateChef={handleUpdateChef}
+            onDeleteChef={handleDeleteChef}
             orders={orders} 
             registeredUsers={registeredUsers}
             chefApplications={chefApplications}

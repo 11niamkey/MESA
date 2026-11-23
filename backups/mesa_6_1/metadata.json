@@ -1,0 +1,10 @@
+{
+  "name": "MESA - Food Delivery Casalingo",
+  "description": "Piattaforma di food delivery casalingo con cuochi locali certificati HACCP e prenotazione piatti autentici.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -9,7 +9,6 @@ import {
   CalendarDays
 } from 'lucide-react';
 import { Chef, Order, AppUser, ChefApplication, ChefDocument } from '../types';
-import { GoogleGenAI } from "@google/genai";
 import { ShareModal } from './ShareModal';
 
 interface AdminDashboardProps {
@@ -20,6 +19,7 @@ interface AdminDashboardProps {
   onVerifyAddress: (userId: string, addressId: string, isVerified: boolean) => void;
   onDeleteUser?: (userId: string) => void;
   onUpdateChef?: (updatedChef: Chef) => void;
+  onDeleteChef?: (chefId: string, deleteLinkedUser?: boolean) => Promise<void> | void;
   onApproveApplication?: (appId: string) => void;
   onRejectApplication?: (appId: string, notes?: string) => void;
 }
@@ -32,6 +32,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onVerifyAddress,
   onDeleteUser,
   onUpdateChef,
+  onDeleteChef,
   onApproveApplication,
   onRejectApplication
 }) => {
@@ -60,6 +61,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editNationality, setEditNationality] = useState('');
   const [editCountryName, setEditCountryName] = useState('');
   const [chefSearch, setChefSearch] = useState('');
+  const [chefToDelete, setChefToDelete] = useState<Chef | null>(null);
+  const [deleteLinkedUser, setDeleteLinkedUser] = useState(false);
+  const [isDeletingChef, setIsDeletingChef] = useState(false);
+
+  const findLinkedChefUser = (chef: Chef) =>
+    registeredUsers.find(
+      u =>
+        u.role === 'chef' &&
+        (u.id === chef.id.replace('chef-', '') ||
+          (chef.email && u.email.trim().toLowerCase() === chef.email.trim().toLowerCase()) ||
+          `${u.name} ${u.lastName}`.trim().toLowerCase() === chef.name.trim().toLowerCase())
+    );
+
+  const handleConfirmDeleteChef = async () => {
+    if (!chefToDelete || !onDeleteChef) return;
+    setIsDeletingChef(true);
+    try {
+      await onDeleteChef(chefToDelete.id, deleteLinkedUser);
+      if (editingChefId === chefToDelete.id) {
+        setEditingChefId(null);
+      }
+      setChefToDelete(null);
+      setDeleteLinkedUser(false);
+    } finally {
+      setIsDeletingChef(false);
+    }
+  };
 
   const pendingAppsCount = chefApplications.filter(a => a.status === 'pending').length;
 
@@ -84,18 +112,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const generateAiReport = async () => {
     setIsGenerating(true);
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     try {
-      const prompt = `Agisci come un consulente strategico per MESA. 
-      Analizza le candidature cuochi: ${chefApplications.length} totali, ${pendingAppsCount} in attesa di verifica HACCP e documenti. 
-      Fornisci 3 consigli pratici all'amministratore per valutare e attivare i profili cuoco in modo sicuro e rapido.`;
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-3-pro-preview",
-        contents: prompt
+      const response = await fetch('/api/gemini/admin-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          totalApplications: chefApplications.length,
+          pendingCount: pendingAppsCount,
+        }),
       });
-      setAiReport(response.text || 'Analisi completata con successo.');
-    } catch (e) {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setAiReport(data.report || 'Analisi completata con successo.');
+    } catch {
       setAiReport('Advisor AI momentaneamente offline. Riprova tra poco.');
     }
     setIsGenerating(false);
@@ -504,7 +535,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div>
             <h3 className="text-3xl font-black italic tracking-tight mb-2">Cuochi Attivi nel Catalogo MESA</h3>
             <p className="text-gray-500 text-sm leading-relaxed max-w-3xl font-medium">
-              Gestisci i profili dei cuochi attualmente pubblicati. Puoi modificarne indirizzo, recapiti telefonici, credenziali d'accesso o disattivarli se necessario.
+              Gestisci i profili dei cuochi attualmente pubblicati. Puoi modificarne indirizzo, recapiti telefonici, credenziali d'accesso oppure eliminarli dal catalogo.
             </p>
           </div>
 
@@ -659,7 +690,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200/60 mt-auto">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-gray-200/60 mt-auto">
                     {isEditing ? (
                       <div className="flex gap-2">
                         <button
@@ -676,22 +707,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => {
-                          setEditingChefId(chef.id);
-                          setEditName(chef.name);
-                          setEditPhone(currentPhone);
-                          setEditLocation(chef.location);
-                          setEditBio(chef.bio);
-                          setEditEmail(chef.email || '');
-                          setEditPassword(chef.password || 'demo123');
-                          setEditNationality(chef.nationality || '🇮🇹');
-                          setEditCountryName(chef.countryName || 'Italia');
-                        }}
-                        className="px-4 py-2 bg-black text-white hover:bg-orange-600 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
-                      >
-                        Modifica Profilo
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingChefId(chef.id);
+                            setEditName(chef.name);
+                            setEditPhone(currentPhone);
+                            setEditLocation(chef.location);
+                            setEditBio(chef.bio);
+                            setEditEmail(chef.email || '');
+                            setEditPassword(chef.password || 'demo123');
+                            setEditNationality(chef.nationality || '🇮🇹');
+                            setEditCountryName(chef.countryName || 'Italia');
+                          }}
+                          className="px-4 py-2 bg-black text-white hover:bg-orange-600 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+                        >
+                          Modifica Profilo
+                        </button>
+
+                        {onDeleteChef && (
+                          <button
+                            onClick={() => {
+                              setDeleteLinkedUser(false);
+                              setChefToDelete(chef);
+                            }}
+                            className="px-3.5 py-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5"
+                            title={`Elimina ${chef.name}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Elimina</span>
+                          </button>
+                        )}
+                      </div>
                     )}
 
                     <span className="text-[9px] font-bold text-green-700 bg-green-100 px-2.5 py-1 rounded-md uppercase">
@@ -852,6 +899,99 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Conferma Eliminazione Cuoco */}
+      {chefToDelete && (() => {
+        const linkedUser = findLinkedChefUser(chefToDelete);
+        return (
+          <div
+            className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+            onClick={() => !isDeletingChef && setChefToDelete(null)}
+          >
+            <div
+              className="bg-white rounded-[2.5rem] p-6 sm:p-8 max-w-md w-full space-y-6 text-left border border-gray-100 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                    <AlertOctagon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-lg text-gray-900 leading-tight">Elimina Cuoco</h4>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Azione irreversibile</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => !isDeletingChef && setChefToDelete(null)}
+                  className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-700"
+                  disabled={isDeletingChef}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                <img
+                  src={chefToDelete.avatar}
+                  alt={chefToDelete.name}
+                  className="w-14 h-14 rounded-2xl object-cover border border-gray-200 shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <h5 className="font-black text-base text-gray-900 truncate">{chefToDelete.name}</h5>
+                    <span>{chefToDelete.nationality}</span>
+                  </div>
+                  <p className="text-xs font-bold text-gray-500 truncate">{chefToDelete.location}</p>
+                  <p className="text-[10px] font-black text-orange-600 uppercase tracking-wider mt-1">
+                    {chefToDelete.dishes.length} {chefToDelete.dishes.length === 1 ? 'piatto in menu' : 'piatti in menu'} • ID: {chefToDelete.id}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs font-medium text-gray-600 leading-relaxed">
+                Confermando, il profilo di <strong>{chefToDelete.name}</strong> e tutti i suoi piatti verranno rimossi definitivamente dal catalogo pubblico MESA e dal database.
+              </p>
+
+              {linkedUser && (
+                <label className="flex items-start gap-3 p-3.5 bg-amber-50 border border-amber-200 rounded-2xl cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={deleteLinkedUser}
+                    onChange={(e) => setDeleteLinkedUser(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-red-600 rounded"
+                    disabled={isDeletingChef}
+                  />
+                  <span className="text-xs font-bold text-amber-900 leading-snug">
+                    Elimina anche l&apos;account utente collegato (<span className="font-mono">{linkedUser.email}</span>)
+                  </span>
+                </label>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setChefToDelete(null)}
+                  disabled={isDeletingChef}
+                  className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-xs uppercase tracking-wider rounded-2xl transition-all disabled:opacity-50"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteChef}
+                  disabled={isDeletingChef}
+                  className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-red-600/25 transition-all flex items-center gap-2 disabled:opacity-60"
+                >
+                  {isDeletingChef ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  <span>{isDeletingChef ? 'Eliminazione...' : 'Conferma Eliminazione'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
     </div>

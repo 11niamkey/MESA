@@ -51,6 +51,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           <div>
             <h4 className="text-lg font-bold mb-6 text-white">Scopri</h4>
             <ul className="space-y-4 text-sm text-gray-400">
+              <li><button onClick={() => onNavigate(ViewState.LANDING)} className="hover:text-orange-500 transition-colors">Presentazione MESA</button></li>
               <li><button onClick={() => onNavigate(ViewState.ABOUT)} className="hover:text-orange-500 transition-colors">Chi Siamo</button></li>
               <li><button onClick={() => onNavigate(ViewState.CHEFS)} className="hover:text-orange-500 transition-colors">I Nostri Cuochi</button></li>
               <li><button onClick={() => onNavigate(ViewState.BECOME_CHEF)} className="hover:text-orange-500 transition-colors">Diventa Chef MESA</button></li>

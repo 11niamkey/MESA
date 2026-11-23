@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Send, X, Sparkles, Loader2, ChefHat, Info } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 
 export const AiConcierge: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,17 +25,18 @@ export const AiConcierge: React.FC = () => {
     setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     setIsLoading(true);
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: userMsg,
-        config: {
-          systemInstruction: "Sei l'AI Concierge di MESA, un'app premium di food delivery da cuochi casalinghi. Sei raffinato, amichevole e molto esperto di tradizioni culinarie. Rispondi in modo conciso e invoglia l'utente a ordinare piatti autentici.",
-        }
+      const response = await fetch('/api/gemini/concierge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg }),
       });
-      setMessages(prev => [...prev, { role: 'ai', text: response.text || "Scusa, ho avuto un piccolo intoppo in cucina. Puoi ripetere?" }]);
-    } catch (e) {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setMessages(prev => [...prev, { role: 'ai', text: data.reply || "Scusa, ho avuto un piccolo intoppo in cucina. Puoi ripetere?" }]);
+    } catch {
       setMessages(prev => [...prev, { role: 'ai', text: "Al momento sono un po' occupato ai fornelli. Riprova tra poco!" }]);
     }
     setIsLoading(false);

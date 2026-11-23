@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Chef, Dish, HeritageStoryResponse } from '../types';
 import { X, Sparkles, Music, Wind, Coffee, Heart, Loader2, Quote, Compass } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
 
 interface HeritageJourneyProps {
   chef: Chef;
@@ -18,42 +17,22 @@ export const HeritageJourney: React.FC<HeritageJourneyProps> = ({ chef, dish, on
 
   useEffect(() => {
     const generateStory = async () => {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       try {
-        const prompt = `
-          Agisci come un antropologo del gusto e un poeta gastronomico.
-          Racconta la "storia dell'anima" di questo piatto: "${dish.name}" cucinato da "${chef.name}" (${chef.nationality}).
-          Lo chef dice di sé: "${chef.fullBio || chef.bio}".
-          Ingredienti chiave: "${dish.ingredients?.join(', ') || 'Tradizionali'}".
-
-          Genera un oggetto JSON con:
-          1. "story": Un breve paragrafo evocativo che parla delle radici culturali e familiari del piatto.
-          2. "sensoryDetails": Una descrizione di ciò che l'utente sentirà al primo morso (profumi, consistenze).
-          3. "ritual": Un consiglio su come consumare il piatto (es. "Spegni le luci, accendi una candela...").
-          4. "pairing": Una raccomandazione di sottofondo musicale o bevanda.
-          
-          Usa un tono caloroso, solenne e artigianale. Rispondi SOLO in formato JSON.
-        `;
-
-        const response = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                story: { type: Type.STRING },
-                sensoryDetails: { type: Type.STRING },
-                ritual: { type: Type.STRING },
-                pairing: { type: Type.STRING }
-              },
-              required: ["story", "sensoryDetails", "ritual", "pairing"]
-            }
-          }
+        const response = await fetch('/api/gemini/heritage-story', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dishName: dish.name,
+            chefName: chef.name,
+            chefNationality: chef.nationality,
+            chefBio: chef.fullBio || chef.bio,
+            ingredients: dish.ingredients?.join(', ') || 'Tradizionali',
+          }),
         });
-
-        const result = JSON.parse(response.text);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const result = (await response.json()) as HeritageStoryResponse;
         setData(result);
       } catch (e) {
         console.error(e);
