@@ -6,10 +6,11 @@ import {
   ArrowDownRight, Sparkles, Loader2, RefreshCw, Rocket, Globe, Activity,
   CheckCircle2, AlertTriangle, FileText, PieChart, ExternalLink, Share2, Globe2,
   Trash2, ShieldAlert, Check, Ban, KeyRound, Clock, Eye, X, MessageSquare, UserCheck, AlertOctagon,
-  CalendarDays
+  CalendarDays, UtensilsCrossed
 } from 'lucide-react';
-import { Chef, Order, AppUser, ChefApplication, ChefDocument } from '../types';
+import { Chef, Dish, Order, AppUser, ChefApplication, ChefDocument } from '../types';
 import { ShareModal } from './ShareModal';
+import { AdminDishesPanel } from './AdminDishesPanel';
 
 interface AdminDashboardProps {
   chefs: Chef[];
@@ -22,6 +23,7 @@ interface AdminDashboardProps {
   onDeleteChef?: (chefId: string, deleteLinkedUser?: boolean) => Promise<void> | void;
   onApproveApplication?: (appId: string) => void;
   onRejectApplication?: (appId: string, notes?: string) => void;
+  onSaveChefDishes: (chefId: string, dishes: Dish[]) => Promise<boolean>;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
@@ -34,9 +36,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onUpdateChef,
   onDeleteChef,
   onApproveApplication,
-  onRejectApplication
+  onRejectApplication,
+  onSaveChefDishes
 }) => {
-  const [adminTab, setAdminTab] = useState<'cockpit' | 'applications' | 'users' | 'chefs'>('applications');
+  const [adminTab, setAdminTab] = useState<'cockpit' | 'applications' | 'users' | 'chefs' | 'dishes'>('applications');
+  const [dishChefFilter, setDishChefFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'client' | 'chef'>('all');
   
@@ -192,6 +196,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <ChefHat className="w-4 h-4" /> Cuochi Attivi nel Catalogo ({chefs.length})
+        </button>
+
+        <button
+          onClick={() => setAdminTab('dishes')}
+          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+            adminTab === 'dishes' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <UtensilsCrossed className="w-4 h-4" /> Piatti ({chefs.reduce((n, c) => n + c.dishes.length, 0)})
         </button>
 
         <button
@@ -690,6 +703,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           Modifica Profilo
                         </button>
 
+                        <button
+                          onClick={() => {
+                            setDishChefFilter(chef.id);
+                            setAdminTab('dishes');
+                          }}
+                          className="px-4 py-2 bg-orange-600 text-black hover:bg-black hover:text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5"
+                        >
+                          <UtensilsCrossed className="w-3.5 h-3.5" /> Piatti ({chef.dishes.length})
+                        </button>
+
                         {onDeleteChef && (
                           <button
                             onClick={() => {
@@ -715,6 +738,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             })}
           </div>
         </div>
+      )}
+
+      {adminTab === 'dishes' && (
+        <AdminDishesPanel
+          chefs={chefs}
+          onSaveChefDishes={onSaveChefDishes}
+          chefFilter={dishChefFilter}
+          onChefFilterChange={setDishChefFilter}
+        />
       )}
 
       {/* TAB 3: UTENTI & INDIRIZZI */}

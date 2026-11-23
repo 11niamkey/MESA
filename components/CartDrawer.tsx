@@ -132,7 +132,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <div key={`${item.id}-${idx}`} className="flex flex-col bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                     <div className="flex items-start space-x-4">
                       <img 
-                        src={item.image || DEFAULT_FOOD_IMAGE} 
+                        src={item.image || availableChefs.find(c => c.id === item.chefId)?.dishes.find(d => d.id === item.id)?.image || DEFAULT_FOOD_IMAGE} 
                         alt={item.name} 
                         onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_FOOD_IMAGE; }}
                         className="w-16 h-16 rounded-xl object-cover" 

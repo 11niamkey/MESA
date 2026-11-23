@@ -178,18 +178,26 @@ const normalizeChef = (chef: Chef): Chef => {
   };
 };
 
-const firestoreWrite = async (collectionName: string, id: string, data: any, merge = false) => {
-  if (!isFirebaseConfigured) return;
+const firestoreWrite = async (collectionName: string, id: string, data: any, merge = false): Promise<boolean> => {
+  if (!isFirebaseConfigured) return true;
   try {
     if (merge) {
       await setDoc(doc(db, collectionName, id), data, { merge: true });
     } else {
       await setDoc(doc(db, collectionName, id), data);
     }
+    return true;
   } catch (err) {
     console.error(`Firestore write failed (${collectionName}/${id})`, err);
+    return false;
   }
 };
+
+// Dish photos uploaded by the admin are stored inline (data: URLs) in the chef
+// document. Don't copy them into carts/orders: those documents would bloat
+// towards Firestore's 1 MB limit. The image is looked up from the catalogue instead.
+const withoutInlineImages = (items: CartItem[]): CartItem[] =>
+  items.map(item => (item.image?.startsWith('data:') ? { ...item, image: '' } : item));
 
 const firestoreDelete = async (collectionName: string, id: string) => {
   if (!isFirebaseConfigured) return;
@@ -407,7 +415,7 @@ function App() {
     const key = stableStringify(cart);
     if (key === sync.synced) return;
     sync.synced = key;
-    firestoreWrite('carts', currentUser.id, { items: cart });
+    firestoreWrite('carts', currentUser.id, { items: withoutInlineImages(cart) });
   }, [cart, currentUser?.id]);
 
   // Derive the verified address from the (Firestore-backed) user record
@@ -503,6 +511,20 @@ function App() {
     updatedLinkedUsers.forEach(u => firestoreWrite('users', u.id, u, true));
 
     showNotification(`Profilo di Chef ${updatedChef.name} aggiornato e sincronizzato! 🧑‍🍳`);
+  };
+
+  // Admin dish editor: only the dishes array changes, nothing else on the chef
+  // or its linked user account is touched.
+  const handleSaveChefDishes = async (chefId: string, dishes: Dish[]): Promise<boolean> => {
+    const previous = chefs.find(c => c.id === chefId)?.dishes;
+    setChefs(prev => prev.map(c => (c.id === chefId ? { ...c, dishes } : c)));
+    const ok = await firestoreWrite('chefs', chefId, { dishes }, true);
+    if (ok) {
+      showNotification('Menu aggiornato: le modifiche sono già visibili a tutti ✓');
+    } else if (previous) {
+      setChefs(prev => prev.map(c => (c.id === chefId ? { ...c, dishes: previous } : c)));
+    }
+    return ok;
   };
 
   const handleAddChef = (newChef: Chef) => {
@@ -918,7 +940,7 @@ function App() {
     const newOrder: Order = {
       id: `MESA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       userId: currentUser?.id,
-      items: [...cart],
+      items: withoutInlineImages(cart),
       total: checkoutTotal,
       status: 'PLACED',
       timestamp: new Date(),
@@ -1194,6 +1216,7 @@ function App() {
             onDeleteUser={handleDeleteUser}
             onApproveApplication={handleApproveApplication}
             onRejectApplication={handleRejectApplication}
+            onSaveChefDishes={handleSaveChefDishes}
           />
         )}
 
