@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { db, auth, isFirebaseConfigured } from './firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, getDoc, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
@@ -7,7 +7,6 @@ import { Header } from './components/Header';
 import { AddressGateModal } from './components/AddressGateModal';
 import { ChefCard } from './components/ChefCard';
 import { CartDrawer } from './components/CartDrawer';
-import { AiMenuCreator } from './components/AiMenuCreator';
 import { FilterBar, nationalityNames } from './components/FilterBar';
 import { ChefProfile } from './components/ChefProfile';
 import { BookingModal } from './components/BookingModal';
@@ -21,11 +20,8 @@ import { FavoritesSection } from './components/FavoritesSection';
 import { Footer } from './components/Footer';
 import { NotificationToast } from './components/NotificationToast';
 import { BottomNav } from './components/BottomNav';
-import { InfoPage } from './components/InfoPage';
-import { OrderTracking } from './components/OrderTracking';
 import { OrderReviewModal } from './components/OrderReviewModal';
 import { ShareModal } from './components/ShareModal';
-import { AdminDashboard } from './components/AdminDashboard';
 import { LaunchTour } from './components/LaunchTour';
 import { AiConcierge } from './components/AiConcierge';
 import { ChefOnboarding } from './components/ChefOnboarding';
@@ -33,9 +29,15 @@ import { ChefGroupSection } from './components/ChefGroupSection';
 import { PublicStorefront } from './components/PublicStorefront';
 import { HeritageMenu } from './components/HeritageMenu';
 import { LandingPage } from './components/LandingPage';
-import { PersonalArea } from './components/PersonalArea';
 import { DishCatalogByOrigin } from './components/DishCatalogByOrigin';
 import { MOCK_CHEFS } from './constants';
+
+// View-specific screens are split into separate chunks so first load stays light
+const AiMenuCreator = lazy(() => import('./components/AiMenuCreator').then(m => ({ default: m.AiMenuCreator })));
+const InfoPage = lazy(() => import('./components/InfoPage').then(m => ({ default: m.InfoPage })));
+const OrderTracking = lazy(() => import('./components/OrderTracking').then(m => ({ default: m.OrderTracking })));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const PersonalArea = lazy(() => import('./components/PersonalArea').then(m => ({ default: m.PersonalArea })));
 import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderStatus, Continent, AppUser, UserAddress, ChefApplication } from './types';
 import { SearchX, ShoppingBag, X } from 'lucide-react';
 
@@ -641,6 +643,11 @@ function App() {
   };
   
   const [orders, setOrders] = useState<Order[]>([]);
+  // "I Miei Ordini" must only list the signed-in user's orders (admins see all)
+  const myOrders = useMemo(
+    () => currentUser?.role === 'admin' ? orders : orders.filter(o => !!currentUser && o.userId === currentUser.id),
+    [orders, currentUser]
+  );
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
 
@@ -971,6 +978,7 @@ function App() {
       {currentView === ViewState.HOME && <FilterBar filters={filters} onFilterChange={setFilters} />}
 
       <main className="max-w-6xl mx-auto px-4 py-6 flex-grow w-full mb-8">
+        <Suspense fallback={<div className="py-24 flex justify-center" aria-busy="true"><div className="w-10 h-10 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin" /></div>}>
         {currentView === ViewState.HOME && (
           <div className="animate-fade-in">
             {!filters.search ? (
@@ -1039,7 +1047,7 @@ function App() {
             : (
               <div className="animate-fade-in space-y-6">
                 <h2 className="text-3xl font-black text-gray-900 mb-8 tracking-tight">I Miei Ordini</h2>
-                {orders.length === 0 ? <p className="text-gray-400 font-bold py-20 text-center bg-gray-50 rounded-[3rem]">Nessun ordine attivo.</p> : orders.map(order => (
+                {myOrders.length === 0 ? <p className="text-gray-400 font-bold py-20 text-center bg-gray-50 rounded-[3rem]">Nessun ordine attivo.</p> : myOrders.map(order => (
                   <div key={order.id} onClick={() => setSelectedOrder(order)} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all cursor-pointer flex justify-between items-center group">
                     <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{order.id.split('-')[0]}</p>
@@ -1096,6 +1104,7 @@ function App() {
         {[ViewState.ABOUT, ViewState.SAFETY, ViewState.BECOME_CHEF, ViewState.HELP, ViewState.TERMS, ViewState.PRIVACY].includes(currentView) && (
           <InfoPage view={currentView} onBack={() => navigateTo(ViewState.HOME)} onOpenOnboarding={() => setIsOnboardingOpen(true)} />
         )}
+        </Suspense>
       </main>
 
       <Footer onNavigate={navigateTo} />

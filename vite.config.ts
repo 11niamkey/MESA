@@ -13,5 +13,18 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('.', import.meta.url)),
     }
-  }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Long-lived vendor chunks: app deploys don't invalidate the browser cache
+        // for React/Firebase/Motion, which rarely change.
+        manualChunks: {
+          react: ['react', 'react-dom'],
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          motion: ['motion'],
+        },
+      },
+    },
+  },
 });

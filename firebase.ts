@@ -1,6 +1,11 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from 'firebase/firestore';
+import { getAuth, type Auth } from 'firebase/auth';
 import firebaseConfig from './firebase-applet-config.json';
 
 // The app remains fully functional without Firebase (falls back to in-memory
@@ -12,23 +17,22 @@ export const isFirebaseConfigured: boolean = Boolean(
     (firebaseConfig as { projectId?: string }).projectId
 );
 
-let app;
-export let db: any = null;
-export let auth: any = null;
+export let db: Firestore = null as unknown as Firestore;
+export let auth: Auth = null as unknown as Auth;
 
 if (isFirebaseConfigured) {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app, (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId);
+  const app = initializeApp(firebaseConfig);
+  db = initializeFirestore(
+    app,
+    {
+      // Optional fields (e.g. `password: undefined` on Firebase Auth users) would
+      // otherwise make every setDoc() call reject and the record never persist.
+      ignoreUndefinedProperties: true,
+      // Offline cache shared across tabs (replaces the deprecated
+      // enableIndexedDbPersistence, which only worked in a single tab).
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    },
+    (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId
+  );
   auth = getAuth(app);
-
-  // Enable offline persistence
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a a time.');
-    } else if (err.code === 'unimplemented') {
-      console.warn('The current browser does not support all of the features required to enable persistence');
-    } else {
-      console.warn('Firebase persistence error:', err);
-    }
-  });
 }

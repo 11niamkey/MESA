@@ -38,13 +38,69 @@ const getAiClient = () => {
 };
 
 const app = express();
-app.use(express.json({ limit: '1mb' }));
+app.disable('x-powered-by');
+// Behind Cloud Run / a reverse proxy, req.ip must come from X-Forwarded-For
+app.set('trust proxy', 1);
+app.use(express.json({ limit: '32kb' }));
+
+// --- Input helpers --------------------------------------------------------
+// Trim user-provided text and cap its length so a single request cannot push
+// arbitrarily large prompts (and costs) to the Gemini API.
+const cleanText = (value: unknown, maxLength: number): string =>
+  typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+
+// --- Basic per-IP rate limiting for the paid AI endpoints -----------------
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 15;
+const hits = new Map<string, { count: number; resetAt: number }>();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of hits) {
+    if (entry.resetAt <= now) hits.delete(ip);
+  }
+}, RATE_LIMIT_WINDOW_MS).unref();
+
+app.use('/api/gemini', (req: Request, res: Response, next) => {
+  const ip = req.ip || 'unknown';
+  const now = Date.now();
+  const entry = hits.get(ip);
+  if (!entry || entry.resetAt <= now) {
+    hits.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    next();
+    return;
+  }
+  entry.count += 1;
+  if (entry.count > RATE_LIMIT_MAX) {
+    res.setHeader('Retry-After', Math.ceil((entry.resetAt - now) / 1000).toString());
+    res.status(429).json({ error: 'Troppe richieste. Riprova tra qualche istante.' });
+    return;
+  }
+  next();
+});
+
+// Log the real error server-side, return a generic message to the client
+// (raw SDK errors can expose model/config details).
+const sendAiError = (res: Response, route: string, error: unknown, publicMessage: string) => {
+  console.error(`Error in ${route}:`, error);
+  res.status(500).json({ error: publicMessage });
+};
+
+const parseModelJson = (text: string | undefined): unknown => {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+};
 
 // POST /api/gemini/menu - Generate dish suggestion from ingredients
 app.post('/api/gemini/menu', async (req: Request, res: Response) => {
   try {
-    const { ingredients, style } = req.body ?? {};
-    if (!ingredients || typeof ingredients !== 'string' || !ingredients.trim()) {
+    const ingredients = cleanText(req.body?.ingredients, 500);
+    const style = cleanText(req.body?.style, 80) || 'Tradizionale Casalingo';
+    if (!ingredients) {
       res.status(400).json({ error: 'Ingredienti mancanti.' });
       return;
     }
@@ -52,8 +108,8 @@ app.post('/api/gemini/menu', async (req: Request, res: Response) => {
     const ai = getAiClient();
     const prompt = `
       Sei un esperto chef africano e copywriter di menu per la piattaforma MESA AirAFRIC.
-      Ho questi ingredienti: "${ingredients.trim()}".
-      Voglio creare un piatto tradizionale africano nello stile: "${typeof style === 'string' && style.trim() ? style.trim() : 'Tradizionale Casalingo'}".
+      Ho questi ingredienti: "${ingredients}".
+      Voglio creare un piatto tradizionale africano nello stile: "${style}".
       
       Genera un nome autentico e attraente per il piatto della tradizione culinaria africana (es. Attiéké, Garba, Jollof Rice, Doro Wat, Ndolé, Yassa, Tajine, etc.), una descrizione appetitosa e culturale (massimo 150 caratteri), 
       un prezzo suggerito in Euro (basato sugli ingredienti) e alcuni tag pertinenti.
@@ -81,17 +137,15 @@ app.post('/api/gemini/menu', async (req: Request, res: Response) => {
       },
     });
 
-    const text = response.text;
-    if (!text) {
-      res.status(502).json({ error: 'Risposta vuota dal modello AI.' });
+    const data = parseModelJson(response.text);
+    if (!data) {
+      res.status(502).json({ error: 'Risposta non valida dal modello AI.' });
       return;
     }
 
-    res.json(JSON.parse(text));
+    res.json(data);
   } catch (error) {
-    console.error('Error in /api/gemini/menu:', error);
-    const message = error instanceof Error ? error.message : 'Errore nella generazione del menu.';
-    res.status(500).json({ error: message });
+    sendAiError(res, '/api/gemini/menu', error, 'Errore nella generazione del menu.');
   }
 });
 
@@ -102,7 +156,7 @@ app.post('/api/gemini/admin-report', async (req: Request, res: Response) => {
     const ai = getAiClient();
 
     const prompt = `Agisci come un consulente strategico per MESA. 
-      Analizza le candidature cuochi: ${Number(totalApplications)} totali, ${Number(pendingCount)} in attesa di verifica HACCP e documenti. 
+      Analizza le candidature cuochi: ${Number(totalApplications) || 0} totali, ${Number(pendingCount) || 0} in attesa di verifica HACCP e documenti. 
       Fornisci 3 consigli pratici all'amministratore per valutare e attivare i profili cuoco in modo sicuro e rapido.`;
 
     const response = await ai.models.generateContent({
@@ -112,17 +166,15 @@ app.post('/api/gemini/admin-report', async (req: Request, res: Response) => {
 
     res.json({ report: response.text || 'Analisi completata con successo.' });
   } catch (error) {
-    console.error('Error in /api/gemini/admin-report:', error);
-    const message = error instanceof Error ? error.message : 'Errore nella generazione del report.';
-    res.status(500).json({ error: message });
+    sendAiError(res, '/api/gemini/admin-report', error, 'Errore nella generazione del report.');
   }
 });
 
 // POST /api/gemini/concierge - MESA AI Concierge chat
 app.post('/api/gemini/concierge', async (req: Request, res: Response) => {
   try {
-    const { message } = req.body ?? {};
-    if (!message || typeof message !== 'string' || !message.trim()) {
+    const message = cleanText(req.body?.message, 1000);
+    if (!message) {
       res.status(400).json({ error: 'Messaggio mancante.' });
       return;
     }
@@ -130,7 +182,7 @@ app.post('/api/gemini/concierge', async (req: Request, res: Response) => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: MODEL_ID,
-      contents: message.trim(),
+      contents: message,
       config: {
         systemInstruction:
           "Sei l'AI Concierge di MESA, un'app premium di food delivery da cuochi casalinghi. Sei raffinato, amichevole e molto esperto di tradizioni culinarie. Rispondi in modo conciso e invoglia l'utente a ordinare piatti autentici.",
@@ -141,16 +193,21 @@ app.post('/api/gemini/concierge', async (req: Request, res: Response) => {
       reply: response.text || 'Scusa, ho avuto un piccolo intoppo in cucina. Puoi ripetere?',
     });
   } catch (error) {
-    console.error('Error in /api/gemini/concierge:', error);
-    const message = error instanceof Error ? error.message : 'Errore del Concierge AI.';
-    res.status(500).json({ error: message });
+    sendAiError(res, '/api/gemini/concierge', error, 'Errore del Concierge AI.');
   }
 });
 
 // POST /api/gemini/heritage-story - Dish cultural story
 app.post('/api/gemini/heritage-story', async (req: Request, res: Response) => {
   try {
-    const { dishName, chefName, chefNationality, chefBio, ingredients } = req.body ?? {};
+    const body = req.body ?? {};
+    const dishName = cleanText(body.dishName, 120);
+    const chefName = cleanText(body.chefName, 120);
+    const chefNationality = cleanText(body.chefNationality, 60);
+    const chefBio = cleanText(body.chefBio, 600);
+    const ingredients = Array.isArray(body.ingredients)
+      ? cleanText(body.ingredients.filter((i: unknown) => typeof i === 'string').join(', '), 400)
+      : cleanText(body.ingredients, 400);
     if (!dishName || !chefName) {
       res.status(400).json({ error: 'Dati piatto o cuoco mancanti.' });
       return;
@@ -190,17 +247,15 @@ app.post('/api/gemini/heritage-story', async (req: Request, res: Response) => {
       },
     });
 
-    const text = response.text;
-    if (!text) {
-      res.status(502).json({ error: 'Risposta vuota dal modello AI.' });
+    const data = parseModelJson(response.text);
+    if (!data) {
+      res.status(502).json({ error: 'Risposta non valida dal modello AI.' });
       return;
     }
 
-    res.json(JSON.parse(text));
+    res.json(data);
   } catch (error) {
-    console.error('Error in /api/gemini/heritage-story:', error);
-    const message = error instanceof Error ? error.message : 'Errore nella generazione della storia.';
-    res.status(500).json({ error: message });
+    sendAiError(res, '/api/gemini/heritage-story', error, 'Errore nella generazione della storia.');
   }
 });
 
