@@ -10,7 +10,6 @@ import { Chef, Dish, ViewState } from '../types';
 import { ReviewList } from './ReviewList';
 import { StarRating } from './StarRating';
 import { ChefAvailabilityCalendar } from './ChefAvailabilityCalendar';
-import { HeritageJourney } from './HeritageJourney';
 
 interface ChefProfileProps {
   chef: Chef;
@@ -26,7 +25,6 @@ const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a
 export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDish, favorites, onToggleFavorite, onNavigateToCulture }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'heritage' | 'reviews'>('menu');
   const [expandedDishId, setExpandedDishId] = useState<string | null>(null);
-  const [heritageDish, setHeritageDish] = useState<Dish | null>(null);
 
   const handleShare = () => {
     alert(`Link copiato negli appunti: https://mesa.app/chef/${chef.id}\nCondividi questo chef con i tuoi amici!`);
@@ -188,12 +186,6 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                     >
                       Prenota
                     </button>
-                    <button 
-                      onClick={() => setHeritageDish(dish)}
-                      className="w-full py-2 flex items-center justify-center gap-2 text-orange-600 text-[10px] font-black uppercase tracking-widest hover:underline"
-                    >
-                      <History className="w-3 h-3" /> Vedi Storia
-                    </button>
                   </div>
                 </div>
               </div>
@@ -280,15 +272,6 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
           </div>
         )}
       </div>
-
-      {/* Heritage Journey Modal Integration */}
-      {heritageDish && (
-        <HeritageJourney 
-          dish={heritageDish} 
-          chef={chef} 
-          onClose={() => setHeritageDish(null)} 
-        />
-      )}
 
       {/* Footer del profilo */}
       <div className="mt-16 bg-black rounded-[4rem] p-12 text-white relative overflow-hidden group">

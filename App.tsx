@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import { db, auth, isFirebaseConfigured } from './firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, getDoc, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
@@ -23,7 +23,6 @@ import { BottomNav } from './components/BottomNav';
 import { OrderReviewModal } from './components/OrderReviewModal';
 import { ShareModal } from './components/ShareModal';
 import { LaunchTour } from './components/LaunchTour';
-import { AiConcierge } from './components/AiConcierge';
 import { ChefOnboarding } from './components/ChefOnboarding';
 import { ChefGroupSection } from './components/ChefGroupSection';
 import { PublicStorefront } from './components/PublicStorefront';
@@ -33,7 +32,6 @@ import { DishCatalogByOrigin } from './components/DishCatalogByOrigin';
 import { MOCK_CHEFS } from './constants';
 
 // View-specific screens are split into separate chunks so first load stays light
-const AiMenuCreator = lazy(() => import('./components/AiMenuCreator').then(m => ({ default: m.AiMenuCreator })));
 const InfoPage = lazy(() => import('./components/InfoPage').then(m => ({ default: m.InfoPage })));
 const OrderTracking = lazy(() => import('./components/OrderTracking').then(m => ({ default: m.OrderTracking })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
@@ -235,6 +233,15 @@ const seedFirestoreDefaults = async () => {
   }
 };
 
+// Key-order independent serialization, used to tell whether a Firestore
+// snapshot actually differs from local state (Firestore doesn't preserve key order).
+const stableStringify = (value: unknown): string =>
+  JSON.stringify(value, (_key, val) =>
+    val && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date)
+      ? Object.keys(val).sort().reduce<Record<string, unknown>>((acc, k) => { acc[k] = (val as Record<string, unknown>)[k]; return acc; }, {})
+      : val
+  ) ?? '';
+
 function App() {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
   const [verifiedAddress, setVerifiedAddress] = useState<string>('Milano (MI), Centro');
@@ -255,6 +262,11 @@ function App() {
   });
 
   const [registeredUsers, setRegisteredUsers] = useState<AppUser[]>(DEFAULT_USERS);
+  // Users exactly as Firestore holds them (null until the first snapshot).
+  // Kept apart from registeredUsers, which also carries optimistic local edits.
+  const [firestoreUsers, setFirestoreUsers] = useState<AppUser[] | null>(null);
+  // Last version of the current user both this session and Firestore agreed on
+  const lastSyncedUserRef = useRef<string>(stableStringify(currentUser));
 
   const [chefApplications, setChefApplications] = useState<ChefApplication[]>(DEFAULT_APPLICATIONS);
 
@@ -274,6 +286,7 @@ function App() {
       unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
         const users: AppUser[] = snapshot.docs.map(d => d.data() as AppUser);
         setRegisteredUsers(users);
+        setFirestoreUsers(users);
       });
 
       // Listen to Firebase chefs (catalogo)
@@ -316,12 +329,86 @@ function App() {
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('mesa_current_user', JSON.stringify(currentUser));
-      // Auto-migrate current user to Firebase if they only exist locally
-      firestoreWrite('users', currentUser.id, currentUser, true);
     } else {
       localStorage.removeItem('mesa_current_user');
     }
   }, [currentUser]);
+
+  // Two-way sync of the signed-in user's profile across every open session:
+  // - changed here since the last sync  -> push it to Firestore
+  // - changed elsewhere (other tab/device, admin) -> adopt the Firestore copy
+  // On first load the Firestore copy wins over the (possibly stale) localStorage one.
+  useEffect(() => {
+    if (!isFirebaseConfigured || !currentUser || !firestoreUsers) return;
+    const local = stableStringify(currentUser);
+    const remoteUser = firestoreUsers.find(u => u.id === currentUser.id);
+    if (!remoteUser) {
+      // Exists only locally (e.g. demo account): migrate it to Firestore
+      lastSyncedUserRef.current = local;
+      firestoreWrite('users', currentUser.id, currentUser);
+      return;
+    }
+    const remote = stableStringify(remoteUser);
+    if (local === remote) {
+      lastSyncedUserRef.current = local;
+    } else if (lastSyncedUserRef.current === local) {
+      setCurrentUser(remoteUser);
+    } else {
+      lastSyncedUserRef.current = local;
+      firestoreWrite('users', currentUser.id, currentUser);
+    }
+  }, [currentUser, firestoreUsers]);
+
+  // Cart: stored per user in carts/{userId} and kept live across sessions
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
+  const cartSyncRef = useRef<{ userId: string | null; synced: string }>({ userId: null, synced: '' });
+  const previousUserIdRef = useRef<string | null>(currentUser?.id ?? null);
+
+  useEffect(() => {
+    const userId = currentUser?.id ?? null;
+    if (previousUserIdRef.current && previousUserIdRef.current !== userId) {
+      // Signed out or switched account: don't carry the previous user's cart over
+      setCart([]);
+    }
+    previousUserIdRef.current = userId;
+    if (!isFirebaseConfigured || !userId) return;
+
+    const unsub = onSnapshot(doc(db, 'carts', userId), (snap) => {
+      // Our own not-yet-confirmed writes echo back here: local state already has them
+      if (snap.metadata.hasPendingWrites) return;
+      const remoteItems = ((snap.data()?.items ?? []) as CartItem[]);
+      const remoteKey = stableStringify(remoteItems);
+      const sync = cartSyncRef.current;
+
+      if (sync.userId !== userId) {
+        // First snapshot after sign-in: keep anything added as a guest
+        const local = cartRef.current;
+        const remoteKeys = new Set(remoteItems.map(i => stableStringify(i)));
+        const merged = [...remoteItems, ...local.filter(i => !remoteKeys.has(stableStringify(i)))];
+        cartSyncRef.current = { userId, synced: remoteKey };
+        setCart(merged);
+        return;
+      }
+      if (remoteKey !== stableStringify(cartRef.current)) {
+        sync.synced = remoteKey;
+        setCart(remoteItems);
+      }
+    });
+    return () => {
+      unsub();
+      cartSyncRef.current = { userId: null, synced: '' };
+    };
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    const sync = cartSyncRef.current;
+    if (!isFirebaseConfigured || !currentUser || sync.userId !== currentUser.id) return;
+    const key = stableStringify(cart);
+    if (key === sync.synced) return;
+    sync.synced = key;
+    firestoreWrite('carts', currentUser.id, { items: cart });
+  }, [cart, currentUser?.id]);
 
   // Derive the verified address from the (Firestore-backed) user record
   useEffect(() => {
@@ -333,10 +420,15 @@ function App() {
     }
   }, [currentUser]);
 
-  // Load favorites from the signed-in user's profile
+  // Favorites live on the user profile, so they follow it across sessions
+  const favoritesKey = currentUser ? JSON.stringify(currentUser.favoriteDishIds || []) : null;
   useEffect(() => {
-    setFavorites(currentUser?.favoriteDishIds || []);
-  }, [currentUser?.id]);
+    if (favoritesKey !== null) setFavorites(JSON.parse(favoritesKey));
+    else setFavorites([]);
+  }, [favoritesKey]);
+
+  // The open chef page always shows the latest catalogue data
+  const liveSelectedChef = selectedChef ? (chefs.find(c => c.id === selectedChef.id) ?? selectedChef) : null;
 
   const handleAddressVerified = (addressString: string) => {
     setVerifiedAddress(addressString);
@@ -372,8 +464,10 @@ function App() {
     setChefs(prev => prev.map(c => c.id === updatedChef.id ? updatedChef : c));
     firestoreWrite('chefs', updatedChef.id, updatedChef, true);
     
-    // Auto-propagate changes to registeredUsers list
-    setRegisteredUsers(prev => prev.map(u => {
+    // Auto-propagate changes to registeredUsers list (and persist them, so every
+    // session sees the updated chef account)
+    const updatedLinkedUsers: AppUser[] = [];
+    const nextUsers = registeredUsers.map(u => {
       const isMatch = u.id === updatedChef.id.replace('chef-', '') || 
                       u.email.trim().toLowerCase() === (updatedChef.email || '').trim().toLowerCase() ||
                       u.name.trim().toLowerCase() === updatedChef.name.trim().toLowerCase() ||
@@ -400,10 +494,13 @@ function App() {
         if (currentUser && currentUser.id === u.id) {
           setCurrentUser(updatedUser);
         }
+        updatedLinkedUsers.push(updatedUser);
         return updatedUser;
       }
       return u;
-    }));
+    });
+    setRegisteredUsers(nextUsers);
+    updatedLinkedUsers.forEach(u => firestoreWrite('users', u.id, u, true));
 
     showNotification(`Profilo di Chef ${updatedChef.name} aggiornato e sincronizzato! 🧑‍🍳`);
   };
@@ -923,11 +1020,11 @@ function App() {
     );
   }
 
-  if (currentView === ViewState.PUBLIC_STOREFRONT && selectedChef) {
+  if (currentView === ViewState.PUBLIC_STOREFRONT && liveSelectedChef) {
     return (
       <div className="min-h-screen bg-white font-sans text-gray-900">
         <PublicStorefront 
-          chef={selectedChef} 
+          chef={liveSelectedChef} 
           onAddDish={handleInitiateBooking} 
           onExit={() => navigateTo(ViewState.HOME)} 
         />
@@ -936,7 +1033,7 @@ function App() {
             isOpen={true} 
             onClose={() => setBookingDish(null)} 
             dish={bookingDish} 
-            chef={selectedChef} 
+            chef={liveSelectedChef} 
             onConfirm={handleConfirmBooking} 
           />
         )}
@@ -1062,10 +1159,9 @@ function App() {
               </div>
             )
         )}
-        {currentView === ViewState.CHEF_PROFILE && selectedChef && (
-          <ChefProfile chef={selectedChef} onBack={() => navigateTo(ViewState.HOME)} onAddDish={handleInitiateBooking} favorites={favorites} onToggleFavorite={handleToggleFavorite} onNavigateToCulture={() => navigateTo(ViewState.CULTURE)} />
+        {currentView === ViewState.CHEF_PROFILE && liveSelectedChef && (
+          <ChefProfile chef={liveSelectedChef} onBack={() => navigateTo(ViewState.HOME)} onAddDish={handleInitiateBooking} favorites={favorites} onToggleFavorite={handleToggleFavorite} onNavigateToCulture={() => navigateTo(ViewState.CULTURE)} />
         )}
-        {currentView === ViewState.AI_MENU_CREATOR && <AiMenuCreator />}
         
         {currentView === ViewState.PROFILE && currentUser && (
           <PersonalArea 
@@ -1199,7 +1295,6 @@ function App() {
           localStorage.setItem('mesa_launch_tour_v60', 'true'); 
         }} />
       )}
-      <AiConcierge />
     </div>
   );
 }

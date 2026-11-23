@@ -151,7 +151,6 @@ export enum ViewState {
   CULTURE = 'CULTURE',
   EXPERIENCES = 'EXPERIENCES',
   CHEF_PROFILE = 'CHEF_PROFILE',
-  AI_MENU_CREATOR = 'AI_MENU_CREATOR',
   FAVORITES = 'FAVORITES',
   ABOUT = 'ABOUT',
   SAFETY = 'SAFETY',
@@ -188,19 +187,6 @@ export interface AppUser {
   favoriteDishIds?: string[];
 }
 
-export interface AiMenuResponse {
-  dishName: string;
-  description: string;
-  suggestedPrice: number;
-  tags: string[];
-}
-
-export interface HeritageStoryResponse {
-  story: string;
-  sensoryDetails: string;
-  ritual: string;
-  pairing: string;
-}
 
 export interface FilterState {
   search: string;

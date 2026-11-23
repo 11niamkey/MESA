@@ -46,8 +46,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [selectedDocPreview, setSelectedDocPreview] = useState<ChefDocument | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState<{ [appId: string]: string }>({});
 
-  const [aiReport, setAiReport] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // States for interactive chef data management
@@ -110,32 +108,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { label: 'Pre-registrazioni Clienti', value: (1240 + totalRegisteredClients).toString(), change: `+${totalRegisteredClients} reali`, up: true, icon: Users },
   ];
 
-  const generateAiReport = async () => {
-    setIsGenerating(true);
-    try {
-      const response = await fetch('/api/gemini/admin-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          totalApplications: chefApplications.length,
-          pendingCount: pendingAppsCount,
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const data = await response.json();
-      setAiReport(data.report || 'Analisi completata con successo.');
-    } catch {
-      setAiReport('Advisor AI momentaneamente offline. Riprova tra poco.');
-    }
-    setIsGenerating(false);
-  };
-
-  useEffect(() => {
-    generateAiReport();
-  }, []);
-
   // Filtered applications
   const filteredApplications = chefApplications.filter(app => {
     const matchesStatus = appStatusFilter === 'all' || app.status === appStatusFilter;
@@ -193,13 +165,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Candidature In Attesa</p>
                  <p className="text-2xl font-black text-orange-500 italic">{pendingAppsCount}</p>
               </div>
-              <button 
-                onClick={generateAiReport}
-                className="bg-orange-600 p-4 rounded-3xl text-black hover:bg-white transition-all shadow-xl group flex items-center justify-center"
-                title="Rigenera Advisor AI"
-              >
-                <RefreshCw className={`w-6 h-6 ${isGenerating ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'}`} />
-              </button>
            </div>
         </div>
       </div>
@@ -244,7 +209,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             adminTab === 'cockpit' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <BarChart3 className="w-4 h-4" /> Cockpit Strategico & AI
+          <BarChart3 className="w-4 h-4" /> Cockpit Strategico
         </button>
       </div>
 
@@ -831,8 +796,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             })}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 bg-white rounded-[3.5rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-6">
+          <div className="grid grid-cols-1 gap-8">
+            <div className="bg-white rounded-[3.5rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-6">
               <h3 className="text-2xl font-black italic tracking-tight">Checklist Operativa MESA</h3>
               <div className="space-y-3">
                 {marketChecklist.map(item => (
@@ -845,19 +810,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="bg-black text-white rounded-[3.5rem] p-8 sm:p-10 border border-orange-600 space-y-6">
-              <div className="flex items-center gap-3">
-                <Sparkles className="w-6 h-6 text-orange-500" />
-                <h3 className="text-xl font-black italic">AI Strategy Report</h3>
-              </div>
-              <p className="text-xs font-medium text-gray-300 leading-relaxed italic">
-                {aiReport || "Generazione report in corso..."}
-              </p>
-              <button onClick={generateAiReport} className="w-full py-4 bg-orange-600 text-black font-black uppercase text-xs rounded-2xl hover:bg-orange-500">
-                Aggiorna Report
-              </button>
             </div>
           </div>
         </div>

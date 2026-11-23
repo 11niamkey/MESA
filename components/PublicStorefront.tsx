@@ -1,8 +1,7 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Chef, Dish } from '../types';
-import { Star, MapPin, Utensils, Share2, ShoppingBag, ShieldCheck, ArrowLeft, Heart, Compass } from 'lucide-react';
-import { HeritageJourney } from './HeritageJourney';
+import { Star, MapPin, Utensils, Share2, ShoppingBag, ShieldCheck, ArrowLeft, Heart } from 'lucide-react';
 
 interface PublicStorefrontProps {
   chef: Chef;
@@ -13,8 +12,6 @@ interface PublicStorefrontProps {
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 
 export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddDish, onExit }) => {
-  const [heritageDish, setHeritageDish] = useState<Dish | null>(null);
-
   const handleShare = () => {
     const url = window.location.href;
     if (navigator.share) {
@@ -125,13 +122,6 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                     <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-[11px] font-black text-white uppercase tracking-widest">
                        € {dish.price.toFixed(2)}
                     </div>
-                    <button 
-                      onClick={() => setHeritageDish(dish)}
-                      className="absolute bottom-4 right-4 p-3 bg-orange-600 text-white rounded-2xl shadow-xl hover:scale-110 transition-all flex items-center gap-2"
-                    >
-                      <Compass className="w-5 h-5" />
-                      <span className="text-[10px] font-black uppercase">Scopri Eredità</span>
-                    </button>
                   </div>
                   <div className="p-8 flex flex-col justify-between flex-1">
                     <div>
@@ -203,14 +193,6 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
 
         </div>
       </div>
-
-      {heritageDish && (
-        <HeritageJourney 
-          dish={heritageDish} 
-          chef={chef} 
-          onClose={() => setHeritageDish(null)} 
-        />
-      )}
     </div>
   );
 };

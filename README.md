@@ -1,16 +1,16 @@
-# Run and deploy your AI Studio app
+# MESA — Food Delivery Casalingo
 
-This contains everything you need to run your app locally.
+App React + Vite con dati sincronizzati in tempo reale tramite Firebase (Firestore + Auth).
 
-View your app in AI Studio: https://ai.studio/apps/12d08fa2-186b-4d42-86ca-a32eed3ef886
+## Sviluppo locale
 
-## Run Locally
+**Prerequisiti:** Node.js
 
-**Prerequisites:**  Node.js
+1. Installa le dipendenze: `npm install`
+2. Avvia l'app: `npm run dev` (http://localhost:3000)
 
+## Build e pubblicazione
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- `npm run build` genera la cartella `dist/`
+- `npm start` serve la build in locale
+- La pubblicazione avviene su Firebase Hosting (`firebase.json`, progetto `mesa-app-59376`)

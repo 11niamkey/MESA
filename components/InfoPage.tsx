@@ -97,7 +97,7 @@ export const InfoPage: React.FC<InfoPageProps> = ({ view, onBack, onOpenOnboardi
                   </li>
                   <li className="flex items-center gap-3">
                     <span className="w-6 h-6 bg-orange-600 rounded-full flex items-center justify-center text-black font-bold">3</span>
-                    <span>Supporto AI per creare menu irresistibili.</span>
+                    <span>Vetrina personale per raccontare i tuoi piatti.</span>
                   </li>
                 </ul>
                 <button 
