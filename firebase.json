@@ -2,18 +2,32 @@
   "firestore": {
     "rules": "firestore.rules"
   },
-  "hosting": {
-    "public": "dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
-  }
+  "hosting": [
+    {
+      "site": "mesa-food",
+      "public": "dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    {
+      "site": "mesa-app-59376",
+      "public": "redirect-site",
+      "redirects": [
+        {
+          "source": "/:path*",
+          "destination": "https://mesa-food.web.app/:path",
+          "type": 301
+        }
+      ]
+    }
+  ]
 }

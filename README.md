@@ -13,4 +13,5 @@ App React + Vite con dati sincronizzati in tempo reale tramite Firebase (Firesto
 
 - `npm run build` genera la cartella `dist/`
 - `npm start` serve la build in locale
-- La pubblicazione avviene su Firebase Hosting (`firebase.json`, progetto `mesa-app-59376`)
+- Ogni push su `main` pubblica automaticamente su https://mesa-food.web.app (GitHub Actions, `.github/workflows/deploy.yml`)
+- Il vecchio indirizzo https://mesa-app-59376.web.app rimanda al nuovo (`redirect-site/`)
