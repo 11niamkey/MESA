@@ -88,7 +88,7 @@ export const ExperiencesSection: React.FC = () => {
             <Mic className="w-3 h-3" />
             MESA Academy
           </div>
-          <h1 className="text-4xl md:text-6xl font-black mb-4 tracking-tighter italic">Cucina con lo Chef.</h1>
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black mb-4 tracking-tighter italic text-orange-500">Cucina con lo Chef.</h1>
           <p className="text-lg text-gray-300 font-medium leading-relaxed">
             Non limitarti a mangiare. Entra nella cucina dei nostri esperti e impara i segreti tramandati da generazioni. Laboratori dal vivo e digitali.
           </p>
@@ -142,7 +142,7 @@ export const ExperiencesSection: React.FC = () => {
 
             <div className="p-8">
               <div className="flex justify-between items-start mb-4">
-                <h3 className="text-2xl font-black text-gray-900 leading-tight group-hover:text-orange-600 transition-colors">{workshop.title}</h3>
+                <h3 className="text-xl sm:text-2xl font-black text-orange-600 leading-tight group-hover:text-orange-700 transition-colors truncate min-w-0 pr-2">{workshop.title}</h3>
                 <div className="bg-orange-50 px-3 py-1.5 rounded-xl text-orange-700 font-black text-lg">€{workshop.price}</div>
               </div>
 
@@ -180,8 +180,8 @@ export const ExperiencesSection: React.FC = () => {
           <Award className="w-12 h-12 text-orange-600" />
         </div>
         <div className="flex-1 text-center md:text-left">
-          <h3 className="text-2xl font-black italic tracking-tight mb-2">Sei un Cuoco? Insegna il tuo mestiere.</h3>
-          <p className="text-sm text-gray-600 font-medium">
+          <h3 className="text-2xl font-black italic tracking-tight mb-2 text-orange-600">Sei un Cuoco? Insegna il tuo mestiere.</h3>
+          <p className="text-sm text-black font-medium">
             Entra nel programma Partner e trasforma la tua cucina in un'aula. Supportiamo la gestione delle iscrizioni e la promozione globale della tua Masterclass.
           </p>
         </div>

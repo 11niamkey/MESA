@@ -8,8 +8,9 @@ import {
   Trash2, ShieldAlert, Check, Ban, KeyRound, Clock, Eye, X, MessageSquare, UserCheck, AlertOctagon,
   CalendarDays
 } from 'lucide-react';
-import { Chef, Order, AppUser, ChefApplication, ChefDocument } from '../types';
+import { Chef, Order, AppUser, ChefApplication, ChefDocument, Continent } from '../types';
 import { ShareModal } from './ShareModal';
+import { COUNTRY_FLAG_PRESETS, getCountryNameByFlag } from './FilterBar';
 
 interface AdminDashboardProps {
   chefs: Chef[];
@@ -46,6 +47,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [selectedDocPreview, setSelectedDocPreview] = useState<ChefDocument | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState<{ [appId: string]: string }>({});
 
+  const [aiReport, setAiReport] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // States for interactive chef data management
@@ -58,6 +61,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editPassword, setEditPassword] = useState('');
   const [editNationality, setEditNationality] = useState('');
   const [editCountryName, setEditCountryName] = useState('');
+  const [editContinent, setEditContinent] = useState<Continent>('Europa');
   const [chefSearch, setChefSearch] = useState('');
   const [chefToDelete, setChefToDelete] = useState<Chef | null>(null);
   const [deleteLinkedUser, setDeleteLinkedUser] = useState(false);
@@ -107,6 +111,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { label: 'Indice di Prontezza', value: '88%', change: '+10%', up: true, icon: PieChart },
     { label: 'Pre-registrazioni Clienti', value: (1240 + totalRegisteredClients).toString(), change: `+${totalRegisteredClients} reali`, up: true, icon: Users },
   ];
+
+  const generateAiReport = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/gemini/admin-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          totalApplications: chefApplications.length,
+          pendingCount: pendingAppsCount,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setAiReport(data.report || 'Analisi completata con successo.');
+    } catch {
+      setAiReport('Advisor AI momentaneamente offline. Riprova tra poco.');
+    }
+    setIsGenerating(false);
+  };
+
+  useEffect(() => {
+    generateAiReport();
+  }, []);
 
   // Filtered applications
   const filteredApplications = chefApplications.filter(app => {
@@ -165,6 +195,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Candidature In Attesa</p>
                  <p className="text-2xl font-black text-orange-500 italic">{pendingAppsCount}</p>
               </div>
+              <button 
+                onClick={generateAiReport}
+                className="bg-orange-600 p-4 rounded-3xl text-black hover:bg-white transition-all shadow-xl group flex items-center justify-center"
+                title="Rigenera Advisor AI"
+              >
+                <RefreshCw className={`w-6 h-6 ${isGenerating ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'}`} />
+              </button>
            </div>
         </div>
       </div>
@@ -209,7 +246,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             adminTab === 'cockpit' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <BarChart3 className="w-4 h-4" /> Cockpit Strategico
+          <BarChart3 className="w-4 h-4" /> Cockpit Strategico & AI
         </button>
       </div>
 
@@ -544,6 +581,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               const handleSave = () => {
                 const normalizedEmail = (editEmail || '').trim().toLowerCase();
+                const trimmedFlag = editNationality.trim();
+                const resolvedCountry = editCountryName.trim() || getCountryNameByFlag(trimmedFlag) || 'Italia';
                 if (onUpdateChef) {
                   onUpdateChef({
                     ...chef,
@@ -553,8 +592,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     bio: editBio.trim(),
                     email: normalizedEmail,
                     password: editPassword.trim(),
-                    nationality: editNationality.trim(),
-                    countryName: editCountryName.trim()
+                    nationality: trimmedFlag,
+                    countryName: resolvedCountry,
+                    continent: editContinent
                   });
                   setEditingChefId(null);
                 }
@@ -572,9 +612,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         referrerPolicy="no-referrer"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-extrabold text-base text-gray-900 truncate leading-none">{chef.name}</h4>
-                          <span className="text-lg" title={chef.nationality}>{chef.nationality}</span>
+                          <span className="text-lg" title={chef.countryName || chef.nationality}>{chef.nationality}</span>
+                          {chef.countryName && (
+                            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600">
+                              {chef.countryName}
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1 font-bold uppercase tracking-wider">{chef.continent} • {chef.specialties.slice(0, 2).join(', ')}</p>
                       </div>
@@ -606,6 +651,69 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               onChange={(e) => setEditPhone(e.target.value)}
                               className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-black font-mono"
                             />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Assegna Paese Rapido</label>
+                          <select
+                            value={COUNTRY_FLAG_PRESETS.some(p => p.flag === editNationality && p.countryName === editCountryName) ? editNationality : ''}
+                            onChange={(e) => {
+                              const preset = COUNTRY_FLAG_PRESETS.find(p => p.flag === e.target.value);
+                              if (preset) {
+                                setEditNationality(preset.flag);
+                                setEditCountryName(preset.countryName);
+                                setEditContinent(preset.continent);
+                              }
+                            }}
+                            className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold mb-3"
+                          >
+                            <option value="">-- Seleziona paese e bandiera --</option>
+                            {COUNTRY_FLAG_PRESETS.map(p => (
+                              <option key={`${p.flag}-${p.countryName}`} value={p.flag}>
+                                {p.flag} {p.countryName} ({p.continent})
+                              </option>
+                            ))}
+                          </select>
+
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Bandiera</label>
+                              <input
+                                type="text"
+                                value={editNationality}
+                                onChange={(e) => {
+                                  const nextFlag = e.target.value;
+                                  setEditNationality(nextFlag);
+                                  const matched = getCountryNameByFlag(nextFlag);
+                                  if (matched) setEditCountryName(matched);
+                                }}
+                                className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-center font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Paese</label>
+                              <input
+                                type="text"
+                                value={editCountryName}
+                                onChange={(e) => setEditCountryName(e.target.value)}
+                                className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-black"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Continente</label>
+                              <select
+                                value={editContinent}
+                                onChange={(e) => setEditContinent(e.target.value as Continent)}
+                                className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
+                              >
+                                <option value="Europa">Europa</option>
+                                <option value="Africa">Africa</option>
+                                <option value="Asia">Asia</option>
+                                <option value="Americhe">Americhe</option>
+                                <option value="Oceania">Oceania</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
 
@@ -683,7 +791,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             setEditEmail(chef.email || '');
                             setEditPassword(chef.password || 'demo123');
                             setEditNationality(chef.nationality || '🇮🇹');
-                            setEditCountryName(chef.countryName || 'Italia');
+                            setEditCountryName(chef.countryName || getCountryNameByFlag(chef.nationality) || 'Italia');
+                            setEditContinent(chef.continent || 'Europa');
                           }}
                           className="px-4 py-2 bg-black text-white hover:bg-orange-600 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
                         >
@@ -796,8 +905,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             })}
           </div>
 
-          <div className="grid grid-cols-1 gap-8">
-            <div className="bg-white rounded-[3.5rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 bg-white rounded-[3.5rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-6">
               <h3 className="text-2xl font-black italic tracking-tight">Checklist Operativa MESA</h3>
               <div className="space-y-3">
                 {marketChecklist.map(item => (
@@ -810,6 +919,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="bg-black text-white rounded-[3.5rem] p-8 sm:p-10 border border-orange-600 space-y-6">
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-6 h-6 text-orange-500" />
+                <h3 className="text-xl font-black italic">AI Strategy Report</h3>
+              </div>
+              <p className="text-xs font-medium text-gray-300 leading-relaxed italic">
+                {aiReport || "Generazione report in corso..."}
+              </p>
+              <button onClick={generateAiReport} className="w-full py-4 bg-orange-600 text-black font-black uppercase text-xs rounded-2xl hover:bg-orange-500">
+                Aggiorna Report
+              </button>
             </div>
           </div>
         </div>

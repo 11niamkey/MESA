@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star, MapPin, ChevronRight, Heart } from 'lucide-react';
 import { Chef, Dish } from '../types';
+import { CountryFlag } from './CountryFlag';
 
 interface ChefCardProps {
   chef: Chef;
@@ -16,7 +17,7 @@ const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1544005313-94ddf0286df
 
 export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfile, favorites, onToggleFavorite }) => {
   return (
-    <div className="bg-white rounded-[2.5rem] shadow-sm border border-orange-100 overflow-hidden mb-10 transition-all hover:shadow-xl">
+    <div className="bg-white rounded-[2.5rem] shadow-sm border border-orange-100 overflow-hidden transition-all hover:shadow-xl flex flex-col h-full">
       {/* Chef Header - Minimal on mobile, expanded on desktop */}
       <div className="p-5 sm:p-7 border-b border-orange-50 bg-gradient-to-r from-orange-50/30 to-white">
         <div className="flex items-center justify-between">
@@ -28,14 +29,14 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
                 onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_AVATAR; }}
                 className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-white shadow-lg"
               />
-              <span className="absolute -bottom-1 -right-1 text-2xl bg-white rounded-full p-0.5 shadow-sm group-hover:scale-110 transition-transform" role="img" aria-label="nationality" title={chef.countryName}>
-                {chef.nationality}
-              </span>
+              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-md border border-gray-100 flex items-center justify-center">
+                <CountryFlag flag={chef.nationality} title={chef.countryName} size="sm" />
+              </div>
             </div>
             <div>
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1.5">
-                <h3 className="text-lg sm:text-xl font-black text-gray-900 leading-none hover:text-orange-600 transition-colors">{chef.name}</h3>
-                {chef.countryName && <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md font-bold tracking-widest uppercase">{chef.countryName}</span>}
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 min-w-0">
+                <h3 className="text-base sm:text-lg font-black text-orange-600 leading-none hover:text-orange-700 transition-colors whitespace-nowrap truncate">{chef.name}</h3>
+                {chef.countryName && <span className="text-[9px] bg-gray-100 text-black px-1.5 py-0.5 rounded-md font-bold tracking-widest uppercase shrink-0">{chef.countryName}</span>}
               </div>
               <div className="flex items-center text-xs font-bold text-gray-500 uppercase tracking-wide">
                 <MapPin className="w-3 h-3 mr-1 text-orange-500" />
@@ -100,12 +101,12 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
               </div>
               <div className="p-6 flex flex-col flex-grow">
                 <h5 
-                  className="text-xl font-black text-gray-900 mb-2 cursor-pointer hover:text-orange-600 transition-colors leading-tight"
+                  className="text-lg font-black text-orange-600 mb-2 cursor-pointer hover:text-orange-700 transition-colors leading-tight truncate"
                   onClick={() => onAddDish(dish)}
                 >
                   {dish.name}
                 </h5>
-                <p className="text-sm text-gray-500 line-clamp-2 mb-6 flex-grow leading-relaxed">{dish.description}</p>
+                <p className="text-sm text-black line-clamp-2 mb-6 flex-grow leading-relaxed">{dish.description}</p>
                 <button 
                   onClick={() => onAddDish(dish)}
                   className="w-full py-4 bg-orange-600 hover:bg-black text-white text-sm font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-orange-200 transition-all transform active:scale-95"

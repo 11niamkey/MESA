@@ -1,11 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import {
-  initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-  type Firestore,
-} from 'firebase/firestore';
-import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, enableIndexedDbPersistence, doc, getDocFromServer } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import firebaseConfig from './firebase-applet-config.json';
 
 // The app remains fully functional without Firebase (falls back to in-memory
@@ -17,22 +12,92 @@ export const isFirebaseConfigured: boolean = Boolean(
     (firebaseConfig as { projectId?: string }).projectId
 );
 
-export let db: Firestore = null as unknown as Firestore;
-export let auth: Auth = null as unknown as Auth;
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+let app;
+export let db: any = null;
+export let auth: any = null;
+
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null,
+  rethrow = false
+): FirestoreErrorInfo {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth?.currentUser?.uid,
+      email: auth?.currentUser?.email,
+      emailVerified: auth?.currentUser?.emailVerified,
+      isAnonymous: auth?.currentUser?.isAnonymous,
+      tenantId: auth?.currentUser?.tenantId,
+      providerInfo:
+        auth?.currentUser?.providerData?.map((provider: { providerId?: string; email?: string }) => ({
+          providerId: provider.providerId,
+          email: provider.email,
+        })) || [],
+    },
+    operationType,
+    path,
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  if (rethrow) {
+    throw new Error(JSON.stringify(errInfo));
+  }
+  return errInfo;
+}
+
+async function testConnection() {
+  if (!db) return;
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.error('Please check your Firebase configuration.');
+    }
+  }
+}
 
 if (isFirebaseConfigured) {
-  const app = initializeApp(firebaseConfig);
-  db = initializeFirestore(
-    app,
-    {
-      // Optional fields (e.g. `password: undefined` on Firebase Auth users) would
-      // otherwise make every setDoc() call reject and the record never persist.
-      ignoreUndefinedProperties: true,
-      // Offline cache shared across tabs (replaces the deprecated
-      // enableIndexedDbPersistence, which only worked in a single tab).
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-    },
-    (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId
-  );
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app, (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId);
   auth = getAuth(app);
+
+  // Enable offline persistence
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+    } else if (err.code === 'unimplemented') {
+      console.warn('The current browser does not support all of the features required to enable persistence');
+    } else {
+      console.warn('Firebase persistence error:', err);
+    }
+  });
+
+  void testConnection();
 }

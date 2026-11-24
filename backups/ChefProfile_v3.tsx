@@ -10,6 +10,8 @@ import { Chef, Dish, ViewState } from '../types';
 import { ReviewList } from './ReviewList';
 import { StarRating } from './StarRating';
 import { ChefAvailabilityCalendar } from './ChefAvailabilityCalendar';
+import { HeritageJourney } from './HeritageJourney';
+import { CountryFlag } from './CountryFlag';
 
 interface ChefProfileProps {
   chef: Chef;
@@ -25,6 +27,7 @@ const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a
 export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDish, favorites, onToggleFavorite, onNavigateToCulture }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'heritage' | 'reviews'>('menu');
   const [expandedDishId, setExpandedDishId] = useState<string | null>(null);
+  const [heritageDish, setHeritageDish] = useState<Dish | null>(null);
 
   const handleShare = () => {
     alert(`Link copiato negli appunti: https://mesa.app/chef/${chef.id}\nCondividi questo chef con i tuoi amici!`);
@@ -65,8 +68,8 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
               alt={chef.name} 
               className="w-40 h-40 md:w-56 md:h-56 rounded-[3rem] object-cover border-8 border-white shadow-2xl rotate-3 group-hover:rotate-0 transition-transform"
             />
-            <div className="absolute -bottom-4 -right-4 bg-white p-3 rounded-2xl shadow-xl text-3xl group-hover:scale-110 transition-transform" title={chef.countryName}>
-              {chef.nationality}
+            <div className="absolute -bottom-4 -right-4 bg-white p-3 rounded-2xl shadow-xl group-hover:scale-110 transition-transform flex items-center justify-center" title={chef.countryName}>
+              <CountryFlag flag={chef.nationality} title={chef.countryName} size="lg" />
             </div>
           </div>
           
@@ -186,6 +189,12 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                     >
                       Prenota
                     </button>
+                    <button 
+                      onClick={() => setHeritageDish(dish)}
+                      className="w-full py-2 flex items-center justify-center gap-2 text-orange-600 text-[10px] font-black uppercase tracking-widest hover:underline"
+                    >
+                      <History className="w-3 h-3" /> Vedi Storia
+                    </button>
                   </div>
                 </div>
               </div>
@@ -216,8 +225,8 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                         className="relative z-10 w-full aspect-square object-cover rounded-[3.5rem] shadow-2xl grayscale-[0.2] hover:grayscale-0 transition-all duration-700" 
                       />
                       <div className="absolute -bottom-6 -right-6 z-20 bg-white rounded-full flex flex-col items-center justify-center p-4 shadow-xl border border-gray-50 min-w-24 min-h-24" title={chef.countryName}>
-                         <span className="text-4xl leading-none">{chef.nationality}</span>
-                         {chef.countryName && <span className="text-[8px] font-black uppercase tracking-widest text-gray-500 mt-1">{chef.countryName}</span>}
+                         <CountryFlag flag={chef.nationality} title={chef.countryName} size="lg" />
+                         {chef.countryName && <span className="text-[8px] font-black uppercase tracking-widest text-gray-500 mt-1.5">{chef.countryName}</span>}
                       </div>
                     </div>
                   </div>
@@ -248,7 +257,10 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                              <Music className="w-3 h-3 text-orange-500" /> Musica
                           </p>
-                          <p className="text-sm font-medium text-gray-600 italic">Melodie popolari della regione {chef.nationality}.</p>
+                          <p className="text-sm font-medium text-gray-600 italic flex items-center gap-1.5 flex-wrap">
+                            <span>Melodie popolari ({chef.countryName || chef.continent})</span>
+                            <CountryFlag flag={chef.nationality} title={chef.countryName} size="xs" />
+                          </p>
                        </div>
                     </div>
 
@@ -272,6 +284,15 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
           </div>
         )}
       </div>
+
+      {/* Heritage Journey Modal Integration */}
+      {heritageDish && (
+        <HeritageJourney 
+          dish={heritageDish} 
+          chef={chef} 
+          onClose={() => setHeritageDish(null)} 
+        />
+      )}
 
       {/* Footer del profilo */}
       <div className="mt-16 bg-black rounded-[4rem] p-12 text-white relative overflow-hidden group">

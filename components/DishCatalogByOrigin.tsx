@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Sparkles, MapPin, Star, Clock, ShoppingBag, Leaf, Flame, Info, ChevronDown, ChevronUp, Utensils } from 'lucide-react';
 import { Chef, Dish, Continent } from '../types';
+import { CountryFlag } from './CountryFlag';
 
 interface DishCatalogByOriginProps {
   chefs: Chef[];
@@ -29,17 +30,7 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
   onToggleFavorite,
   onViewProfile
 }) => {
-  const [selectedProvenance, setSelectedProvenance] = useState<Continent | 'Tutti'>('Tutti');
   const [expandedDishId, setExpandedDishId] = useState<string | null>(null);
-
-  // List of provenances to display
-  const provenances: { key: Continent | 'Tutti'; label: string; icon: string; bg: string; text: string }[] = [
-    { key: 'Tutti', label: 'Tutti i Sapori', icon: '🌟', bg: 'bg-orange-500', text: 'text-orange-900' },
-    { key: 'Europa', label: 'Europa', icon: '🇪🇺', bg: 'bg-blue-500', text: 'text-blue-900' },
-    { key: 'Africa', label: 'Sapori d\'Africa', icon: '🇲🇦', bg: 'bg-amber-500', text: 'text-amber-900' },
-    { key: 'Asia', label: 'Tradizioni Asiatiche', icon: '🇨🇳', bg: 'bg-red-500', text: 'text-red-900' },
-    { key: 'Americhe', label: 'Dalle Americhe', icon: '🇲🇽', bg: 'bg-emerald-500', text: 'text-emerald-950' }
-  ];
 
   // Extract all dishes and bundle with chef info
   const allDishesWithChef: DishWithChefDetails[] = chefs.flatMap(chef => 
@@ -54,60 +45,16 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
     }))
   );
 
-  // Filter based on selected tab
-  const displayedDishes = allDishesWithChef.filter(dish => 
-    selectedProvenance === 'Tutti' || dish.chefContinent === selectedProvenance
-  );
-
-  // Count available dishes per provenance for badges
-  const getCount = (prov: Continent | 'Tutti') => {
-    if (prov === 'Tutti') return allDishesWithChef.length;
-    return allDishesWithChef.filter(d => d.chefContinent === prov).length;
-  };
-
   return (
-    <div id="dish-catalog-provenance" className="my-14 animate-fade-in scroll-mt-24">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 px-1 gap-4">
-        <div>
-          <span className="text-[10px] font-black text-orange-600 uppercase tracking-[0.25em] block mb-2">Esplora Libero</span>
-          <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tighter italic">
-            Piatti del Mondo per Provenienza
-          </h2>
-          <p className="text-gray-500 text-xs sm:text-sm mt-1 max-w-xl">
-            Scegli la provenienza culinaria che desideri e scopri i piatti tradizionali preparati oggi dai cuochi locali nel tuo quartiere.
-          </p>
-        </div>
-      </div>
-
-      {/* Provenance Pills / Tabs */}
-      <div className="flex overflow-x-auto space-x-3 pb-6 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide mb-8">
-        {provenances.map((prov) => {
-          const isActive = selectedProvenance === prov.key;
-          const dishCount = getCount(prov.key);
-          
-          if (dishCount === 0 && prov.key !== 'Tutti') return null; // Hide if empty
-
-          return (
-            <button
-              key={prov.key}
-              onClick={() => setSelectedProvenance(prov.key)}
-              className={`relative flex items-center gap-3 px-5 sm:px-6 py-3.5 rounded-full text-xs font-black uppercase tracking-wider transition-all shadow-sm flex-shrink-0 border ${
-                isActive
-                  ? 'bg-black text-white border-black scale-105 shadow-xl font-bold'
-                  : 'bg-white text-gray-700 border-gray-100 hover:border-orange-200'
-              }`}
-            >
-              <span className="text-lg">{prov.icon}</span>
-              <span>{prov.label}</span>
-              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                isActive ? 'bg-orange-600 text-black' : 'bg-gray-100 text-gray-500'
-              }`}>
-                {dishCount}
-              </span>
-            </button>
-          );
-        })}
+    <div id="dish-catalog-provenance" className="my-8 animate-fade-in scroll-mt-24">
+      {/* Compact Single-Line Header */}
+      <div className="flex items-center justify-between gap-3 mb-5 px-1">
+        <h2 className="text-[17px] sm:text-2xl font-black text-orange-600 tracking-tight italic whitespace-nowrap truncate min-w-0">
+          Piatti del Mondo per Provenienza
+        </h2>
+        <span className="hidden sm:inline-flex text-[10px] font-black text-orange-600 uppercase tracking-[0.2em] shrink-0">
+          Esplora
+        </span>
       </div>
 
       {/* Grid of Dishes with Smooth Category Swap AnimatePresence */}
@@ -116,7 +63,7 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10"
       >
         <AnimatePresence mode="popLayout">
-          {displayedDishes.map((dish) => {
+          {allDishesWithChef.map((dish) => {
             const isFav = favorites.includes(dish.id);
             const associatedChef = chefs.find(c => c.id === dish.chefId);
 
@@ -149,8 +96,8 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
 
                   {/* Floating Middle Bottom: Origin Flag Badge */}
                   <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm text-black text-[10px] font-black px-3 py-1.5 rounded-2xl uppercase tracking-wider shadow-md flex items-center gap-1.5 border border-white/20">
-                    <span className="text-xl leading-none">{dish.chefNationality}</span>
-                    <span className="text-gray-800 tracking-tight">{associatedChef?.countryName || dish.chefContinent}</span>
+                    <CountryFlag flag={dish.chefNationality} title={associatedChef?.countryName || dish.chefContinent} size="sm" />
+                    <span className="text-black tracking-tight">{associatedChef?.countryName || dish.chefContinent}</span>
                   </div>
 
                   {/* Favorite Toggle button */}
@@ -169,8 +116,8 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                 <div className="p-6 sm:p-7 flex-1 flex flex-col justify-between">
                   <div>
                     {/* Header line: Title & Quick Details Toggle */}
-                    <div className="flex justify-between items-start gap-2 mb-2">
-                      <h3 className="font-black italic text-gray-900 text-lg sm:text-xl leading-tight group-hover:text-orange-600 transition-colors">
+                    <div className="flex justify-between items-center gap-2 mb-2">
+                      <h3 className="font-black italic text-orange-600 text-base sm:text-lg leading-tight group-hover:text-orange-700 transition-colors truncate min-w-0">
                         {dish.name}
                       </h3>
                       <button
@@ -187,7 +134,7 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                     </div>
 
                     {/* Short Description */}
-                    <p className="text-gray-500 text-xs sm:text-sm leading-relaxed mb-3 line-clamp-2 italic font-medium">
+                    <p className="text-black text-xs sm:text-sm leading-relaxed mb-3 line-clamp-2 italic font-medium">
                       "{dish.description}"
                     </p>
 
@@ -196,21 +143,21 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                       <div className="mb-4 p-3 bg-orange-50/70 border border-orange-100 rounded-2xl space-y-2 text-xs animate-fade-in" onClick={(e) => e.stopPropagation()}>
                         {dish.ingredients && dish.ingredients.length > 0 && (
                           <div>
-                            <span className="font-black text-orange-900 uppercase tracking-wider text-[9px] flex items-center gap-1 mb-0.5">
+                            <span className="font-black text-orange-700 uppercase tracking-wider text-[9px] flex items-center gap-1 mb-0.5">
                               <Leaf className="w-3 h-3 text-green-600" /> Ingredienti:
                             </span>
-                            <p className="text-gray-700 font-medium">{dish.ingredients.join(', ')}</p>
+                            <p className="text-black font-medium">{dish.ingredients.join(', ')}</p>
                           </div>
                         )}
                         {dish.preparation && (
                           <div className="pt-1.5 border-t border-orange-200/50">
-                            <span className="font-black text-orange-900 uppercase tracking-wider text-[9px] flex items-center gap-1 mb-0.5">
+                            <span className="font-black text-orange-700 uppercase tracking-wider text-[9px] flex items-center gap-1 mb-0.5">
                               <Utensils className="w-3 h-3 text-orange-600" /> Note dello Chef:
                             </span>
-                            <p className="text-gray-700 italic">{dish.preparation}</p>
+                            <p className="text-black italic">{dish.preparation}</p>
                           </div>
                         )}
-                        <div className="pt-1.5 border-t border-orange-200/50 flex items-center justify-between text-[10px] text-gray-600 font-bold">
+                        <div className="pt-1.5 border-t border-orange-200/50 flex items-center justify-between text-[10px] text-black font-bold">
                           <span>Porzione: ~350g (Singola)</span>
                           <span className="text-orange-700 font-black">Allergeni Segnalati</span>
                         </div>

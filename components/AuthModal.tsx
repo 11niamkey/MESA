@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { X, User, ChefHat, LogIn, ShieldCheck, MapPin, Eye, EyeOff } from 'lucide-react';
-import { AppUser, UserAddress } from '../types';
+import React, { useState, useEffect } from 'react';
+import { X, User, ChefHat, ShieldCheck, MapPin, Eye, EyeOff, Smartphone, Sparkles } from 'lucide-react';
+import { AppUser, UserAddress, Chef } from '../types';
 import { auth, isFirebaseConfigured } from '../firebase';
 import {
   signInWithEmailAndPassword,
@@ -13,16 +13,20 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   registeredUsers: AppUser[];
-  onLoginSuccess: (user: AppUser) => void;
-  onRegisterUser: (user: AppUser) => void;
+  chefs?: Chef[];
+  onLoginSuccess: (user: AppUser, isNewRegistration?: boolean) => void;
+  onRegisterUser: (user: AppUser) => Promise<void> | void;
+  onOpenOnboarding?: () => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ 
   isOpen, 
   onClose, 
   registeredUsers,
+  chefs = [],
   onLoginSuccess,
-  onRegisterUser
+  onRegisterUser,
+  onOpenOnboarding
 }) => {
   const [role, setRole] = useState<'client' | 'chef' | 'admin'>('client');
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -30,17 +34,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Basic Fields
   const [name, setName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [brandName, setBrandName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
-  // Optional Address block for registration
+  // Address block for registration
   const [street, setStreet] = useState('');
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
   
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMsg('');
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -62,9 +75,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       case 'auth/network-request-failed':
         return 'Errore di rete. Controlla la connessione e riprova.';
       case 'auth/popup-closed-by-user':
+      case 'auth/cancelled-popup-request':
         return 'Accesso con Google annullato.';
       case 'auth/account-exists-with-different-credential':
         return 'Esiste già un account con questa email usando un altro metodo di accesso.';
+      case 'auth/operation-not-allowed':
+      case 'auth/admin-restricted-operation':
+        return 'Accesso Email/Password gestito tramite profilo MESA.';
       default:
         return 'Si è verificato un errore. Riprova.';
     }
@@ -73,7 +90,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Build an AppUser record from a Firebase Auth user
   const buildUserFromFirebase = (
     fbUser: { uid: string; email?: string | null; displayName?: string | null },
-    role: 'client' | 'chef' | 'admin'
+    targetRole: 'client' | 'chef' | 'admin'
   ): AppUser => {
     const displayName = fbUser.displayName || '';
     const [fbName, ...fbLastNameParts] = displayName.split(' ');
@@ -81,11 +98,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       id: `usr-${fbUser.uid.slice(0, 6).toUpperCase()}`,
       name: fbName.trim() || 'Utente',
       lastName: fbLastNameParts.join(' ').trim() || 'Mesa',
-      email: (fbUser.email || email).trim(),
-      role,
+      email: (fbUser.email || email).trim().toLowerCase(),
+      role: targetRole,
       addresses: [],
       createdAt: new Date().toLocaleDateString('it-IT'),
-      password: undefined
+      password: password || undefined
     };
   };
 
@@ -94,42 +111,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMsg('');
     setIsSubmitting(true);
 
+    const normalizedInputEmail = email.trim().toLowerCase();
+
     try {
       if (mode === 'login') {
-        // 1) Try Firebase Auth first (real accounts)
-        if (isFirebaseConfigured) {
+        // 1) Try Firebase Auth first if configured, falling back cleanly if Email/Password isn't enabled or user is in Firestore
+        if (isFirebaseConfigured && auth) {
           try {
-            const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+            const cred = await signInWithEmailAndPassword(auth, normalizedInputEmail, password);
             const existing = registeredUsers.find(
-              u => u.email.toLowerCase() === (cred.user.email || email).toLowerCase()
+              u => u.email.trim().toLowerCase() === (cred.user.email || normalizedInputEmail).trim().toLowerCase()
             );
             if (existing) {
-              onLoginSuccess(existing);
+              onLoginSuccess(existing, false);
             } else {
               const newUser = buildUserFromFirebase(cred.user, role);
-              onRegisterUser(newUser);
-              onLoginSuccess(newUser);
+              await onRegisterUser(newUser);
+              onLoginSuccess(newUser, false);
             }
             onClose();
             return;
           } catch (err) {
             const code = (err as { code?: string })?.code || '';
-            const isDemoFallback =
+            const shouldFallbackToFirestore =
               code === 'auth/user-not-found' ||
               code === 'auth/wrong-password' ||
               code === 'auth/invalid-credential' ||
-              code === 'auth/invalid-email';
-            if (!isDemoFallback) {
+              code === 'auth/invalid-email' ||
+              code === 'auth/operation-not-allowed' ||
+              code === 'auth/admin-restricted-operation' ||
+              code === 'auth/too-many-requests';
+            if (!shouldFallbackToFirestore) {
               setErrorMsg(translateAuthError(err));
               return;
             }
-            // fall through to demo/local account check
           }
         }
 
-        // 2) Demo / local account fallback (pre-seeded users)
+        // 2) Firestore-backed MESA user / catalog chef account verification
         const match = registeredUsers.find(
-          u => u.email.toLowerCase() === email.toLowerCase() && u.role === role
+          u => u.email.trim().toLowerCase() === normalizedInputEmail && u.role === role
         );
         if (match) {
           const expectedPassword = match.password || 'demo123';
@@ -137,28 +158,87 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             setErrorMsg('La password inserita non è corretta. Riprova.');
             return;
           }
-          onLoginSuccess(match);
-          alert(`Accesso effettuato con successo!\nBenvenuto, ${match.name}!`);
+          onLoginSuccess(match, false);
           onClose();
           return;
         }
-        setErrorMsg(`Account ${role === 'chef' ? 'Cuoco' : 'Cliente'} non trovato con questa email. Registrati per iniziare!`);
+
+        // Check if registered under another role to give helpful message
+        const otherRoleMatch = registeredUsers.find(
+          u => u.email.trim().toLowerCase() === normalizedInputEmail
+        );
+        if (otherRoleMatch && role !== 'admin') {
+          const roleLabel = otherRoleMatch.role === 'chef' ? 'Cuoco' : otherRoleMatch.role === 'admin' ? 'Admin' : 'Cliente';
+          setErrorMsg(`Questa email è registrata come ${roleLabel}. Seleziona la scheda "${roleLabel}" in alto per accedere.`);
+          return;
+        }
+
+        if (role === 'chef') {
+          const chefMatch = chefs.find(
+            c => (c.email || '').trim().toLowerCase() === normalizedInputEmail
+          );
+          if (chefMatch) {
+            const expectedPassword = chefMatch.password || 'demo123';
+            if (password !== expectedPassword) {
+              setErrorMsg('La password inserita non è corretta. Riprova.');
+              return;
+            }
+            const nameParts = chefMatch.name.trim().split(' ');
+            const linkedChefUser: AppUser = {
+              id: chefMatch.id.startsWith('chef-') ? chefMatch.id.replace('chef-', '') : `usr-${chefMatch.id}`,
+              name: nameParts[0] || chefMatch.name,
+              lastName: nameParts.slice(1).join(' ') || 'Chef',
+              email: (chefMatch.email || normalizedInputEmail).trim().toLowerCase(),
+              phone: chefMatch.phone,
+              brandName: chefMatch.name,
+              role: 'chef',
+              addresses: chefMatch.location
+                ? [{ id: `addr-${chefMatch.id}`, street: chefMatch.location, city: 'Italia', zip: '33170', isVerified: true }]
+                : [],
+              createdAt: new Date().toLocaleDateString('it-IT'),
+              password: expectedPassword
+            };
+            await onRegisterUser(linkedChefUser);
+            onLoginSuccess(linkedChefUser, false);
+            onClose();
+            return;
+          }
+        }
+        setErrorMsg(`Account ${role === 'chef' ? 'Cuoco' : role === 'admin' ? 'Admin' : 'Cliente'} non trovato con questa email. Registrati per iniziare!`);
       } else {
-        // Register logic
-        const exists = registeredUsers.some(u => u.email.toLowerCase() === email.toLowerCase());
-        if (exists) {
+        // Registration logic
+        if (!normalizedInputEmail || !normalizedInputEmail.includes('@')) {
+          setErrorMsg('Inserisci un indirizzo email valido.');
+          return;
+        }
+        if (password.length < 4) {
+          setErrorMsg('La password deve contenere almeno 4 caratteri.');
+          return;
+        }
+        if (role === 'chef' && !phone.trim()) {
+          setErrorMsg('Inserisci un numero di telefono / WhatsApp per le verifiche cuoco.');
+          return;
+        }
+
+        const existsInUsers = registeredUsers.some(u => u.email.trim().toLowerCase() === normalizedInputEmail);
+        const existsInChefs = chefs.some(c => (c.email || '').trim().toLowerCase() === normalizedInputEmail);
+        if (existsInUsers || existsInChefs) {
           setErrorMsg('Questa email è già registrata su MESA.');
           return;
         }
 
         let firebaseUid = '';
-        if (isFirebaseConfigured) {
+        if (isFirebaseConfigured && auth) {
           try {
-            const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+            const cred = await createUserWithEmailAndPassword(auth, normalizedInputEmail, password);
             firebaseUid = cred.user.uid;
           } catch (err) {
-            setErrorMsg(translateAuthError(err));
-            return;
+            const code = (err as { code?: string })?.code || '';
+            // If Firebase Email/Password provider isn't enabled in Console, proceed with Firestore MESA persistence
+            if (code !== 'auth/operation-not-allowed' && code !== 'auth/admin-restricted-operation') {
+              setErrorMsg(translateAuthError(err));
+              return;
+            }
           }
         }
 
@@ -181,20 +261,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           id: generatedId,
           name: name.trim() || 'Utente',
           lastName: lastName.trim() || 'Mesa',
-          email: email.trim(),
+          email: normalizedInputEmail,
+          ...(phone.trim() ? { phone: phone.trim() } : {}),
+          ...(role === 'chef' && brandName.trim() ? { brandName: brandName.trim() } : {}),
           role: role,
           addresses: addresses,
           createdAt: new Date().toLocaleDateString('it-IT'),
-          password: firebaseUid ? undefined : password
+          password: password
         };
 
-        onRegisterUser(newUser);
-        onLoginSuccess(newUser);
-
-        alert(
-          `Registrazione completata!\nBenvenuto ${newUser.name}.` +
-          (role === 'chef' && addresses.length > 0 ? `\nL'indirizzo inserito è stato registrato ed è in attesa di verifica nella dashboard dell'amministratore.` : '')
-        );
+        await onRegisterUser(newUser);
+        onLoginSuccess(newUser, true);
         onClose();
       }
     } finally {
@@ -204,7 +281,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleGoogleLogin = async () => {
     setErrorMsg('');
-    if (!isFirebaseConfigured) {
+    if (!isFirebaseConfigured || !auth) {
       setErrorMsg('Accesso con Google non disponibile in questa configurazione.');
       return;
     }
@@ -212,14 +289,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const provider = new GoogleAuthProvider();
       const cred = await signInWithPopup(auth, provider);
-      const fbEmail = cred.user.email || '';
-      let user = registeredUsers.find(u => u.email.toLowerCase() === fbEmail.toLowerCase());
+      const fbEmail = (cred.user.email || '').trim().toLowerCase();
+      let user = registeredUsers.find(u => u.email.trim().toLowerCase() === fbEmail);
+      let isNew = false;
       if (!user) {
         const targetRole = role === 'admin' ? 'client' : role;
         user = buildUserFromFirebase(cred.user, targetRole);
-        onRegisterUser(user);
+        isNew = true;
+        await onRegisterUser(user);
       }
-      onLoginSuccess(user);
+      onLoginSuccess(user, isNew);
       onClose();
     } catch (err) {
       const code = (err as { code?: string })?.code || '';
@@ -230,18 +309,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleDemoLogin = (selectedRole: 'client' | 'chef' | 'admin') => {
-    let defaultEmail = 'luca@mesa.com';
-    if (selectedRole === 'chef') defaultEmail = 'chef.francesco@mesa.com';
-    if (selectedRole === 'admin') defaultEmail = 'admin@mesa.com';
-
-    setRole(selectedRole);
-    setEmail(defaultEmail);
-    setPassword('demo123');
-    setMode('login');
-    setErrorMsg(`Compilato con i dati del profilo Demo (${selectedRole === 'chef' ? 'Cuoco' : selectedRole === 'admin' ? 'Amministratore' : 'Cliente'}). Clicca per accedere!`);
   };
 
   return (
@@ -266,7 +333,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="flex border-b border-gray-100 bg-gray-50 pr-14 sm:pr-16 relative">
             <button
               type="button"
-              onClick={() => { setRole('client'); setMode('login'); setErrorMsg(''); }}
+              onClick={() => { setRole('client'); setErrorMsg(''); }}
               className={`flex-1 py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
                 role === 'client' ? 'bg-white text-orange-600 border-b-4 border-orange-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
                }`}
@@ -276,7 +343,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setRole('chef'); setMode('login'); setErrorMsg(''); }}
+              onClick={() => { setRole('chef'); setErrorMsg(''); }}
               className={`flex-1 py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
                 role === 'chef' ? 'bg-white text-orange-600 border-b-4 border-orange-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
               }`}
@@ -302,51 +369,103 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
           </div>
 
-          <div className="p-10 max-h-[80vh] overflow-y-auto">
+          <div className="p-8 sm:p-10 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 rounded-xl overflow-hidden bg-black shadow-lg outline outline-1 outline-white/10">
+              <div className="w-16 h-16 rounded-xl overflow-hidden bg-black shadow-lg outline outline-1 outline-white/10 shrink-0">
                 <img src="/images/mesa_logo_type.png" alt="MESA" className="w-full h-full object-cover" />
               </div>
               <h2 className="text-3xl font-black text-gray-900 italic tracking-tight m-0">
-                {role === 'admin' ? 'Pannello di Controllo' : mode === 'login' ? 'Bentornato!' : role === 'client' ? 'Unisciti' : 'Diventa un Cuoco'}
+                {role === 'admin' ? 'Pannello di Controllo' : mode === 'login' ? 'Bentornato!' : role === 'client' ? 'Unisciti' : 'Registrati come Cuoco'}
               </h2>
             </div>
-            <p className="text-gray-500 text-sm font-medium mb-8 leading-relaxed">
+            <p className="text-gray-500 text-sm font-medium mb-6 leading-relaxed">
               {role === 'admin' 
-                ? 'Accedi alla visione a 360° per approvare e convalidare utenti e indirizzi.'
+                ? 'Accedi alla visione a 360° per approvare e convalidare utenti, candidature cuochi e indirizzi.'
                 : mode === 'login' 
                   ? 'Accedi per gestire il tuo profilo, i tuoi indirizzi e i tuoi ordini.' 
                   : role === 'client' 
-                    ? 'Registrati per ordinare piatti fatti in casa dalle cucine verificate.' 
-                    : 'Condividi la tua passione e vendi i tuoi piatti tipici certificati.'}
+                    ? 'Registrati per ordinare piatti fatti in casa dalle cucine verificate. Il tuo profilo sarà subito visibile nell\'Area Admin.' 
+                    : 'Crea il tuo account Cuoco: verrai sincronizzato con l\'Area Admin per la verifica e l\'attivazione nel catalogo MESA.'}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === 'register' && role !== 'admin' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <input 
-                      type="text" 
-                      placeholder="Nome" 
-                      value={name} 
-                      onChange={e => setName(e.target.value)} 
-                      className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
-                      required 
-                    />
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <input 
+                        type="text" 
+                        placeholder="Nome" 
+                        value={name} 
+                        onChange={e => setName(e.target.value)} 
+                        className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
+                        required 
+                      />
+                    </div>
+                    <div>
+                      <input 
+                        type="text" 
+                        placeholder="Cognome" 
+                        value={lastName} 
+                        onChange={e => setLastName(e.target.value)} 
+                        className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
+                        required 
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <input 
-                      type="text" 
-                      placeholder="Cognome" 
-                      value={lastName} 
-                      onChange={e => setLastName(e.target.value)} 
-                      className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
-                      required 
-                    />
-                  </div>
-                </div>
+
+                  {role === 'chef' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <input 
+                        type="text" 
+                        placeholder="Nome Cucina / Brand (opzionale)" 
+                        value={brandName} 
+                        onChange={e => setBrandName(e.target.value)} 
+                        className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
+                      />
+                      <div className="relative">
+                        <Smartphone className="w-4 h-4 text-orange-600 absolute left-4 top-1/2 -translate-y-1/2" />
+                        <input 
+                          type="tel" 
+                          placeholder="Telefono / WhatsApp *" 
+                          value={phone} 
+                          onChange={e => setPhone(e.target.value)} 
+                          className="w-full pl-11 pr-4 py-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
+                          required 
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
               
+              {role === 'chef' && mode === 'login' && chefs.length > 0 && (
+                <div className="bg-orange-50/70 border border-orange-200 rounded-2xl p-3.5 space-y-1.5">
+                  <label className="block text-[10px] font-black text-orange-700 uppercase tracking-widest">
+                    Seleziona Cuoco del Catalogo (Test Area Cuoco)
+                  </label>
+                  <select
+                    value={chefs.some(c => (c.email || '').toLowerCase() === email.trim().toLowerCase()) ? email.trim().toLowerCase() : ''}
+                    onChange={(e) => {
+                      const chosen = chefs.find(c => (c.email || '').toLowerCase() === e.target.value);
+                      if (chosen) {
+                        setEmail(chosen.email || '');
+                        setPassword(chosen.password || 'demo123');
+                        setErrorMsg('');
+                      }
+                    }}
+                    className="w-full p-2.5 bg-white border border-orange-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="">-- Scegli uno chef per accedere alla sua Area Cuoco --</option>
+                    {chefs.map(c => (
+                      <option key={c.id} value={(c.email || '').toLowerCase()}>
+                        {c.name} ({c.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <input 
                 type="email" 
                 placeholder="Indirizzo Email" 
@@ -376,10 +495,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               {/* Campi Indirizzo durante la registrazione */}
               {mode === 'register' && role !== 'admin' && (
-                <div className="space-y-3 bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 mt-6 pt-5">
+                <div className="space-y-3 bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 mt-4 pt-5">
                   <div className="flex items-center gap-1.5 mb-2">
                     <MapPin className="w-4 h-4 text-orange-600" />
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sede del tuo Indirizzo</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      {role === 'chef' ? 'Sede della tua Cucina' : 'Sede del tuo Indirizzo'}
+                    </span>
                   </div>
                   
                   <input 
@@ -402,7 +523,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     />
                     <input 
                       type="text" 
-                      placeholder="CAP es. 00185" 
+                      placeholder="CAP es. 33170" 
                       value={zip}
                       onChange={e => setZip(e.target.value)}
                       className="w-full p-3 border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-white text-xs font-bold"
@@ -411,7 +532,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     />
                   </div>
                   <p className="text-[9px] text-gray-400 font-bold italic leading-tight mt-1">
-                    Nota: L'indirizzo inserito verrà registrato e sarà sottoposto a verifica nell'area dell'amministratore prima di autorizzare gli ordini.
+                    {role === 'chef'
+                      ? 'La tua registrazione cuoco e questo indirizzo saranno subito visibili nell\'Area Admin per la convalida e l\'attivazione.'
+                      : 'L\'indirizzo inserito verrà registrato nell\'Area Admin per la verifica prima degli ordini a domicilio.'}
                   </p>
                 </div>
               )}
@@ -427,9 +550,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 disabled={isSubmitting}
                 className={`w-full py-4.5 font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95 text-xs ${role === 'admin' ? 'bg-orange-600 text-black' : 'bg-black text-white hover:bg-orange-600'} disabled:opacity-60 disabled:cursor-not-allowed`}
               >
-                {isSubmitting ? 'Attendere...' : role === 'admin' ? 'Entra nella Dashboard' : mode === 'login' ? 'Accedi' : 'Registrati'}
+                {isSubmitting ? 'Salvataggio in corso...' : role === 'admin' ? 'Entra nella Dashboard' : mode === 'login' ? 'Accedi' : role === 'chef' ? 'Registrati & Invia ad Admin' : 'Registrati'}
               </button>
             </form>
+
+            {role === 'chef' && mode === 'register' && onOpenOnboarding && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenOnboarding();
+                }}
+                className="mt-3 w-full py-3.5 px-4 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-800 rounded-2xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+              >
+                <Sparkles className="w-4 h-4 text-orange-600" />
+                <span>Oppure compila Candidatura Completa (HACCP & Menu)</span>
+              </button>
+            )}
 
             {role !== 'admin' && (
               <div className="mt-6">

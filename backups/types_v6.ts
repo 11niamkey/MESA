@@ -99,7 +99,16 @@ export interface Chef {
   documents?: ChefDocument[];
 }
 
-export type OrderStatus = 'PLACED' | 'PREPARING' | 'READY' | 'DELIVERING' | 'COMPLETED';
+export type OrderStatus = 'PENDING_CONFIRMATION' | 'PLACED' | 'PREPARING' | 'READY' | 'DELIVERING' | 'COMPLETED';
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  PENDING_CONFIRMATION: 'In attesa di conferma',
+  PLACED: 'Ricevuto',
+  PREPARING: 'In Cucina',
+  READY: 'Pronto',
+  DELIVERING: 'In Consegna',
+  COMPLETED: 'Completato'
+};
 
 export interface Message {
   id: string;
@@ -151,6 +160,7 @@ export enum ViewState {
   CULTURE = 'CULTURE',
   EXPERIENCES = 'EXPERIENCES',
   CHEF_PROFILE = 'CHEF_PROFILE',
+  AI_MENU_CREATOR = 'AI_MENU_CREATOR',
   FAVORITES = 'FAVORITES',
   ABOUT = 'ABOUT',
   SAFETY = 'SAFETY',
@@ -187,6 +197,19 @@ export interface AppUser {
   favoriteDishIds?: string[];
 }
 
+export interface AiMenuResponse {
+  dishName: string;
+  description: string;
+  suggestedPrice: number;
+  tags: string[];
+}
+
+export interface HeritageStoryResponse {
+  story: string;
+  sensoryDetails: string;
+  ritual: string;
+  pairing: string;
+}
 
 export interface FilterState {
   search: string;

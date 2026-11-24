@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Search, SlidersHorizontal, Leaf, Flame, Fish, Drumstick, Globe, ChevronDown, ChevronUp, X, Check, UtensilsCrossed } from 'lucide-react';
-import { FilterState } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Search, SlidersHorizontal, Leaf, Flame, Fish, Drumstick, ChevronDown, ChevronUp, X, Check, UtensilsCrossed } from 'lucide-react';
+import { Chef, FilterState } from '../types';
 import { MOCK_CHEFS } from '../constants';
+import { CountryFlag } from './CountryFlag';
 
 export const nationalityNames: Record<string, string[]> = {
   '🇮🇹': ['Italia', 'Italiano', 'Pizza', 'Pasta', 'Italy'],
@@ -16,15 +17,15 @@ export const nationalityNames: Record<string, string[]> = {
   '🇨🇳': ['Cina', 'Cinese', 'China', 'Ravioli'],
   '🇮🇳': ['India', 'Indiano', 'Curry'],
   '🇹🇭': ['Thailandia', 'Thailandese', 'Thai'],
-  '🇰🇷': ['Corea', 'Coreano', 'Korea'],
+  '🇰🇷': ['Corea del Sud', 'Corea', 'Coreano', 'Korea'],
   '🇻🇳': ['Vietnam', 'Vietnamita', 'Vietnam'],
   '🇱🇧': ['Libano', 'Libanese', 'Lebanon'],
   '🇹🇷': ['Turchia', 'Turco', 'Turkey'],
   '🇲🇽': ['Messico', 'Messicano', 'Mexico', 'Tacos'],
   '🇧🇷': ['Brasile', 'Brasiliano', 'Brazil'],
-  '🇵🇪': ['Peru', 'Peruviano', 'Peru'],
+  '🇵🇪': ['Perù', 'Peru', 'Peruviano'],
   '🇦🇷': ['Argentina', 'Argentino'],
-  '🇺🇸': ['USA', 'America', 'Americano', 'Burger'],
+  '🇺🇸': ['Stati Uniti', 'USA', 'America', 'Americano', 'Burger'],
   '🇲🇦': ['Marocco', 'Marocchino', 'Morocco', 'Couscous'],
   '🇸🇳': ['Senegal', 'Senegalese'],
   '🇨🇮': ['Costa d\'Avorio', 'Ivoriano'],
@@ -35,17 +36,64 @@ export const nationalityNames: Record<string, string[]> = {
   '🇰🇪': ['Kenya', 'Keniano'],
   '🇿🇦': ['Sudafrica', 'South Africa'],
   '🇨🇲': ['Camerun', 'Cameroon'],
-  '🇨🇩': ['Congo', 'Congolese'],
-  '🇲🇱': ['Mali'],
+  '🇨🇩': ['R.D. Congo', 'Congo', 'Congolese'],
+  '🇲🇱': ['Mali', 'Maliano'],
   '🇹🇳': ['Tunisia', 'Tunisino'],
+  '🇸🇴': ['Somalia', 'Somalo'],
+  '🇲🇬': ['Madagascar', 'Malgascio'],
+};
+
+export const COUNTRY_FLAG_PRESETS: { flag: string; countryName: string; continent: 'Europa' | 'Africa' | 'Asia' | 'Americhe' }[] = [
+  { flag: '🇮🇹', countryName: 'Italia', continent: 'Europa' },
+  { flag: '🇫🇷', countryName: 'Francia', continent: 'Europa' },
+  { flag: '🇪🇸', countryName: 'Spagna', continent: 'Europa' },
+  { flag: '🇬🇷', countryName: 'Grecia', continent: 'Europa' },
+  { flag: '🇩🇪', countryName: 'Germania', continent: 'Europa' },
+  { flag: '🇵🇹', countryName: 'Portogallo', continent: 'Europa' },
+  { flag: '🇸🇪', countryName: 'Svezia', continent: 'Europa' },
+  { flag: '🇬🇧', countryName: 'Regno Unito', continent: 'Europa' },
+  { flag: '🇨🇮', countryName: 'Costa d\'Avorio', continent: 'Africa' },
+  { flag: '🇳🇬', countryName: 'Nigeria', continent: 'Africa' },
+  { flag: '🇸🇳', countryName: 'Senegal', continent: 'Africa' },
+  { flag: '🇲🇦', countryName: 'Marocco', continent: 'Africa' },
+  { flag: '🇪🇹', countryName: 'Etiopia', continent: 'Africa' },
+  { flag: '🇪🇬', countryName: 'Egitto', continent: 'Africa' },
+  { flag: '🇬🇭', countryName: 'Ghana', continent: 'Africa' },
+  { flag: '🇰🇪', countryName: 'Kenya', continent: 'Africa' },
+  { flag: '🇨🇲', countryName: 'Camerun', continent: 'Africa' },
+  { flag: '🇹🇳', countryName: 'Tunisia', continent: 'Africa' },
+  { flag: '🇿🇦', countryName: 'Sudafrica', continent: 'Africa' },
+  { flag: '🇨🇩', countryName: 'R.D. Congo', continent: 'Africa' },
+  { flag: '🇲🇱', countryName: 'Mali', continent: 'Africa' },
+  { flag: '🇸🇴', countryName: 'Somalia', continent: 'Africa' },
+  { flag: '🇲🇬', countryName: 'Madagascar', continent: 'Africa' },
+  { flag: '🇯🇵', countryName: 'Giappone', continent: 'Asia' },
+  { flag: '🇨🇳', countryName: 'Cina', continent: 'Asia' },
+  { flag: '🇮🇳', countryName: 'India', continent: 'Asia' },
+  { flag: '🇹🇭', countryName: 'Thailandia', continent: 'Asia' },
+  { flag: '🇰🇷', countryName: 'Corea del Sud', continent: 'Asia' },
+  { flag: '🇻🇳', countryName: 'Vietnam', continent: 'Asia' },
+  { flag: '🇱🇧', countryName: 'Libano', continent: 'Asia' },
+  { flag: '🇹🇷', countryName: 'Turchia', continent: 'Asia' },
+  { flag: '🇲🇽', countryName: 'Messico', continent: 'Americhe' },
+  { flag: '🇦🇷', countryName: 'Argentina', continent: 'Americhe' },
+  { flag: '🇧🇷', countryName: 'Brasile', continent: 'Americhe' },
+  { flag: '🇵🇪', countryName: 'Perù', continent: 'Americhe' },
+  { flag: '🇺🇸', countryName: 'Stati Uniti', continent: 'Americhe' },
+];
+
+export const getCountryNameByFlag = (flag?: string): string | undefined => {
+  if (!flag) return undefined;
+  return nationalityNames[flag.trim()]?.[0];
 };
 
 interface FilterBarProps {
   filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
+  chefs?: Chef[];
 }
 
-export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange }) => {
+export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, chefs = MOCK_CHEFS }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const categoryOptions = [
@@ -75,59 +123,31 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
     },
   ];
 
-  // Map country choices directly with amazing dedicated cuisine headers & local dish imagery
-  const countryCuisines = [
-    { 
-      flag: '🇮🇹', 
-      name: 'Italia', 
-      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=260&h=180&q=80',
-      cuisine: 'Pizza e Pasta'
-    },
-    { 
-      flag: '🇲🇽', 
-      name: 'Messico', 
-      image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=260&h=180&q=80',
-      cuisine: 'Tacos e Tortillas'
-    },
-    { 
-      flag: '🇯🇵', 
-      name: 'Giappone', 
-      image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=260&h=180&q=80',
-      cuisine: 'Sushi e Ramen'
-    },
-    { 
-      flag: '🇨🇳', 
-      name: 'Cina', 
-      image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=260&h=180&q=80',
-      cuisine: 'Gyoza e Anatra'
-    },
-    { 
-      flag: '🇲🇦', 
-      name: 'Marocco', 
-      image: 'https://images.unsplash.com/photo-1585238342024-78d387f4a707?auto=format&fit=crop&w=260&h=180&q=80',
-      cuisine: 'Couscous e Tajine'
-    },
-    { 
-      flag: '🇮🇳', 
-      name: 'India', 
-      image: 'https://images.unsplash.com/photo-1585938338392-50a599d02177?auto=format&fit=crop&w=260&h=180&q=80',
-      cuisine: 'Samosa e Curry'
-    },
-    { 
-      flag: '🇫🇷', 
-      name: 'Francia', 
-      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=260&h=180&q=80',
-      cuisine: 'Boulangerie'
-    }
-  ];
+  // Build ordered list of active countries from live chefs with their original flags and country names
+  const countryOptions = useMemo(() => {
+    const map = new Map<string, { flag: string; name: string; dishCount: number }>();
+    chefs.forEach(chef => {
+      if (!chef.nationality) return;
+      const flag = chef.nationality.trim();
+      const resolvedName =
+        (chef.countryName && !(chef.countryName === 'Italia' && flag !== '🇮🇹') ? chef.countryName : undefined) ||
+        getCountryNameByFlag(flag) ||
+        'Paese';
+      const existing = map.get(flag);
+      if (existing) {
+        existing.dishCount += chef.dishes.length;
+      } else {
+        map.set(flag, { flag, name: resolvedName, dishCount: chef.dishes.length });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'it'));
+  }, [chefs]);
 
-  const countryOptions = Array.from(new Set(MOCK_CHEFS.map(chef => chef.nationality))).sort();
-
-  const toggleCountry = (option: string) => {
+  const toggleCountry = (flag: string) => {
     const current = filters.countries || [];
-    const next = current.includes(option)
-      ? current.filter(c => c !== option)
-      : [...current, option];
+    const next = current.includes(flag)
+      ? current.filter(c => c !== flag)
+      : [...current, flag];
     onFilterChange({ ...filters, countries: next });
   };
 
@@ -155,7 +175,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
   };
 
   return (
-    <div id="main-filter-bar" className="bg-white border-b border-orange-100 py-3.5 md:py-6 sticky top-16 md:top-20 z-40 shadow-sm animate-fade-in transition-all">
+    <div id="main-filter-bar" className="bg-white border-b border-orange-100 py-3.5 md:py-5 sticky top-16 md:top-20 z-40 shadow-sm animate-fade-in transition-all">
       <div className="max-w-6xl mx-auto px-4">
         {/* Search Header Container */}
         <div className="flex items-center gap-2.5">
@@ -165,8 +185,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
             </div>
             <input
               type="text"
-              placeholder="Cerca piatti, cucine..."
-              className="block w-full pl-11 pr-4 py-3 md:py-4 border-2 border-gray-100 rounded-[1.3rem] md:rounded-[1.8rem] bg-gray-50/50 text-xs md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:bg-white transition-all shadow-inner placeholder-gray-400"
+              placeholder="Cerca piatti, ingredienti, paesi o cuochi (es. Lasagna, Jollof, Giappone)..."
+              className="block w-full pl-11 pr-10 py-3 md:py-4 border-2 border-gray-100 rounded-[1.3rem] md:rounded-[1.8rem] bg-gray-50/50 text-xs md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:bg-white transition-all shadow-inner placeholder-gray-400"
               value={filters.search}
               onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
             />
@@ -174,6 +194,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
               <button 
                 onClick={() => onFilterChange({ ...filters, search: '' })}
                 className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-orange-600"
+                title="Pulisci ricerca"
               >
                 <X className="h-4.5 w-4.5" />
               </button>
@@ -182,14 +203,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
 
           <button 
             onClick={() => setIsExpanded(!isExpanded)}
-            className={`relative flex items-center gap-2 px-4 md:px-8 py-3 md:py-4 rounded-[1.3rem] md:rounded-[1.8rem] border-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${
+            className={`relative flex items-center gap-2 px-4 md:px-7 py-3 md:py-4 rounded-[1.3rem] md:rounded-[1.8rem] border-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${
               isExpanded || activeFiltersCount > 0 
                 ? 'bg-black border-black text-white shadow-xl' 
                 : 'bg-white border-gray-100 text-gray-700 hover:border-orange-500'
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span className="hidden sm:inline">Advanced</span>
+            <span className="hidden sm:inline">Filtri</span>
             {activeFiltersCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-orange-600 text-black border-2 border-white rounded-full flex items-center justify-center text-[9px] font-black">
                 {activeFiltersCount}
@@ -199,11 +220,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
           </button>
         </div>
 
-        {/* Visually Highlighted Options Below Search Bar (Permanent and Beautiful with Images) */}
-        <div className="mt-4 md:mt-6 pt-1">
-          {/* Categorie Section with Real Food Banners */}
-          <div className="mb-2 md:mb-6">
-            <div className="flex items-center justify-between mb-2 md:mb-3 px-1">
+        {/* Categorie Section with Food Banners */}
+        <div className="mt-3.5 md:mt-5 pt-1">
+          <div>
+            <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-1.5">
                 <UtensilsCrossed className="w-3 h-3 md:w-3.5 md:h-3.5 text-orange-500" />
                 Preferenze Alimentari
@@ -218,7 +238,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
               )}
             </div>
 
-            <div className="flex overflow-x-auto space-x-2 md:space-x-4 pb-2 md:pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+            <div className="flex overflow-x-auto space-x-2 md:space-x-3.5 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
               {categoryOptions.map(cat => {
                 const Icon = cat.icon;
                 const isActive = filters.categories.includes(cat.name);
@@ -226,13 +246,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
                   <button
                     key={cat.name}
                     onClick={() => toggleCategory(cat.name)}
-                    className={`relative flex-none w-[140px] sm:w-44 h-16 sm:h-24 rounded-xl sm:rounded-[1.5rem] overflow-hidden border-2 transition-all group cursor-pointer ${
+                    className={`relative flex-none w-[132px] sm:w-44 h-14 sm:h-20 rounded-xl sm:rounded-[1.4rem] overflow-hidden border-2 transition-all group cursor-pointer ${
                       isActive 
-                        ? 'border-orange-500 shadow-xl scale-[1.02] sm:scale-105 ring-4 ring-orange-500/15' 
+                        ? 'border-orange-500 shadow-lg ring-2 ring-orange-500/20' 
                         : 'border-transparent hover:border-orange-200 hover:shadow-md'
                     }`}
                   >
-                    {/* Background image & overlay */}
                     <img 
                       src={cat.image} 
                       alt={cat.name} 
@@ -242,8 +261,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
                       isActive ? 'from-orange-600/90 to-black/35 opacity-95' : 'from-black/80 via-black/45 to-transparent'
                     }`}></div>
 
-                    {/* Content inside card */}
-                    <div className="absolute inset-0 p-2 md:p-3.5 flex flex-col justify-end text-left z-10">
+                    <div className="absolute inset-0 p-2 md:p-3 flex flex-col justify-end text-left z-10">
                       <div className="flex items-center gap-1 md:gap-1.5 mb-0.5">
                         <Icon className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isActive ? 'text-black' : 'text-orange-500'}`} />
                         <span className={`text-[11px] md:text-[13px] font-black tracking-tight uppercase leading-none ${isActive ? 'text-black' : 'text-white'}`}>
@@ -255,9 +273,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
                       </span>
                     </div>
 
-                    {/* Selected Badge */}
                     {isActive && (
-                      <div className="absolute top-1.5 right-1.5 md:top-2.5 md:right-2.5 bg-black text-orange-500 p-1 md:p-1.5 rounded-full shadow-lg">
+                      <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 bg-black text-orange-500 p-1 rounded-full shadow-lg">
                         <Check className="w-2.5 h-2.5 md:w-3 md:h-3 stroke-[3]" />
                       </div>
                     )}
@@ -266,34 +283,51 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
               })}
             </div>
           </div>
-
-
         </div>
 
-        {/* Traditional Advanced Filters Expandable Drawer Section */}
+        {/* Advanced Filters Expandable Drawer */}
         {isExpanded && (
-          <div className="mt-4 pt-6 border-t border-gray-100 animate-slide-up space-y-6">
+          <div className="mt-4 pt-5 border-t border-gray-100 animate-slide-up space-y-5 max-h-[55vh] overflow-y-auto">
+            {/* Price Filter */}
+            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] block">Prezzo Massimo Piatto</span>
+                <span className="text-sm font-black text-gray-900">
+                  {filters.maxPrice >= 50 ? 'Qualsiasi prezzo' : `Fino a € ${filters.maxPrice.toFixed(0)}`}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={5}
+                max={50}
+                step={1}
+                value={filters.maxPrice}
+                onChange={(e) => onFilterChange({ ...filters, maxPrice: Number(e.target.value) })}
+                className="w-full sm:w-64 accent-orange-600 cursor-pointer"
+              />
+            </div>
+
+            {/* Complete Countries Grid */}
             <div>
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] block mb-3">Tutte le Altre Nazioni</span>
-              <div className="flex flex-wrap gap-2.5">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] block mb-3">
+                Tutte le Nazioni Disponibili ({countryOptions.length})
+              </span>
+              <div className="flex flex-wrap gap-2">
                 {countryOptions.map(country => {
-                  const alreadyFeatured = countryCuisines.some(item => item.flag === country);
-                  if (alreadyFeatured) return null; // Avoid duplicating featured cards
-                  
-                  const isActive = filters.countries.includes(country);
-                  const countryName = nationalityNames[country]?.[0] || 'Paese';
+                  const isActive = filters.countries.includes(country.flag);
                   return (
                     <button
-                      key={country}
-                      onClick={() => toggleCountry(country)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all border-2 duration-300 ${
+                      key={country.flag}
+                      onClick={() => toggleCountry(country.flag)}
+                      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all border-2 duration-200 ${
                         isActive
                           ? 'bg-orange-50 border-orange-500 text-orange-950 font-black'
-                          : 'bg-gray-50/50 border-gray-100 text-gray-500 hover:bg-white'
+                          : 'bg-gray-50/50 border-gray-100 text-gray-600 hover:bg-white hover:border-orange-200'
                       }`}
                     >
-                      <span className="text-xl">{country}</span>
-                      <span className="text-xs font-bold">{countryName}</span>
+                      <CountryFlag flag={country.flag} title={country.name} size="sm" />
+                      <span className="text-xs font-bold">{country.name}</span>
+                      <span className="text-[10px] font-black text-gray-400">({country.dishCount})</span>
                     </button>
                   );
                 })}
@@ -305,13 +339,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
                 onClick={resetFilters}
                 className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors"
               >
-                Resetta Filtri
+                Resetta Tutti i Filtri
               </button>
               <button 
                 onClick={() => setIsExpanded(false)}
-                className="px-10 py-3.5 bg-black hover:bg-orange-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95"
+                className="px-8 py-3 bg-black hover:bg-orange-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95"
               >
-                Chiudi Avanzate
+                Applica e Chiudi
               </button>
             </div>
           </div>

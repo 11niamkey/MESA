@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, ChefHat, ShieldCheck, Camera, FileText, Check, ArrowRight, 
   Sparkles, MapPin, Smartphone, Loader2, Upload, Trash2, Eye, 
@@ -6,12 +6,13 @@ import {
   Calendar, Clock, Sun, Moon, Sunset, CalendarDays, Plus, CheckSquare
 } from 'lucide-react';
 import { Chef, AppUser, ChefApplication, ChefDocument, Continent } from '../types';
+import { CountryFlag } from './CountryFlag';
 
 interface ChefOnboardingProps {
   isOpen: boolean;
   onClose: () => void;
   onChefCreate?: (chef: Chef) => void;
-  onSubmitApplication?: (application: ChefApplication) => void;
+  onSubmitApplication?: (application: ChefApplication, chosenPassword?: string) => Promise<void> | void;
   currentUser?: AppUser | null;
 }
 
@@ -32,10 +33,39 @@ const PRESET_TIME_SLOTS = [
   { id: 'cena_tarda', label: 'Cena Serale Tarda', slot: '21:00 - 23:30', icon: Clock, desc: 'Per ordini serali e dopocena' },
 ];
 
+const compressImageFile = (file: File, maxWidth = 640, quality = 0.72): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Errore nella lettura dell\'immagine.'));
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      if (!file.type.startsWith('image/') || !result) {
+        resolve(result);
+        return;
+      }
+      const img = new Image();
+      img.onerror = () => resolve(result.length <= 180000 ? result : '');
+      img.onload = () => {
+        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(result.length <= 180000 ? result : '');
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+  });
+
 export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({ 
   isOpen, 
   onClose, 
-  onChefCreate,
   onSubmitApplication,
   currentUser 
 }) => {
@@ -43,16 +73,22 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [submittedAppId, setSubmittedAppId] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Form State
   const [fullName, setFullName] = useState(currentUser ? `${currentUser.name} ${currentUser.lastName}`.trim() : '');
-  const [brandName, setBrandName] = useState(currentUser ? `${currentUser.name} Home Chef` : '');
+  const [brandName, setBrandName] = useState(currentUser ? (currentUser.brandName || `${currentUser.name} Home Chef`) : '');
   const [email, setEmail] = useState(currentUser ? currentUser.email : '');
-  const [phone, setPhone] = useState('+39 ');
+  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState(currentUser?.phone || '+39 ');
   const [nationality, setNationality] = useState('🇮🇹');
   const [countryName, setCountryName] = useState('Italia');
   const [continent, setContinent] = useState<Continent>('Europa');
-  const [location, setLocation] = useState('Milano, Centro');
+  const [location, setLocation] = useState(
+    currentUser?.addresses?.[0]
+      ? `${currentUser.addresses[0].street}, ${currentUser.addresses[0].city}`
+      : 'Pordenone (PN), Centro'
+  );
   const [bio, setBio] = useState('');
   const [specialties, setSpecialties] = useState<string[]>(['Cucina Casalinga', 'Ricette di Famiglia']);
   const [newSpecialty, setNewSpecialty] = useState('');
@@ -96,6 +132,24 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
   const [proposedDishDesc, setProposedDishDesc] = useState('Piatto preparato fresco su ordinazione con ingredienti selezionati.');
   const [proposedDishPrice, setProposedDishPrice] = useState<number>(14.50);
 
+  useEffect(() => {
+    if (isOpen) {
+      setStep(1);
+      setIsSuccess(false);
+      setIsSubmitting(false);
+      setErrorMsg('');
+      if (currentUser) {
+        setFullName(`${currentUser.name} ${currentUser.lastName}`.trim());
+        setBrandName(currentUser.brandName || `${currentUser.name} Home Chef`);
+        setEmail(currentUser.email);
+        if (currentUser.phone) setPhone(currentUser.phone);
+        if (currentUser.addresses?.[0]) {
+          setLocation(`${currentUser.addresses[0].street}, ${currentUser.addresses[0].city}`);
+        }
+      }
+    }
+  }, [isOpen, currentUser?.id]);
+
   if (!isOpen) return null;
 
   // Day toggle
@@ -131,52 +185,67 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
     setSelectedSlots(prev => prev.filter(s => s !== slotStr));
   };
 
-  // File upload handlers
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File upload handlers (compressed to keep Firestore documents lightweight & well under 1MB)
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setAvatarUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    try {
+      const compressed = await compressImageFile(file, 480, 0.72);
+      if (compressed) {
+        setAvatarUrl(compressed);
+        setErrorMsg('');
+      }
+    } catch {
+      setErrorMsg('Impossibile leggere la foto profilo selezionata.');
     }
   };
 
-  const handleKitchenPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleKitchenPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setKitchenPhotos(prev => [...prev, reader.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    try {
+      const compressed = await compressImageFile(file, 640, 0.7);
+      if (compressed) {
+        setKitchenPhotos(prev => [...prev.slice(0, 2), compressed]);
+        setErrorMsg('');
+      }
+    } catch {
+      setErrorMsg('Impossibile leggere la foto della cucina.');
     }
   };
 
-  const handleDocumentFileUpload = (type: 'id_card' | 'haccp_certificate' | 'kitchen_hygiene' | 'other', title: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDocumentFileUpload = (type: 'id_card' | 'haccp_certificate' | 'kitchen_hygiene' | 'other', title: string) => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const newDoc: ChefDocument = {
-          id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          type,
-          title,
-          fileName: file.name,
-          fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-          fileData: typeof reader.result === 'string' ? reader.result : undefined,
-          uploadedAt: new Date().toLocaleDateString('it-IT'),
-          isVerified: false
-        };
-        setDocuments(prev => [...prev.filter(d => d.type !== type), newDoc]);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    let fileData: string | undefined;
+    if (file.type.startsWith('image/')) {
+      try {
+        fileData = await compressImageFile(file, 640, 0.65);
+      } catch {
+        fileData = undefined;
+      }
+    } else if (file.size <= 160 * 1024) {
+      fileData = await new Promise<string | undefined>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
+        reader.onerror = () => resolve(undefined);
+        reader.readAsDataURL(file);
+      });
     }
+    const newDoc: ChefDocument = {
+      id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      type,
+      title,
+      fileName: file.name,
+      fileSize: file.size >= 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+        : `${Math.max(1, Math.round(file.size / 1024))} KB`,
+      ...(fileData ? { fileData } : {}),
+      uploadedAt: new Date().toLocaleDateString('it-IT'),
+      isVerified: false
+    };
+    setDocuments(prev => [...prev.filter(d => d.type !== type), newDoc]);
+    setErrorMsg('');
   };
 
   const handleRemoveDoc = (id: string) => {
@@ -194,28 +263,54 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
     setSpecialties(prev => prev.filter(s => s !== spec));
   };
 
-  const handleSubmit = () => {
+  const handleNextStep = () => {
+    setErrorMsg('');
+    if (step === 1) {
+      if (!fullName.trim() || !brandName.trim() || !email.trim() || !email.includes('@') || !phone.trim() || phone.trim() === '+39' || !location.trim()) {
+        setErrorMsg('Compila tutti i campi obbligatori (*) di Profilo, Email, Telefono e Sede Cucina prima di continuare.');
+        return;
+      }
+      if (!currentUser && password.trim().length > 0 && password.trim().length < 4) {
+        setErrorMsg('La password (se inserita) deve contenere almeno 4 caratteri.');
+        return;
+      }
+    }
+    setStep(prev => Math.min(5, prev + 1));
+  };
+
+  const handleSubmit = async () => {
+    setErrorMsg('');
+    if (!fullName.trim() || !brandName.trim() || !email.trim() || !phone.trim() || !location.trim()) {
+      setErrorMsg('Completa tutti i campi anagrafici obbligatori nello Step 1.');
+      setStep(1);
+      return;
+    }
+    if (!proposedDishName.trim() || !proposedDishPrice || proposedDishPrice <= 0) {
+      setErrorMsg('Inserisci il nome e un prezzo valido per il tuo primo piatto.');
+      return;
+    }
+
     setIsSubmitting(true);
     const appId = `APP-CHEF-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
     const newApplication: ChefApplication = {
       id: appId,
-      userId: currentUser?.id,
-      fullName: fullName || 'Nuovo Cuoco MESA',
-      brandName: brandName || fullName || 'Chef Casalingo MESA',
-      email: email || `chef.${Date.now()}@mesa.com`,
-      phone: phone || '+393475552026',
+      ...(currentUser?.id ? { userId: currentUser.id } : {}),
+      fullName: fullName.trim(),
+      brandName: brandName.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
       nationality: nationality || '🇮🇹',
-      countryName: countryName || 'Italia',
+      countryName: countryName.trim() || 'Italia',
       continent: continent || 'Europa',
-      location: location || 'Milano, Centro',
-      bio: bio || 'Appassionato/a di cucina autentica casalinga.',
+      location: location.trim(),
+      bio: bio.trim() || 'Appassionato/a di cucina autentica casalinga.',
       specialties: specialties.length > 0 ? specialties : ['Cucina Casalinga'],
       avatarUrl: avatarUrl,
       kitchenPhotos: kitchenPhotos,
       documents: documents,
-      proposedDishName: proposedDishName,
-      proposedDishDesc: proposedDishDesc,
+      proposedDishName: proposedDishName.trim(),
+      proposedDishDesc: proposedDishDesc.trim() || 'Piatto preparato fresco su ordinazione.',
       proposedDishPrice: proposedDishPrice || 14.50,
       availableDays: selectedDays.length > 0 ? selectedDays : [1, 2, 3, 4, 5, 6],
       availabilitySlots: selectedSlots.length > 0 ? selectedSlots : ['12:00 - 15:00', '19:00 - 22:00'],
@@ -223,52 +318,17 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
       submittedAt: new Date().toLocaleString('it-IT')
     };
 
-    // Also build chef profile
-    const newChef: Chef = {
-      id: `chef-${appId.toLowerCase()}`,
-      name: brandName || fullName || 'Nuovo Cuoco MESA',
-      nationality: nationality || '🇮🇹',
-      countryName: countryName || 'Italia',
-      continent: continent || 'Europa',
-      avatar: avatarUrl,
-      rating: 5.0,
-      location: location || 'Milano, Centro',
-      phone: phone || '+393475552026',
-      email: email || `chef.${Date.now()}@mesa.com`,
-      password: 'demo123',
-      specialties: specialties,
-      bio: bio || 'Ricette artigianali e sapori autentici di casa.',
-      availability: selectedSlots.length > 0 ? selectedSlots : ['19:00 - 22:00'],
-      availableDays: selectedDays.length > 0 ? selectedDays : [1, 2, 3, 4, 5, 6],
-      reviews: [],
-      dishes: [
-        {
-          id: `dish-${Date.now()}`,
-          name: proposedDishName,
-          description: proposedDishDesc,
-          price: proposedDishPrice || 14.50,
-          image: kitchenPhotos[0] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
-          chefId: `chef-${appId.toLowerCase()}`,
-          tags: specialties
-        }
-      ],
-      distance: 1.2,
-      verificationStatus: 'pending',
-      documents: documents
-    };
-
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSuccess(true);
-      setSubmittedAppId(appId);
-
+    try {
       if (onSubmitApplication) {
-        onSubmitApplication(newApplication);
+        await onSubmitApplication(newApplication, password.trim() || undefined);
       }
-      if (onChefCreate) {
-        onChefCreate(newChef);
-      }
-    }, 1200);
+      setSubmittedAppId(appId);
+      setIsSuccess(true);
+    } catch {
+      setErrorMsg('Errore durante il salvataggio della candidatura. Controlla la connessione e riprova.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -416,16 +476,34 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                         </div>
                       </div>
 
+                      {!currentUser && (
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">
+                            Password per accedere all&apos;Area Cuoco (opzionale, default: demo123)
+                          </label>
+                          <input 
+                            type="password" 
+                            value={password} 
+                            onChange={(e) => setPassword(e.target.value)} 
+                            placeholder="Scegli una password per il tuo account Cuoco MESA" 
+                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 font-bold text-sm" 
+                          />
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-3 gap-3">
                         <div>
                           <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Bandiera Paese</label>
-                          <input 
-                            type="text" 
-                            value={nationality} 
-                            onChange={(e) => setNationality(e.target.value)} 
-                            placeholder="es. 🇨🇮" 
-                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 font-bold text-sm text-center" 
-                          />
+                          <div className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-2xl focus-within:ring-2 focus-within:ring-orange-500">
+                            <CountryFlag flag={nationality} title={countryName} size="sm" />
+                            <input 
+                              type="text" 
+                              value={nationality} 
+                              onChange={(e) => setNationality(e.target.value)} 
+                              placeholder="es. 🇨🇮" 
+                              className="w-full bg-transparent outline-none font-bold text-sm text-center" 
+                            />
+                          </div>
                         </div>
                         <div>
                           <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Nome Paese</label>
@@ -957,10 +1035,21 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                 </div>
               )}
 
+              {errorMsg && (
+                <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-600 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
               {/* Action Navigation Buttons */}
               <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between">
                  <button 
-                  onClick={() => step > 1 ? setStep(step - 1) : onClose()}
+                  type="button"
+                  onClick={() => {
+                    setErrorMsg('');
+                    step > 1 ? setStep(step - 1) : onClose();
+                  }}
                   className="px-6 py-4 text-gray-500 font-black uppercase tracking-widest text-xs hover:text-black transition-colors"
                  >
                    {step === 1 ? 'Annulla' : 'Indietro'}
@@ -968,7 +1057,8 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                  
                  {step < 5 ? (
                    <button 
-                    onClick={() => setStep(step + 1)}
+                    type="button"
+                    onClick={handleNextStep}
                     className="px-8 py-4 bg-black text-white rounded-2xl font-black uppercase tracking-widest text-xs flex items-center gap-2 hover:bg-orange-600 transition-all shadow-xl active:scale-95"
                    >
                      <span>Continua</span>
@@ -976,6 +1066,7 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                    </button>
                  ) : (
                    <button 
+                    type="button"
                     onClick={handleSubmit}
                     disabled={isSubmitting}
                     className="px-10 py-4.5 bg-orange-600 hover:bg-orange-500 text-black rounded-2xl font-black uppercase tracking-widest text-xs flex items-center gap-3 transition-all shadow-xl shadow-orange-600/30 active:scale-95 disabled:opacity-50"

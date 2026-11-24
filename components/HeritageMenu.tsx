@@ -16,6 +16,8 @@ import {
   UtensilsCrossed,
   Globe
 } from 'lucide-react';
+import { HeritageJourney } from './HeritageJourney';
+import { CountryFlag } from './CountryFlag';
 
 interface HeritageMenuProps {
   chefs: Chef[];
@@ -124,6 +126,7 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
   onToggleFavorite 
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedHeritageDish, setSelectedHeritageDish] = useState<{chef: Chef, dish: Dish} | null>(null);
 
   // Raccogliamo tutti i piatti in una lista piana, arricchendoli dei dati del cuoco e del loro aneddoto storico unico
   const allHeritageDishes = useMemo(() => {
@@ -157,26 +160,26 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
   }, [allHeritageDishes, searchQuery]);
 
   return (
-    <div className="animate-fade-in space-y-12">
+    <div className="animate-fade-in space-y-8">
       {/* Header Premium dal sapore editoriale (Libro Antico / Fine Art) */}
-      <div className="relative bg-[#0b0b0b] text-white rounded-[3rem] p-8 md:p-16 border border-orange-950/40 overflow-hidden shadow-2xl">
+      <div className="relative bg-[#0b0b0b] text-white rounded-[2.5rem] p-6 md:p-10 border border-orange-950/40 overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-orange-600/10 to-amber-600/5 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-orange-900/5 rounded-full blur-[100px] -ml-32 -mb-32 pointer-events-none"></div>
         
-        <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
-          <div className="w-20 h-20 bg-gradient-to-tr from-orange-500 to-amber-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-orange-950/20">
-            <BookOpen className="w-10 h-10 text-black shrink-0" />
+        <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 md:gap-10">
+          <div className="w-16 h-16 bg-gradient-to-tr from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-xl shadow-orange-950/20 shrink-0">
+            <BookOpen className="w-8 h-8 text-black shrink-0" />
           </div>
-          <div className="flex-1 text-center md:text-left space-y-3">
-            <div className="inline-flex items-center gap-2 bg-orange-600/10 border border-orange-500/20 px-3.5 py-1 rounded-xl">
+          <div className="flex-1 text-center md:text-left space-y-2 min-w-0">
+            <div className="inline-flex items-center gap-2 bg-orange-600/10 border border-orange-500/20 px-3 py-1 rounded-xl">
               <History className="w-3.5 h-3.5 text-orange-500" />
               <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">Archivio delle Tradizioni MESA</span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter leading-none uppercase">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-black italic tracking-tight leading-none uppercase whitespace-nowrap truncate text-orange-500">
               Le Radici del Gusto
             </h1>
-            <p className="text-sm md:text-base text-gray-400 max-w-2xl font-serif italic leading-relaxed">
-              "In questa sezione riscopri il patrimonio invisibile delle nostre cucine rionali. Nessun piatto è un semplice pasto: qui troverai esclusivamente le fedi, gli aneddoti e le storie tradizionali che compongono l'anima delle ricette di famiglia."
+            <p className="text-xs sm:text-sm text-gray-400 max-w-2xl font-serif italic leading-relaxed line-clamp-2">
+              "In questa sezione riscopri il patrimonio invisibile delle nostre cucine rionali: le tradizioni, gli aneddoti e le storie che compongono l'anima delle ricette di famiglia."
             </p>
           </div>
         </div>
@@ -242,10 +245,10 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
                 {/* Titoli Sopra l'immagine */}
                 <div className="absolute bottom-5 left-6 right-6 text-white text-left">
                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-2xl filter drop-shadow">{dish.chefNationality}</span>
+                      <CountryFlag flag={dish.chefNationality} title={dish.chefData.countryName} size="md" className="drop-shadow" />
                       <span className="text-[10px] font-black uppercase tracking-widest text-orange-500 font-mono">Ricetta del Cuore</span>
                    </div>
-                   <h3 className="text-2xl sm:text-3xl font-black italic tracking-tighter leading-none font-sans uppercase">
+                   <h3 className="text-xl sm:text-2xl font-black italic tracking-tighter leading-none font-sans uppercase text-orange-400 truncate">
                       {dish.name}
                    </h3>
                 </div>
@@ -262,7 +265,7 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
                   </div>
                   
                   <div className="bg-orange-50/50 rounded-2.5xl p-5 border border-orange-100">
-                    <p className="text-xs sm:text-sm text-gray-700 leading-relaxed font-serif italic">
+                    <p className="text-xs sm:text-sm text-black leading-relaxed font-serif italic">
                       "{dish.storyData.history}"
                     </p>
                   </div>
@@ -270,17 +273,17 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
 
                 {/* Il Segreto di Famiglia */}
                 <div className="space-y-2 border-t border-gray-100 pt-5">
-                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-orange-600">
                     <Sparkles className="w-3.5 h-3.5 text-orange-500 shrink-0" /> 
                     <span>Il Segreto del Cuoco:</span>
                   </div>
-                  <p className="text-xs text-gray-600 leading-relaxed">
+                  <p className="text-xs text-black leading-relaxed">
                     <strong>Come lo prepara {dish.chefName}:</strong> {dish.storyData.secret}
                   </p>
                 </div>
 
                 {/* Era/Epoca e Riferimenti */}
-                <div className="flex items-center gap-2 bg-neutral-50 px-4 py-2.5 rounded-xl border border-neutral-100 text-[10px] text-gray-500 font-medium">
+                <div className="flex items-center gap-2 bg-neutral-50 px-4 py-2.5 rounded-xl border border-neutral-100 text-[10px] text-black font-medium">
                   <Hourglass className="w-3.5 h-3.5 text-orange-500 shrink-0" />
                   <span className="truncate"><strong>Origine:</strong> {dish.storyData.vintage}</span>
                 </div>
@@ -301,7 +304,14 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
                     <span className="text-[9px] font-black uppercase tracking-wider text-orange-500 pr-2">Profilo ▸</span>
                   </div>
 
-                  <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => setSelectedHeritageDish({ chef: dish.chefData, dish })}
+                      className="w-full py-3 border-2 border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-black rounded-xl font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
+                    >
+                      <Compass className="w-3.5 h-3.5 shrink-0" /> Vivi Rituale AI
+                    </button>
+
                     <button 
                       onClick={() => onAddDish(dish)}
                       className="w-full py-3 bg-black hover:bg-orange-600 text-white hover:text-black rounded-xl font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
@@ -337,7 +347,7 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
       <div className="bg-[#0b0b0b] text-white rounded-[4rem] p-8 md:p-16 text-center relative border border-orange-950/40 overflow-hidden shadow-2xl">
          <div className="absolute top-0 left-0 w-80 h-80 bg-orange-600/10 rounded-full blur-[120px] -ml-40 -mt-40 pointer-events-none"></div>
          <Sparkles className="w-10 h-10 text-orange-500 mx-auto mb-6 shrink-0" />
-         <h3 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tight mb-4">Insieme per salvaguardare il cibo rionale</h3>
+         <h3 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tight mb-4 text-orange-500">Insieme per salvaguardare il cibo rionale</h3>
          <p className="text-gray-400 mb-8 max-w-xl mx-auto font-serif italic text-xs sm:text-sm leading-relaxed">
            "Ogni ordine effettuato all'interno del Menu delle Radici supporta i cuochi custodi della tradizione locale, consentendo il sostentamento di tecniche culinarie preziose e di filiere sane a km zero."
          </p>
@@ -347,6 +357,15 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
             <div className="flex items-center gap-1.5"><ChefHat className="w-4 h-4 text-orange-500" /> Cuochi Nazionali Selezionati</div>
          </div>
       </div>
+
+      {/* Modal del Percorso Culturale delle Radici (Immersion Multimediale) */}
+      {selectedHeritageDish && (
+        <HeritageJourney 
+          dish={selectedHeritageDish.dish} 
+          chef={selectedHeritageDish.chef} 
+          onClose={() => setSelectedHeritageDish(null)} 
+        />
+      )}
     </div>
   );
 };

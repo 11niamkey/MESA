@@ -9,7 +9,8 @@ import {
 import { Chef, Dish, ViewState } from '../types';
 import { ReviewList } from './ReviewList';
 import { StarRating } from './StarRating';
-import { ChefAvailabilityCalendar } from './ChefAvailabilityCalendar';
+import { HeritageJourney } from './HeritageJourney';
+import { CountryFlag } from './CountryFlag';
 
 interface ChefProfileProps {
   chef: Chef;
@@ -25,6 +26,7 @@ const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a
 export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDish, favorites, onToggleFavorite, onNavigateToCulture }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'heritage' | 'reviews'>('menu');
   const [expandedDishId, setExpandedDishId] = useState<string | null>(null);
+  const [heritageDish, setHeritageDish] = useState<Dish | null>(null);
 
   const handleShare = () => {
     alert(`Link copiato negli appunti: https://mesa.app/chef/${chef.id}\nCondividi questo chef con i tuoi amici!`);
@@ -65,30 +67,30 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
               alt={chef.name} 
               className="w-40 h-40 md:w-56 md:h-56 rounded-[3rem] object-cover border-8 border-white shadow-2xl rotate-3 group-hover:rotate-0 transition-transform"
             />
-            <div className="absolute -bottom-4 -right-4 bg-white p-3 rounded-2xl shadow-xl text-3xl group-hover:scale-110 transition-transform" title={chef.countryName}>
-              {chef.nationality}
+            <div className="absolute -bottom-4 -right-4 bg-white p-3 rounded-2xl shadow-xl group-hover:scale-110 transition-transform flex items-center justify-center" title={chef.countryName}>
+              <CountryFlag flag={chef.nationality} title={chef.countryName} size="lg" />
             </div>
           </div>
           
           <div className="flex-1 text-center md:text-left">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <h1 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tighter italic">{chef.name}</h1>
-                {chef.countryName && <span className="hidden md:inline-block text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-lg font-bold tracking-widest uppercase mt-2">{chef.countryName}</span>}
+                <h1 className="text-4xl md:text-5xl font-black text-orange-600 tracking-tighter italic">{chef.name}</h1>
+                {chef.countryName && <span className="hidden md:inline-block text-xs bg-gray-100 text-black px-3 py-1 rounded-lg font-bold tracking-widest uppercase mt-2">{chef.countryName}</span>}
               </div>
-              <div className="flex items-center justify-center md:justify-start gap-2 mt-4 md:mt-0 bg-black text-white px-4 py-2 rounded-2xl shadow-lg">
+              <div className="flex items-center justify-center md:justify-start md:ml-auto gap-2 mt-4 md:mt-0 bg-black text-white px-4 py-2 rounded-2xl shadow-lg">
                 <Star className="w-4 h-4 text-orange-500 fill-current" />
                 <span className="font-black">{chef.rating}</span>
                 <span className="text-xs text-gray-400 font-bold uppercase">({chef.reviews.length} feedback)</span>
               </div>
             </div>
             
-            <div className="flex items-center justify-center md:justify-start text-gray-400 font-bold text-sm uppercase tracking-widest mb-6">
+            <div className="flex items-center justify-center md:justify-start text-black font-bold text-sm uppercase tracking-widest mb-6">
               <MapPin className="w-4 h-4 mr-2 text-orange-500" />
               {chef.location} • {chef.distance} km
             </div>
 
-            <p className="text-lg text-gray-600 leading-relaxed max-w-2xl italic font-medium">
+            <p className="text-lg text-black leading-relaxed max-w-2xl italic font-medium">
               "{chef.fullBio || chef.bio}"
             </p>
 
@@ -148,7 +150,7 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                 <div className="p-6 flex-1 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start mb-2">
-                      <h4 className="text-xl font-black text-gray-900">{dish.name}</h4>
+                      <h4 className="text-xl font-black text-orange-600">{dish.name}</h4>
                       <button
                         onClick={() => toggleDishDetails(dish.id)}
                         className="p-1 min-w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex-shrink-0"
@@ -157,24 +159,24 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                         {expandedDishId === dish.id ? <ChevronUp className="w-4 h-4" /> : <Info className="w-4 h-4" />}
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500 line-clamp-2 italic">{dish.description}</p>
+                    <p className="text-xs text-black line-clamp-2 italic">{dish.description}</p>
                     
                     {expandedDishId === dish.id && (
                       <div className="mt-4 p-4 bg-orange-50/50 rounded-2xl border border-orange-100 space-y-3 animate-fade-in text-sm">
                         {dish.ingredients && dish.ingredients.length > 0 && (
                           <div>
                             <span className="block text-[10px] font-black uppercase tracking-widest text-orange-800 mb-1">Ingredienti Chiave</span>
-                            <p className="text-gray-700 italic font-medium text-xs">{dish.ingredients.join(', ')}</p>
+                            <p className="text-black italic font-medium text-xs">{dish.ingredients.join(', ')}</p>
                           </div>
                         )}
                         {dish.preparation && (
                           <div>
                             <span className="block text-[10px] font-black uppercase tracking-widest text-orange-800 mb-1">Preparazione</span>
-                            <p className="text-gray-700 italic font-medium text-xs">{dish.preparation}</p>
+                            <p className="text-black italic font-medium text-xs">{dish.preparation}</p>
                           </div>
                         )}
                         {(!dish.ingredients || dish.ingredients.length === 0) && !dish.preparation && (
-                          <p className="text-gray-500 italic text-xs">Ulteriori dettagli in arrivo...</p>
+                          <p className="text-black italic text-xs">Ulteriori dettagli in arrivo...</p>
                         )}
                       </div>
                     )}
@@ -185,6 +187,12 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                       className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] transition-all font-bold border-b-2 border-orange-800"
                     >
                       Prenota
+                    </button>
+                    <button 
+                      onClick={() => setHeritageDish(dish)}
+                      className="w-full py-2 flex items-center justify-center gap-2 text-orange-600 text-[10px] font-black uppercase tracking-widest hover:underline"
+                    >
+                      <History className="w-3 h-3" /> Vedi Storia
                     </button>
                   </div>
                 </div>
@@ -198,8 +206,8 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
           <div className="space-y-12 animate-fade-in">
              <div className="bg-orange-50 border border-orange-100 p-8 rounded-[3rem] text-center mb-10">
                 <Compass className="w-10 h-10 text-orange-600 mx-auto mb-4" />
-                <h3 className="text-2xl font-black italic tracking-tight text-orange-900">Il Viaggio nel Gusto</h3>
-                <p className="text-sm text-orange-800 font-medium max-w-xl mx-auto italic">
+                <h3 className="text-2xl font-black italic tracking-tight text-orange-600">Il Viaggio nel Gusto</h3>
+                <p className="text-sm text-black font-medium max-w-xl mx-auto italic">
                   "Ogni piatto è un capitolo di una storia millenaria. In questa sezione, esploriamo le radici delle ricette di {chef.name}."
                 </p>
              </div>
@@ -216,8 +224,8 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                         className="relative z-10 w-full aspect-square object-cover rounded-[3.5rem] shadow-2xl grayscale-[0.2] hover:grayscale-0 transition-all duration-700" 
                       />
                       <div className="absolute -bottom-6 -right-6 z-20 bg-white rounded-full flex flex-col items-center justify-center p-4 shadow-xl border border-gray-50 min-w-24 min-h-24" title={chef.countryName}>
-                         <span className="text-4xl leading-none">{chef.nationality}</span>
-                         {chef.countryName && <span className="text-[8px] font-black uppercase tracking-widest text-gray-500 mt-1">{chef.countryName}</span>}
+                         <CountryFlag flag={chef.nationality} title={chef.countryName} size="lg" />
+                         {chef.countryName && <span className="text-[8px] font-black uppercase tracking-widest text-black mt-1.5">{chef.countryName}</span>}
                       </div>
                     </div>
                   </div>
@@ -227,10 +235,10 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                        <span className="px-3 py-1 bg-orange-100 text-orange-700 text-[9px] font-black uppercase tracking-widest rounded-lg">Ricetta Antica</span>
                        <div className="h-px flex-1 bg-orange-100"></div>
                     </div>
-                    <h4 className="text-4xl font-black italic text-gray-900 tracking-tighter">{dish.name}</h4>
+                    <h4 className="text-4xl font-black italic text-orange-600 tracking-tighter">{dish.name}</h4>
                     
                     <div className="bg-white border-l-4 border-orange-600 pl-6 py-2">
-                       <p className="text-xl font-serif text-gray-700 leading-relaxed italic">
+                       <p className="text-xl font-serif text-black leading-relaxed italic">
                          {/* Qui verrebbe caricato o generato lo storytelling specifico del piatto */}
                          Questa ricetta è stata tramandata nella famiglia di {chef.name} per generazioni. 
                          Utilizza tecniche di cottura lente che permettono agli ingredienti di sprigionare l'essenza della loro terra d'origine.
@@ -239,16 +247,19 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
 
                     <div className="grid grid-cols-2 gap-6 pt-4">
                        <div className="space-y-2">
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                          <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-2">
                              <Wind className="w-3 h-3 text-orange-500" /> Atmosfera
                           </p>
-                          <p className="text-sm font-medium text-gray-600 italic">Luci soffuse e un calice di vino rosso locale.</p>
+                          <p className="text-sm font-medium text-black italic">Luci soffuse e un calice di vino rosso locale.</p>
                        </div>
                        <div className="space-y-2">
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                          <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-2">
                              <Music className="w-3 h-3 text-orange-500" /> Musica
                           </p>
-                          <p className="text-sm font-medium text-gray-600 italic">Melodie popolari della regione {chef.nationality}.</p>
+                          <p className="text-sm font-medium text-black italic flex items-center gap-1.5 flex-wrap">
+                            <span>Melodie popolari ({chef.countryName || chef.continent})</span>
+                            <CountryFlag flag={chef.nationality} title={chef.countryName} size="xs" />
+                          </p>
                        </div>
                     </div>
 
@@ -273,13 +284,22 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
         )}
       </div>
 
+      {/* Heritage Journey Modal Integration */}
+      {heritageDish && (
+        <HeritageJourney 
+          dish={heritageDish} 
+          chef={chef} 
+          onClose={() => setHeritageDish(null)} 
+        />
+      )}
+
       {/* Footer del profilo */}
       <div className="mt-16 bg-black rounded-[4rem] p-12 text-white relative overflow-hidden group">
          <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:rotate-12 transition-transform duration-1000">
             <BookOpen className="w-64 h-64" />
          </div>
          <div className="relative z-10 max-w-2xl">
-            <h3 className="text-3xl font-black italic mb-6">MESA Cultural Project</h3>
+            <h3 className="text-3xl font-black italic mb-6 text-orange-500">MESA Cultural Project</h3>
             <p className="text-gray-400 text-lg leading-relaxed mb-10 italic">
                "Ogni piatto ordinato è un voto per la conservazione delle culture locali. Insieme, proteggiamo il patrimonio invisibile dei cuochi locali."
             </p>

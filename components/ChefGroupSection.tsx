@@ -19,18 +19,15 @@ export const ChefGroupSection: React.FC<ChefGroupSectionProps> = ({
   if (chefs.length === 0) return null;
 
   return (
-    <div className="mb-16">
-      <div className="flex items-center justify-between mb-8 px-1">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-black rounded-2xl flex items-center justify-center text-white">
-            <Globe className="w-6 h-6" />
+    <div className="mb-10">
+      <div className="flex items-center justify-between gap-3 mb-5 px-1">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 bg-black rounded-xl flex items-center justify-center text-white shrink-0">
+            <Globe className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">{title}</h2>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Eccellenze del continente</p>
-          </div>
+          <h2 className="text-lg sm:text-2xl font-black text-orange-600 tracking-tight whitespace-nowrap truncate">{title}</h2>
         </div>
-        <button className="text-xs font-black text-orange-600 uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-transform">
+        <button className="text-xs font-black text-orange-600 uppercase tracking-widest flex items-center gap-1.5 hover:translate-x-1 transition-transform shrink-0 whitespace-nowrap">
           Vedi tutti <ArrowRight className="w-4 h-4" />
         </button>
       </div>

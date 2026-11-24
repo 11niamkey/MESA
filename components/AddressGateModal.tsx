@@ -165,9 +165,8 @@ export const AddressGateModal: React.FC<AddressGateModalProps> = ({
   const handleGeolocate = () => {
     setVerificationStatus('checking');
     setTimeout(() => {
-      // Simulate real GPS mapping to high density MESA hub
-      setAddressInput('Roma Centro, RM (Posizione GPS)');
-      handleQuickSelect('Roma', 'RM');
+      setAddressInput('Pordenone (PN) (Posizione GPS)');
+      handleQuickSelect('Pordenone', 'PN');
     }, 1000);
   };
 
@@ -396,7 +395,7 @@ export const AddressGateModal: React.FC<AddressGateModalProps> = ({
                 <div className="pt-2 border-t border-white/5">
                   <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Città consigliate al volo:</p>
                   <div className="flex flex-wrap gap-2">
-                    {[['Milano', 'MI'], ['Roma', 'RM'], ['Torino', 'TO'], ['Bari', 'BA'], ['Napoli', 'NA']].map(([city, code]) => (
+                    {[['Pordenone', 'PN'], ['Milano', 'MI'], ['Roma', 'RM'], ['Torino', 'TO'], ['Bari', 'BA']].map(([city, code]) => (
                       <button
                         key={city}
                         onClick={() => handleQuickSelect(city, code)}

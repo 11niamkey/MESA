@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react';
 import { MOCK_CULTURE_STORIES } from '../constants';
 import { CultureStory } from '../types';
 import { Globe, BookOpen, Lightbulb, ArrowRight, Bookmark, Share2, Compass, X, Utensils, Quote } from 'lucide-react';
+import { CountryFlag } from './CountryFlag';
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 
@@ -115,9 +116,9 @@ export const CultureSection: React.FC = () => {
                   onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_FOOD_IMAGE; }}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
-                <div className="absolute top-6 left-6 bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-2xl text-xs font-black flex items-center border border-white/20">
-                  <span className="text-2xl mr-2">{story.flag}</span>
-                  {story.country}
+                <div className="absolute top-6 left-6 bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-2xl text-xs font-black flex items-center gap-2 border border-white/20">
+                  <CountryFlag flag={story.flag} title={story.country} size="sm" />
+                  <span>{story.country}</span>
                 </div>
                 <button 
                   onClick={(e) => { e.stopPropagation(); alert("Storia salvata!"); }}
@@ -127,10 +128,10 @@ export const CultureSection: React.FC = () => {
                 </button>
               </div>
               <div className="px-2">
-                <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-4 tracking-tight group-hover:text-orange-600 transition-colors">
+                <h2 className="text-2xl sm:text-3xl font-black text-orange-600 mb-3 tracking-tight group-hover:text-orange-700 transition-colors">
                   {story.title}
                 </h2>
-                <p className="text-gray-500 text-lg leading-relaxed mb-6 line-clamp-3">
+                <p className="text-black text-base sm:text-lg leading-relaxed mb-6 line-clamp-3">
                   {story.content}
                 </p>
                 <div className="flex items-center justify-between">
@@ -160,7 +161,7 @@ export const CultureSection: React.FC = () => {
         {/* Sidebar Articles (Small) */}
         <div className="md:col-span-4 space-y-12">
           <div className="bg-gray-50 rounded-[2.5rem] p-8 border border-gray-100 sticky top-32">
-            <h3 className="text-xl font-black text-gray-900 mb-8 flex items-center">
+            <h3 className="text-xl font-black text-orange-600 mb-8 flex items-center">
               <Lightbulb className="w-5 h-5 mr-2 text-orange-600" />
               Lo sapevi che?
             </h3>
@@ -173,7 +174,7 @@ export const CultureSection: React.FC = () => {
                 >
                   <span className="absolute -left-[5px] top-0 w-2 h-2 bg-orange-600 rounded-full"></span>
                   <p className="text-xs font-black text-orange-700 uppercase tracking-widest mb-1">{story.country}</p>
-                  <p className="text-sm text-gray-600 font-medium italic leading-relaxed group-hover:text-black transition-colors">
+                  <p className="text-sm text-black font-medium italic leading-relaxed group-hover:text-orange-600 transition-colors">
                     "{story.funFact}"
                   </p>
                 </div>
@@ -220,10 +221,10 @@ export const CultureSection: React.FC = () => {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent"></div>
               <div className="absolute bottom-8 left-8 flex items-center gap-4">
-                <span className="text-5xl drop-shadow-lg">{selectedStory.flag}</span>
+                <CountryFlag flag={selectedStory.flag} title={selectedStory.country} size="xl" className="shadow-lg" />
                 <div>
                   <p className="text-xs font-black uppercase tracking-widest text-orange-600 drop-shadow-sm">{selectedStory.country}</p>
-                  <h3 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{selectedStory.title}</h3>
+                  <h3 className="text-3xl md:text-5xl font-black text-orange-600 tracking-tighter">{selectedStory.title}</h3>
                 </div>
               </div>
             </div>
@@ -231,20 +232,20 @@ export const CultureSection: React.FC = () => {
             <div className="p-8 md:p-16">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
                 <div className="md:col-span-8">
-                  <p className="text-xl md:text-2xl text-gray-800 font-medium leading-relaxed mb-8 first-letter:text-7xl first-letter:font-black first-letter:text-orange-600 first-letter:mr-3 first-letter:float-left">
+                  <p className="text-xl md:text-2xl text-black font-medium leading-relaxed mb-8 first-letter:text-7xl first-letter:font-black first-letter:text-orange-600 first-letter:mr-3 first-letter:float-left">
                     {selectedStory.content}
                   </p>
-                  <p className="text-gray-600 leading-relaxed mb-8">
+                  <p className="text-black leading-relaxed mb-8">
                     Ogni piatto preparato dai nostri chef in questa tradizione segue passaggi che sono stati perfezionati nel corso di decenni. Su MESA, la qualità non è una scelta, ma un'eredità che proteggiamo insieme a voi.
                   </p>
                 </div>
                 
                 <div className="md:col-span-4 space-y-8">
                   <div className="bg-orange-50 rounded-3xl p-6 border border-orange-100">
-                    <h4 className="flex items-center text-sm font-black text-orange-900 uppercase tracking-widest mb-4">
+                    <h4 className="flex items-center text-sm font-black text-orange-600 uppercase tracking-widest mb-4">
                       <Lightbulb className="w-4 h-4 mr-2" /> Curiosità
                     </h4>
-                    <p className="text-sm text-orange-800 italic leading-relaxed">
+                    <p className="text-sm text-black italic leading-relaxed">
                       {selectedStory.funFact}
                     </p>
                   </div>
@@ -273,7 +274,7 @@ export const CultureSection: React.FC = () => {
            <Quote className="w-32 h-32 text-orange-600" />
         </div>
         <div className="max-w-3xl mx-auto relative z-10">
-          <p className="text-3xl md:text-4xl font-black text-orange-900 leading-tight italic mb-10">
+          <p className="text-3xl md:text-4xl font-black text-orange-600 leading-tight italic mb-10">
             "Il cibo è l'unico linguaggio universale che non ha bisogno di traduzioni, ma solo di un cuore che ascolta."
           </p>
           <div className="flex items-center justify-center gap-3">

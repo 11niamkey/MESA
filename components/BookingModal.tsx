@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { X, Calendar, Clock, ChefHat, Truck, ShoppingBag, Flame, Utensils, MessageSquare, Leaf, Info, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Clock, ChefHat, Truck, ShoppingBag, Flame, Utensils, MessageSquare, Leaf, Info, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { Dish, Chef } from '../types';
+import { CountryFlag } from './CountryFlag';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -11,6 +12,32 @@ interface BookingModalProps {
 }
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
+const MONDAY_FIRST_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
+const ITALIAN_DAY_NAMES = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'] as const;
+
+const parseLocalDate = (dateStr: string): Date | null => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const parsed = new Date(year, month, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+};
+
+const getTodayStart = (): Date => {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now;
+};
 
 export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dish, chef, onConfirm }) => {
   const [date, setDate] = useState('');
@@ -23,9 +50,25 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   const [notes, setNotes] = useState('');
 
   // Custom Calendar State
-  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const currentMonth = currentCalendarDate.getMonth();
   const currentYear = currentCalendarDate.getFullYear();
+
+  useEffect(() => {
+    if (isOpen) {
+      const now = new Date();
+      setDate('');
+      setTime('');
+      setDeliveryMode('pickup');
+      setSpiceLevel(1);
+      setSaltLevel('Normal');
+      setNotes('');
+      setCurrentCalendarDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    }
+  }, [isOpen, dish?.id, chef?.id]);
 
   const months = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -33,9 +76,25 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   ];
   const weekdays = ['Lu', 'Ma', 'Me', 'Gi', 'Ve', 'Sa', 'Do'];
 
+  const normalizedAvailableDays = useMemo<number[]>(() => {
+    if (!chef || !Array.isArray(chef.availableDays)) {
+      return [...MONDAY_FIRST_ORDER];
+    }
+    const validSet = new Set(
+      chef.availableDays
+        .map((d) => Number(d))
+        .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+    );
+    return MONDAY_FIRST_ORDER.filter((d) => validSet.has(d));
+  }, [chef]);
+
+  const todayNow = new Date();
+  const isAtOrBeforeCurrentMonth =
+    currentYear < todayNow.getFullYear() ||
+    (currentYear === todayNow.getFullYear() && currentMonth <= todayNow.getMonth());
+
   const handlePrevMonth = () => {
-    const now = new Date();
-    if (currentYear > now.getFullYear() || (currentYear === now.getFullYear() && currentMonth > now.getMonth())) {
+    if (!isAtOrBeforeCurrentMonth) {
       setCurrentCalendarDate(new Date(currentYear, currentMonth - 1, 1));
     }
   };
@@ -46,17 +105,19 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
 
   const isDayInPast = (dayNum: number) => {
     const targetDate = new Date(currentYear, currentMonth, dayNum);
-    const today = new Date();
     targetDate.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-    return targetDate < today;
+    return targetDate < getTodayStart();
+  };
+
+  const isToday = (dayNum: number) => {
+    const targetDate = new Date(currentYear, currentMonth, dayNum);
+    targetDate.setHours(0, 0, 0, 0);
+    return targetDate.getTime() === getTodayStart().getTime();
   };
 
   const isChefAvailableOnDay = (dayNum: number) => {
-    if (!chef || !chef.availableDays) return true;
-    const dateObj = new Date(currentYear, currentMonth, dayNum);
-    const dayOfWeek = dateObj.getDay();
-    return chef.availableDays.includes(dayOfWeek);
+    const dayOfWeek = new Date(currentYear, currentMonth, dayNum).getDay();
+    return normalizedAvailableDays.includes(dayOfWeek);
   };
 
   const formatDateStr = (y: number, m: number, d: number) => {
@@ -66,8 +127,21 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   };
 
   const handleSelectDay = (dayNum: number) => {
-    setDate(formatDateStr(currentYear, currentMonth, dayNum));
+    if (isDayInPast(dayNum) || !isChefAvailableOnDay(dayNum)) return;
+    const nextDate = formatDateStr(currentYear, currentMonth, dayNum);
+    if (nextDate !== date) {
+      setDate(nextDate);
+      setTime('');
+    }
   };
+
+  const selectedDateObj = useMemo(() => parseLocalDate(date), [date]);
+
+  const isSelectedDateValid = useMemo(() => {
+    if (!selectedDateObj) return false;
+    if (selectedDateObj < getTodayStart()) return false;
+    return normalizedAvailableDays.includes(selectedDateObj.getDay());
+  }, [selectedDateObj, normalizedAvailableDays]);
 
   const getChefTimeSlots = () => {
     const defaultSlots = [
@@ -118,9 +192,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   };
 
   const getItalianAvailableDays = () => {
-    if (!chef || !chef.availableDays) return '';
-    const dayNames = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
-    return chef.availableDays.map(d => dayNames[d]).join(', ');
+    if (normalizedAvailableDays.length === 0) return 'Nessun giorno disponibile';
+    return normalizedAvailableDays.map(d => ITALIAN_DAY_NAMES[d]).join(', ');
   };
 
   const timeSlots = getChefTimeSlots();
@@ -128,9 +201,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   if (!isOpen) return null;
 
   const handleConfirm = () => {
-    if (date && time) {
+    if (isSelectedDateValid && time) {
       onConfirm(date, time, deliveryMode, { spiceLevel, saltLevel, notes });
-      // Reset
       setSpiceLevel(1);
       setSaltLevel('Normal');
       setNotes('');
@@ -149,7 +221,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
           
           {/* Header */}
           <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-b border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center">
+            <h3 className="text-xl font-bold text-orange-600 flex items-center">
               <Utensils className="w-5 h-5 mr-2 text-orange-600" />
               Dettagli & Prenotazione
             </h3>
@@ -170,17 +242,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                 />
                 <div className="flex-1">
                   <div className="flex justify-between items-start">
-                    <h4 className="font-bold text-gray-900 text-xl mb-1">{dish.name}</h4>
+                    <h4 className="font-bold text-orange-600 text-xl mb-1">{dish.name}</h4>
                     <div className="text-orange-600 font-extrabold text-lg">€ {dish.price.toFixed(2)}</div>
                   </div>
                   
-                  <div className="flex items-center text-sm text-gray-600 mb-3">
-                    <ChefHat className="w-4 h-4 mr-1 text-orange-500" />
-                    <span>Cucinato da <span className="font-semibold">{chef?.name}</span> {chef?.nationality}</span>
+                  <div className="flex items-center text-sm text-black mb-3 gap-1.5">
+                    <ChefHat className="w-4 h-4 text-orange-500 shrink-0" />
+                    <span>Cucinato da <span className="font-semibold">{chef?.name}</span></span>
+                    {chef?.nationality && <CountryFlag flag={chef.nationality} title={chef.countryName} size="sm" />}
                   </div>
                   
                   {/* Full Description */}
-                  <p className="text-gray-600 text-sm leading-relaxed mb-3">
+                  <p className="text-black text-sm leading-relaxed mb-3">
                     {dish.description}
                   </p>
 
@@ -207,7 +280,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                           <span className="font-bold text-orange-800 flex items-center text-xs uppercase tracking-wide mb-1">
                             <Leaf className="w-3 h-3 mr-1" /> Ingredienti
                           </span>
-                          <p className="text-gray-700">{dish.ingredients.join(', ')}</p>
+                          <p className="text-black">{dish.ingredients.join(', ')}</p>
                         </div>
                       )}
                       {dish.preparation && (
@@ -215,7 +288,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                           <span className="font-bold text-orange-800 flex items-center text-xs uppercase tracking-wide mb-1">
                             <Info className="w-3 h-3 mr-1" /> Preparazione
                           </span>
-                          <p className="text-gray-700 italic">"{dish.preparation}"</p>
+                          <p className="text-black italic">"{dish.preparation}"</p>
                         </div>
                       )}
                     </div>
@@ -228,7 +301,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
               
               {/* Left Col: Customization */}
               <div className="space-y-6">
-                <h4 className="font-bold text-gray-900 border-b pb-2 flex items-center">
+                <h4 className="font-bold text-orange-600 border-b pb-2 flex items-center">
                   <span className="bg-black text-white w-5 h-5 rounded-full flex items-center justify-center text-xs mr-2">1</span>
                   Personalizza il Piatto
                 </h4>
@@ -243,6 +316,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                       {[0, 1, 2, 3].map((level) => (
                         <button
                           key={level}
+                          type="button"
                           onClick={() => setSpiceLevel(level)}
                           className={`flex-1 py-1 text-xs font-bold rounded-md transition-colors ${
                             spiceLevel === level ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
@@ -263,6 +337,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                       {(['Low', 'Normal', 'High'] as const).map((level) => (
                         <button
                           key={level}
+                          type="button"
                           onClick={() => setSaltLevel(level)}
                           className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg border transition-all ${
                             saltLevel === level 
@@ -283,7 +358,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                     Note per lo Chef
                   </label>
                   <textarea 
-                    className="w-full text-sm p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-gray-50 resize-none"
+                    className="w-full text-sm p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-gray-50 resize-none text-black"
                     placeholder="Allergie, intolleranze o richieste speciali..."
                     rows={3}
                     value={notes}
@@ -294,7 +369,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
 
               {/* Right Col: Logistics */}
               <div className="space-y-6">
-                <h4 className="font-bold text-gray-900 border-b pb-2 flex items-center">
+                <h4 className="font-bold text-orange-600 border-b pb-2 flex items-center">
                   <span className="bg-black text-white w-5 h-5 rounded-full flex items-center justify-center text-xs mr-2">2</span>
                   Consegna e Data
                 </h4>
@@ -302,6 +377,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                 {/* Delivery Mode */}
                 <div className="flex p-1 bg-gray-100 rounded-xl">
                   <button
+                    type="button"
                     onClick={() => setDeliveryMode('pickup')}
                     className={`flex-1 flex items-center justify-center py-2 text-sm font-bold rounded-lg transition-all ${
                       deliveryMode === 'pickup' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'
@@ -311,9 +387,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                     Ritiro
                   </button>
                   <button
+                    type="button"
                     onClick={() => setDeliveryMode('delivery')}
                     className={`flex-1 flex items-center justify-center py-2 text-sm font-bold rounded-lg transition-all ${
-                      deliveryMode === 'delivery' ? (chef?.continent === 'Africa' ? 'bg-white text-[#2d5a27] shadow-sm' : 'bg-white text-orange-600 shadow-sm') : 'text-gray-400'
+                      deliveryMode === 'delivery' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-400'
                     }`}
                   >
                     <Truck className="w-4 h-4 mr-2" />
@@ -321,90 +398,86 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                   </button>
                 </div>
 
-                {/* Date Selection */}
-                <div className="bg-gray-50 border border-gray-150 p-4 rounded-2xl relative overflow-hidden">
+                {/* Single Date Selector */}
+                <div className="bg-gray-50 border border-gray-200 p-4 rounded-2xl relative overflow-hidden">
                   <div className="flex items-center justify-between mb-4">
-                    <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-                      <CalendarDays className={`w-4 h-4 ${chef?.continent === 'Africa' ? 'text-[#2d5a27]' : 'text-orange-500'}`} />
+                    <label className="text-sm font-bold text-orange-600 flex items-center gap-1.5">
+                      <CalendarDays className="w-4 h-4 text-orange-600" />
                       Scegli Data
                     </label>
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={handlePrevMonth}
                         type="button"
-                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
-                        disabled={
-                          currentYear <= new Date().getFullYear() &&
-                          currentMonth <= new Date().getMonth()
-                        }
+                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        disabled={isAtOrBeforeCurrentMonth}
+                        aria-label="Mese precedente"
                       >
                         <ChevronLeft className="w-4 h-4" />
                       </button>
-                      <span className="text-xs font-black uppercase text-gray-700 select-none min-w-[95px] text-center">
+                      <span className="text-xs font-black uppercase text-gray-800 select-none min-w-[100px] text-center">
                         {months[currentMonth]} {currentYear}
                       </span>
                       <button
                         onClick={handleNextMonth}
                         type="button"
-                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors"
+                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                        aria-label="Mese successivo"
                       >
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Calendar Grid */}
+                  {/* Calendar Grid: Monday (LU) to Sunday (DO) */}
                   <div className="grid grid-cols-7 gap-1 text-center mb-3">
                     {weekdays.map(day => (
-                      <span key={day} className="text-[10px] font-black uppercase text-gray-400">
+                      <span key={day} className="text-[10px] font-black uppercase text-gray-400 pb-1">
                         {day}
                       </span>
                     ))}
                     {(() => {
                       const daysInMonthVal = new Date(currentYear, currentMonth + 1, 0).getDate();
-                      const firstDayIndexVal = new Date(currentYear, currentMonth, 1).getDay(); // Sunday=0
-                      const startOffsetVal = (firstDayIndexVal + 6) % 7; // Monday first
+                      const firstDayIndexVal = new Date(currentYear, currentMonth, 1).getDay(); // 0=Dom..6=Sab
+                      const startOffsetVal = (firstDayIndexVal + 6) % 7; // 0=Lu..6=Do
                       
                       const dayCells = [];
                       for (let i = 0; i < startOffsetVal; i++) {
-                        dayCells.push(<div key={`empty-${i}`} className="h-8 w-8" />);
+                        dayCells.push(<div key={`empty-${i}`} className="h-8 w-8 mx-auto" />);
                       }
 
                       for (let d = 1; d <= daysInMonthVal; d++) {
                         const inPast = isDayInPast(d);
+                        const todayCell = isToday(d);
                         const isAvailable = isChefAvailableOnDay(d);
+                        const isClickable = !inPast && isAvailable;
                         const dateStr = formatDateStr(currentYear, currentMonth, d);
-                        const isSelected = date === dateStr;
-                        const isAfricanChef = chef?.continent === 'Africa';
+                        const isSelected = isSelectedDateValid && date === dateStr;
 
                         let btnClass = "h-8 w-8 text-xs font-bold rounded-lg flex items-center justify-center transition-all relative mx-auto ";
                         
                         if (inPast) {
-                          btnClass += "text-gray-200 cursor-not-allowed line-through";
+                          btnClass += "text-gray-300 bg-gray-100/70 cursor-not-allowed line-through opacity-50";
                         } else if (!isAvailable) {
-                          btnClass += "text-gray-300 hover:bg-gray-100/50 cursor-not-allowed";
+                          btnClass += `text-gray-300 cursor-not-allowed ${todayCell ? 'ring-1 ring-gray-300' : ''}`;
                         } else if (isSelected) {
-                          btnClass += isAfricanChef
-                            ? "bg-[#2d5a27] text-[#e5c158] shadow-md scale-105"
-                            : "bg-orange-600 text-white shadow-md scale-105";
+                          btnClass += "bg-orange-600 text-white border border-orange-600 shadow-md scale-105 cursor-pointer";
                         } else {
-                          btnClass += isAfricanChef
-                            ? "bg-[#2d5a27]/10 text-[#2d5a27] hover:bg-[#2d5a27]/25 cursor-pointer border border-[#2d5a27]/20"
-                            : "bg-orange-50 text-orange-600 hover:bg-orange-100 cursor-pointer border border-orange-100";
+                          btnClass += `bg-orange-50 text-orange-600 hover:bg-orange-100 cursor-pointer border border-orange-200 ${todayCell ? 'ring-2 ring-orange-300' : ''}`;
                         }
 
                         dayCells.push(
                           <button
                             key={`day-${d}`}
-                            onClick={() => !inPast && isAvailable && handleSelectDay(d)}
-                            disabled={inPast || !isAvailable}
+                            onClick={() => isClickable && handleSelectDay(d)}
+                            disabled={!isClickable}
                             className={btnClass}
-                            title={inPast ? 'Data passata' : !isAvailable ? 'Chef non disponibile' : 'Seleziona per ordinare'}
+                            title={inPast ? 'Data passata non selezionabile' : !isAvailable ? 'Chef non disponibile in questo giorno' : 'Seleziona data'}
                             type="button"
                           >
                             <span>{d}</span>
-                            {isAvailable && !inPast && !isSelected && (
-                              <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${isAfricanChef ? 'bg-[#e5c158]' : 'bg-orange-600'}`} />
+                            {isClickable && !isSelected && (
+                              <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-orange-600" />
                             )}
                           </button>
                         );
@@ -414,68 +487,90 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                   </div>
 
                   {/* Informational Footer in Italian */}
-                  <div className="border-t border-gray-200/60 pt-2 flex flex-col gap-1">
-                    {chef?.availableDays && (
-                      <div className="flex items-center text-[10px] text-gray-500 font-bold gap-1 mt-1">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        <span>Disponibile: <span className="text-gray-700">{getItalianAvailableDays()}</span></span>
-                      </div>
-                    )}
-                    {date && (
-                      <div className={`text-xs font-extrabold flex items-center justify-between mt-1 rounded-xl p-2 ${chef?.continent === 'Africa' ? 'bg-[#2d5a27]/10 text-[#2d5a27]' : 'bg-orange-50 text-orange-700'}`}>
+                  <div className="border-t border-gray-200/70 pt-2.5 flex flex-col gap-1.5">
+                    <div className="flex items-center text-[11px] text-black font-semibold gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                      <span>
+                        Disponibile: <span className="font-bold text-orange-600">{getItalianAvailableDays()}</span>
+                      </span>
+                    </div>
+                    {isSelectedDateValid && selectedDateObj && (
+                      <div className="text-xs font-extrabold flex items-center justify-between mt-1 rounded-xl p-2 bg-orange-50 text-orange-700 border border-orange-100">
                         <span>Data Selezionata:</span>
-                        <span className="uppercase tracking-wide font-black bg-white px-2 py-1 rounded-lg shadow-sm border border-gray-100">
-                          {new Date(date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        <span className="capitalize tracking-wide font-black bg-white px-2.5 py-1 rounded-lg shadow-sm border border-orange-100 text-orange-600">
+                          {selectedDateObj.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                         </span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Time Selection */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-550 uppercase mb-2">Orario di consegna/ritiro</label>
-                  <div className="grid grid-cols-4 gap-2 max-h-[140px] overflow-y-auto custom-scrollbar pr-1">
-                    {timeSlots.map(slot => (
-                      <button
-                        key={slot}
-                        onClick={() => setTime(slot)}
-                        className={`py-1.5 px-1 text-xs font-bold rounded-lg border transition-all ${
-                          time === slot
-                            ? (chef?.continent === 'Africa' ? 'bg-[#2d5a27] text-[#e5c158] border-[#2d5a27]' : 'bg-orange-600 text-white border-orange-600')
-                            : 'bg-white text-gray-700 border-gray-200 hover:bg-orange-50/50'
-                        }`}
-                      >
-                        {slot}
-                      </button>
-                    ))}
+                {/* Time Selection: shown ONLY after user selects a valid date */}
+                {isSelectedDateValid ? (
+                  <div className="animate-fade-in">
+                    <label className="block text-xs font-bold text-orange-600 uppercase mb-2">
+                      Orario di consegna/ritiro
+                    </label>
+                    <div className="grid grid-cols-4 gap-2 max-h-[140px] overflow-y-auto custom-scrollbar pr-1">
+                      {timeSlots.map(slot => (
+                        <button
+                          key={slot}
+                          type="button"
+                          onClick={() => setTime(slot)}
+                          className={`py-1.5 px-1 text-xs font-bold rounded-lg border transition-all ${
+                            time === slot
+                              ? 'bg-orange-600 text-white border-orange-600 shadow-sm'
+                              : 'bg-white text-gray-700 border-gray-200 hover:bg-orange-50 hover:border-orange-200'
+                          }`}
+                        >
+                          {slot}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-black/70 mt-2 font-medium italic">
+                      * Orari elaborati in base alla disponibilità indicata dello chef ({chef?.availability?.join(', ') || 'standard'})
+                    </p>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-2 font-medium italic">
-                    * Orari elaborati in base alla disponibilità indicata dello chef ({chef?.availability?.join(', ') || 'reali'})
-                  </p>
-                </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-orange-200 bg-orange-50/40 p-4 text-center">
+                    <Clock className="w-5 h-5 text-orange-500 mx-auto mb-1.5" />
+                    <p className="text-xs font-semibold text-black">
+                      Seleziona prima una data valida dal calendario per visualizzare gli orari di consegna/ritiro.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-50 px-6 py-4 flex justify-between items-center border-t border-gray-200">
-            <div className="text-sm text-gray-500 hidden sm:block">
-              {deliveryMode === 'delivery' ? 'Consegna a Domicilio inclusa' : 'Ritiro presso Chef'}
+          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 space-y-3">
+            <div className="bg-orange-50 border border-orange-200 rounded-xl px-3.5 py-2.5 flex items-start gap-2.5 text-left">
+              <Info className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+              <p className="text-xs font-semibold text-black leading-snug">
+                Nessun addebito online ora: il pagamento avviene al ritiro o alla consegna secondo le indicazioni dell'ordine.
+              </p>
             </div>
-            <div className="flex space-x-3 w-full sm:w-auto">
-              <button
-                onClick={onClose}
-                className="flex-1 sm:flex-none px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition-colors"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={handleConfirm}
-                disabled={!date || !time}
-                className="flex-1 sm:flex-none px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center"
-              >
-                Conferma
-              </button>
+            <div className="flex justify-between items-center gap-3">
+              <div className="text-sm text-black font-medium hidden sm:block">
+                {deliveryMode === 'delivery' ? 'Consegna a Domicilio (+€2.50)' : 'Ritiro presso Chef'}
+              </div>
+              <div className="flex space-x-3 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 sm:flex-none px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition-colors"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={!isSelectedDateValid || !time}
+                  className="flex-1 sm:flex-none px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center"
+                >
+                  Invia Prenotazione
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -18,20 +18,22 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({ chefs, onAddDish, 
   }).sort(() => 0.5 - Math.random()).slice(0, 6);
 
   return (
-    <div className="mb-14 animate-fade-in">
-      <div className="flex items-center justify-between mb-8 px-1">
-        <div className="flex items-center space-x-3">
-          <div className="bg-orange-600 p-2.5 rounded-2xl shadow-md shadow-orange-200">
-            <Sparkles className="w-5 h-5 text-white" />
+    <div className="mb-8 animate-fade-in">
+      <div className="flex items-center justify-between gap-3 mb-4 px-1">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="bg-orange-600 p-2 rounded-xl shadow-md shadow-orange-200 shrink-0">
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tighter">Piatti del Giorno</h2>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Le scelte fresche degli chef per oggi</p>
-          </div>
+          <h2 className="text-lg sm:text-2xl font-black text-orange-600 tracking-tight whitespace-nowrap truncate">
+            Piatti del Giorno
+          </h2>
+          <span className="hidden md:inline-block text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+            • Scelte fresche di oggi
+          </span>
         </div>
       </div>
       
-      <div className="flex overflow-x-auto space-x-6 sm:space-x-8 pb-10 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div className="flex overflow-x-auto space-x-5 sm:space-x-6 pb-6 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
         {specials.map((dish) => (
           <div 
             key={dish.id} 
@@ -74,10 +76,10 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({ chefs, onAddDish, 
             <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between">
               <div>
                 <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1 pr-2">
-                    <h3 className="font-black text-gray-900 text-lg sm:text-xl leading-tight mb-1 group-hover:text-orange-600 transition-colors">{dish.name}</h3>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      Chef <span className="text-gray-900">{dish.chefName}</span>
+                  <div className="flex-1 pr-2 min-w-0">
+                    <h3 className="font-black text-orange-600 text-base sm:text-lg leading-tight mb-1 group-hover:text-orange-700 transition-colors truncate">{dish.name}</h3>
+                    <p className="text-[10px] font-black text-black uppercase tracking-widest">
+                      Chef <span className="text-black">{dish.chefName}</span>
                     </p>
                   </div>
                   <div className="text-lg sm:text-2xl font-black text-orange-600 bg-orange-50 px-3 py-1 rounded-xl shrink-0">
@@ -85,7 +87,7 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({ chefs, onAddDish, 
                   </div>
                 </div>
                 
-                <p className="text-gray-500 text-xs leading-relaxed mb-4 line-clamp-2 italic">
+                <p className="text-black text-xs leading-relaxed mb-4 line-clamp-2 italic">
                   "{dish.description}"
                 </p>
 

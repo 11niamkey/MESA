@@ -69,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
             {activeAddress && (
               <button 
                 onClick={onChangeAddress}
-                className="flex flex-col text-left ml-1 sm:ml-3 py-0.5 md:py-1 px-2 sm:px-3 bg-neutral-900 hover:bg-neutral-800 border border-white/5 hover:border-orange-500/40 rounded-xl cursor-pointer transition-all shrink text-ellipsis whitespace-nowrap overflow-hidden max-w-[70px] xs:max-w-[110px] sm:max-w-[210px]"
+                className="flex flex-col text-left ml-1 sm:ml-3 py-0.5 md:py-1 px-2 sm:px-3 bg-neutral-900 hover:bg-neutral-800 border border-white/5 hover:border-orange-500/40 rounded-xl cursor-pointer transition-all shrink text-ellipsis whitespace-nowrap overflow-hidden max-w-[96px] xs:max-w-[130px] sm:max-w-[210px]"
                 title="Cambia indirizzo di consegna"
               >
                 <div className="flex items-center gap-1 text-orange-500">

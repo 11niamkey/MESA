@@ -6,11 +6,12 @@ import {
   ArrowDownRight, Sparkles, Loader2, RefreshCw, Rocket, Globe, Activity,
   CheckCircle2, AlertTriangle, FileText, PieChart, ExternalLink, Share2, Globe2,
   Trash2, ShieldAlert, Check, Ban, KeyRound, Clock, Eye, X, MessageSquare, UserCheck, AlertOctagon,
-  CalendarDays, UtensilsCrossed
+  CalendarDays, UtensilsCrossed, Plus, Pencil
 } from 'lucide-react';
-import { Chef, Dish, Order, AppUser, ChefApplication, ChefDocument } from '../types';
+import { Chef, Dish, Order, OrderStatus, ORDER_STATUS_LABELS, AppUser, ChefApplication, ChefDocument, Continent } from '../types';
 import { ShareModal } from './ShareModal';
-import { AdminDishesPanel } from './AdminDishesPanel';
+import { COUNTRY_FLAG_PRESETS, getCountryNameByFlag } from './FilterBar';
+import { CountryFlag } from './CountryFlag';
 
 interface AdminDashboardProps {
   chefs: Chef[];
@@ -23,7 +24,7 @@ interface AdminDashboardProps {
   onDeleteChef?: (chefId: string, deleteLinkedUser?: boolean) => Promise<void> | void;
   onApproveApplication?: (appId: string) => void;
   onRejectApplication?: (appId: string, notes?: string) => void;
-  onSaveChefDishes: (chefId: string, dishes: Dish[]) => Promise<boolean>;
+  onDeleteApplication?: (appId: string) => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
@@ -37,12 +38,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDeleteChef,
   onApproveApplication,
   onRejectApplication,
-  onSaveChefDishes
+  onDeleteApplication
 }) => {
-  const [adminTab, setAdminTab] = useState<'cockpit' | 'applications' | 'users' | 'chefs' | 'dishes'>('applications');
-  const [dishChefFilter, setDishChefFilter] = useState<string>('all');
+  const [adminTab, setAdminTab] = useState<'orders' | 'dishes' | 'applications' | 'users' | 'chefs' | 'cockpit'>('orders');
   const [userSearch, setUserSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'client' | 'chef'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'client' | 'chef' | 'admin'>('all');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | OrderStatus>('all');
+  const [dishSearch, setDishSearch] = useState('');
+  const [dishChefFilter, setDishChefFilter] = useState<string>('all');
+  const [editingDishKey, setEditingDishKey] = useState<string | null>(null);
+  const [dishFormName, setDishFormName] = useState('');
+  const [dishFormDesc, setDishFormDesc] = useState('');
+  const [dishFormPrice, setDishFormPrice] = useState('');
+  const [dishFormImage, setDishFormImage] = useState('');
+  const [dishFormTags, setDishFormTags] = useState('');
+  const [dishFormIngredients, setDishFormIngredients] = useState('');
+  const [dishFormPreparation, setDishFormPreparation] = useState('');
+  const [isAddingNewDish, setIsAddingNewDish] = useState(false);
+  const [newDishChefId, setNewDishChefId] = useState('');
   
   // Applications tab states
   const [appStatusFilter, setAppStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
@@ -50,6 +64,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [selectedDocPreview, setSelectedDocPreview] = useState<ChefDocument | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState<{ [appId: string]: string }>({});
 
+  const [aiReport, setAiReport] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // States for interactive chef data management
@@ -62,6 +78,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editPassword, setEditPassword] = useState('');
   const [editNationality, setEditNationality] = useState('');
   const [editCountryName, setEditCountryName] = useState('');
+  const [editContinent, setEditContinent] = useState<Continent>('Europa');
   const [chefSearch, setChefSearch] = useState('');
   const [chefToDelete, setChefToDelete] = useState<Chef | null>(null);
   const [deleteLinkedUser, setDeleteLinkedUser] = useState(false);
@@ -92,6 +109,125 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const pendingAppsCount = chefApplications.filter(a => a.status === 'pending').length;
+  const pendingOrdersCount = orders.filter(o => o.status === 'PENDING_CONFIRMATION').length;
+  const confirmedOrdersCount = orders.filter(o => o.status === 'CONFIRMED' || o.status === 'PLACED' || o.status === 'PREPARING' || o.status === 'READY' || o.status === 'DELIVERING' || o.status === 'COMPLETED').length;
+  const rejectedOrdersCount = orders.filter(o => o.status === 'REJECTED').length;
+  const allDishes = chefs.flatMap(chef => chef.dishes.map(dish => ({ dish, chef })));
+  const filteredDishes = allDishes.filter(({ dish, chef }) => {
+    const matchesChef = dishChefFilter === 'all' || chef.id === dishChefFilter;
+    const q = dishSearch.trim().toLowerCase();
+    const matchesQuery =
+      !q ||
+      dish.name.toLowerCase().includes(q) ||
+      dish.description.toLowerCase().includes(q) ||
+      chef.name.toLowerCase().includes(q) ||
+      dish.tags.some(t => t.toLowerCase().includes(q)) ||
+      (dish.ingredients || []).some(i => i.toLowerCase().includes(q));
+    return matchesChef && matchesQuery;
+  });
+
+  const startEditingDish = (dish: Dish, chefId: string) => {
+    setIsAddingNewDish(false);
+    setEditingDishKey(`${chefId}::${dish.id}`);
+    setDishFormName(dish.name);
+    setDishFormDesc(dish.description);
+    setDishFormPrice(dish.price.toFixed(2));
+    setDishFormImage(dish.image || '');
+    setDishFormTags((dish.tags || []).join(', '));
+    setDishFormIngredients((dish.ingredients || []).join(', '));
+    setDishFormPreparation(dish.preparation || '');
+  };
+
+  const handleSaveDishEdit = (chef: Chef, dishId: string) => {
+    if (!onUpdateChef || !dishFormName.trim()) return;
+    const parsedPrice = parseFloat(dishFormPrice.replace(',', '.'));
+    const nextPrice = Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : 12;
+    const tags = dishFormTags.split(',').map(t => t.trim()).filter(Boolean);
+    const ingredients = dishFormIngredients.split(',').map(i => i.trim()).filter(Boolean);
+
+    const updatedDishes = chef.dishes.map(d => {
+      if (d.id !== dishId) return d;
+      const updated: Dish = {
+        ...d,
+        name: dishFormName.trim(),
+        description: dishFormDesc.trim(),
+        price: nextPrice,
+        image: dishFormImage.trim() || d.image,
+        tags,
+        ...(ingredients.length > 0 ? { ingredients } : {}),
+        ...(dishFormPreparation.trim() ? { preparation: dishFormPreparation.trim() } : {})
+      };
+      if (ingredients.length === 0) delete updated.ingredients;
+      if (!dishFormPreparation.trim()) delete updated.preparation;
+      return updated;
+    });
+
+    onUpdateChef({ ...chef, dishes: updatedDishes });
+    setEditingDishKey(null);
+  };
+
+  const handleDeleteDishFromChef = (chef: Chef, dishId: string) => {
+    if (!onUpdateChef) return;
+    onUpdateChef({
+      ...chef,
+      dishes: chef.dishes.filter(d => d.id !== dishId)
+    });
+    if (editingDishKey === `${chef.id}::${dishId}`) {
+      setEditingDishKey(null);
+    }
+  };
+
+  const handleCreateNewDish = () => {
+    if (!onUpdateChef || !dishFormName.trim()) return;
+    const targetChef = chefs.find(c => c.id === newDishChefId) || chefs[0];
+    if (!targetChef) return;
+    const parsedPrice = parseFloat(dishFormPrice.replace(',', '.'));
+    const nextPrice = Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : 12;
+    const tags = dishFormTags.split(',').map(t => t.trim()).filter(Boolean);
+    const ingredients = dishFormIngredients.split(',').map(i => i.trim()).filter(Boolean);
+
+    const newDish: Dish = {
+      id: `dish-${Date.now().toString(36)}`,
+      name: dishFormName.trim(),
+      description: dishFormDesc.trim() || 'Piatto preparato al momento con ingredienti freschi.',
+      price: nextPrice,
+      image: dishFormImage.trim() || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
+      chefId: targetChef.id,
+      tags: tags.length > 0 ? tags : ['Tradizionale'],
+      ...(ingredients.length > 0 ? { ingredients } : {}),
+      ...(dishFormPreparation.trim() ? { preparation: dishFormPreparation.trim() } : {})
+    };
+
+    onUpdateChef({
+      ...targetChef,
+      dishes: [newDish, ...targetChef.dishes]
+    });
+    setIsAddingNewDish(false);
+    setDishFormName('');
+    setDishFormDesc('');
+    setDishFormPrice('');
+    setDishFormImage('');
+    setDishFormTags('');
+    setDishFormIngredients('');
+    setDishFormPreparation('');
+  };
+
+  const filteredOrders = orders.filter(order => {
+    const matchesStatus =
+      orderStatusFilter === 'all'
+        ? true
+        : orderStatusFilter === 'CONFIRMED'
+          ? order.status === 'CONFIRMED' || order.status === 'PLACED'
+          : order.status === orderStatusFilter;
+    const q = orderSearch.trim().toLowerCase();
+    const matchesQuery =
+      !q ||
+      order.id.toLowerCase().includes(q) ||
+      order.chefName.toLowerCase().includes(q) ||
+      (order.customerName || '').toLowerCase().includes(q) ||
+      order.items.some(item => item.name.toLowerCase().includes(q));
+    return matchesStatus && matchesQuery;
+  });
 
   const marketChecklist = [
     { id: 1, task: "Validazione HACCP Cuochi", status: chefApplications.some(a => a.documents.length > 0) ? 'complete' : 'pending', priority: 'Alta' },
@@ -112,6 +248,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { label: 'Pre-registrazioni Clienti', value: (1240 + totalRegisteredClients).toString(), change: `+${totalRegisteredClients} reali`, up: true, icon: Users },
   ];
 
+  const generateAiReport = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/gemini/admin-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          totalApplications: chefApplications.length,
+          pendingCount: pendingAppsCount,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setAiReport(data.report || 'Analisi completata con successo.');
+    } catch {
+      setAiReport('Advisor AI momentaneamente offline. Riprova tra poco.');
+    }
+    setIsGenerating(false);
+  };
+
+  useEffect(() => {
+    generateAiReport();
+  }, []);
+
   // Filtered applications
   const filteredApplications = chefApplications.filter(app => {
     const matchesStatus = appStatusFilter === 'all' || app.status === appStatusFilter;
@@ -126,10 +288,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Filtered registered users
   const filteredUsers = registeredUsers.filter(user => {
-    const matchesSearch = 
-      user.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(userSearch.toLowerCase()) ||
-      user.email.toLowerCase().includes(userSearch.toLowerCase());
+    const q = userSearch.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      user.name.toLowerCase().includes(q) ||
+      user.lastName.toLowerCase().includes(q) ||
+      user.email.toLowerCase().includes(q) ||
+      (user.phone || '').toLowerCase().includes(q) ||
+      (user.brandName || '').toLowerCase().includes(q) ||
+      user.addresses.some(a => `${a.street} ${a.city} ${a.zip}`.toLowerCase().includes(q));
     
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
 
@@ -164,17 +331,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
            </div>
            
-           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-3xl text-center">
+                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Ordini In Attesa</p>
+                 <p className="text-2xl font-black text-orange-500 italic">{pendingOrdersCount}</p>
+              </div>
               <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-3xl text-center">
                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Candidature In Attesa</p>
                  <p className="text-2xl font-black text-orange-500 italic">{pendingAppsCount}</p>
               </div>
+              <button 
+                onClick={generateAiReport}
+                className="bg-orange-600 p-4 rounded-3xl text-black hover:bg-white transition-all shadow-xl group flex items-center justify-center"
+                title="Rigenera Advisor AI"
+              >
+                <RefreshCw className={`w-6 h-6 ${isGenerating ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'}`} />
+              </button>
            </div>
         </div>
       </div>
 
       {/* Tabs di Navigazione Amministratore */}
       <div className="flex border-b border-gray-100 overflow-x-auto pb-px gap-2">
+        <button
+          onClick={() => setAdminTab('orders')}
+          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+            adminTab === 'orders' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <ShoppingBag className="w-4 h-4" /> Monitoraggio Ordini ({orders.length})
+          {pendingOrdersCount > 0 && (
+            <span className="ml-1 px-2 py-0.5 text-[10px] bg-orange-600 text-white rounded-full font-bold animate-pulse">
+              {pendingOrdersCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setAdminTab('dishes')}
+          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+            adminTab === 'dishes' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <UtensilsCrossed className="w-4 h-4" /> Piatti & Menu ({allDishes.length})
+        </button>
+
         <button
           onClick={() => setAdminTab('applications')}
           className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
@@ -199,15 +400,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setAdminTab('dishes')}
-          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
-            adminTab === 'dishes' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
-          }`}
-        >
-          <UtensilsCrossed className="w-4 h-4" /> Piatti ({chefs.reduce((n, c) => n + c.dishes.length, 0)})
-        </button>
-
-        <button
           onClick={() => setAdminTab('users')}
           className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             adminTab === 'users' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -222,23 +414,510 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             adminTab === 'cockpit' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <BarChart3 className="w-4 h-4" /> Cockpit Strategico
+          <BarChart3 className="w-4 h-4" /> Cockpit Strategico & AI
         </button>
       </div>
+
+      {/* TAB 0: MONITORAGGIO ORDINI IN TEMPO REALE */}
+      {adminTab === 'orders' && (
+        <div className="animate-fade-in space-y-8 bg-white rounded-[3rem] p-6 sm:p-10 border border-gray-100 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-orange-600">
+                Monitoraggio Ordini & Prenotazioni
+              </h3>
+              <p className="text-black text-sm mt-1 leading-relaxed font-medium">
+                Tutte le prenotazioni dei clienti sincronizzate in tempo reale con cuoco, piatto, importo, data/orario e stato attuale.
+              </p>
+            </div>
+            <span className="bg-orange-100 text-orange-800 text-xs font-black px-4 py-2 rounded-2xl border border-orange-200 uppercase tracking-wider w-fit">
+              Live Sync Attivo
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Ordini Totali</p>
+              <p className="text-2xl font-black text-gray-900 mt-1">{orders.length}</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200">
+              <p className="text-[10px] font-black uppercase tracking-widest text-amber-800">In attesa di conferma</p>
+              <p className="text-2xl font-black text-amber-900 mt-1">{pendingOrdersCount}</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-green-50 border border-green-200">
+              <p className="text-[10px] font-black uppercase tracking-widest text-green-800">Confermati / Attivi</p>
+              <p className="text-2xl font-black text-green-900 mt-1">{confirmedOrdersCount}</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-red-50 border border-red-200">
+              <p className="text-[10px] font-black uppercase tracking-widest text-red-800">Rifiutati</p>
+              <p className="text-2xl font-black text-red-900 mt-1">{rejectedOrdersCount}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between border-b border-gray-100 pb-6">
+            <div className="relative w-full sm:max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Cerca per cuoco, piatto, codice ordine o cliente..."
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                className="w-full pl-11 pr-4 py-3.5 border border-gray-200 rounded-2xl bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none text-xs font-bold"
+              />
+            </div>
+
+            <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
+              {([
+                { key: 'all', label: `Tutti (${orders.length})` },
+                { key: 'PENDING_CONFIRMATION', label: `In attesa (${pendingOrdersCount})` },
+                { key: 'CONFIRMED', label: 'Confermati' },
+                { key: 'REJECTED', label: `Rifiutati (${rejectedOrdersCount})` },
+                { key: 'COMPLETED', label: 'Completati' }
+              ] as const).map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setOrderStatusFilter(tab.key)}
+                  className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all shrink-0 ${
+                    orderStatusFilter === tab.key
+                      ? 'bg-black text-white border-black'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredOrders.length === 0 ? (
+            <div className="py-16 text-center text-gray-400 font-bold border-2 border-dashed border-gray-200 rounded-[2.5rem] bg-gray-50/50 space-y-2">
+              <ShoppingBag className="w-10 h-10 text-gray-300 mx-auto" />
+              <p className="text-base font-black text-gray-700">Nessun ordine trovato.</p>
+              <p className="text-xs text-gray-500">Le nuove prenotazioni dei clienti appariranno qui automaticamente.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-3xl border border-gray-200">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    <th className="py-4 px-5">Ordine</th>
+                    <th className="py-4 px-5">Cuoco</th>
+                    <th className="py-4 px-5">Piatto</th>
+                    <th className="py-4 px-5">Importo</th>
+                    <th className="py-4 px-5">Data / Orario</th>
+                    <th className="py-4 px-5">Stato Attuale</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-xs">
+                  {filteredOrders.map(order => {
+                    const firstItem = order.items[0];
+                    const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status;
+                    const isConfirmed = order.status === 'CONFIRMED' || order.status === 'PLACED';
+                    return (
+                      <tr key={order.id} className="hover:bg-orange-50/20 transition-colors">
+                        <td className="py-4 px-5 align-top">
+                          <p className="font-mono font-black text-gray-900">#{order.id.split('-')[0]}</p>
+                          <p className="text-[10px] font-semibold text-gray-500 mt-0.5">
+                            {order.customerName || 'Cliente Ospite'}
+                          </p>
+                        </td>
+                        <td className="py-4 px-5 align-top">
+                          <p className="font-black text-orange-600">{order.chefName}</p>
+                        </td>
+                        <td className="py-4 px-5 align-top">
+                          <div className="space-y-1">
+                            {order.items.map((item, i) => (
+                              <p key={i} className="font-bold text-black">
+                                {item.name} <span className="text-orange-600 font-black">x{item.quantity}</span>
+                              </p>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-4 px-5 align-top font-mono font-black text-gray-900 whitespace-nowrap">
+                          € {order.total.toFixed(2)}
+                        </td>
+                        <td className="py-4 px-5 align-top">
+                          <p className="font-bold text-black whitespace-nowrap">
+                            {firstItem?.scheduledDate ? `${firstItem.scheduledDate} • ${firstItem.scheduledTime}` : order.estimatedTime}
+                          </p>
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">
+                            {order.deliveryMode === 'delivery' ? 'Consegna a domicilio' : 'Ritiro in sede'}
+                          </p>
+                        </td>
+                        <td className="py-4 px-5 align-top whitespace-nowrap">
+                          <span className={`inline-flex px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                            order.status === 'PENDING_CONFIRMATION'
+                              ? 'bg-amber-100 text-amber-900 border-amber-300'
+                              : isConfirmed || order.status === 'COMPLETED'
+                                ? 'bg-green-100 text-green-800 border-green-300'
+                                : order.status === 'REJECTED'
+                                  ? 'bg-red-100 text-red-800 border-red-300'
+                                  : 'bg-orange-100 text-orange-800 border-orange-300'
+                          }`}>
+                            {statusLabel}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 0B: GESTIONE PIATTI & DESCRIZIONI */}
+      {adminTab === 'dishes' && (
+        <div className="animate-fade-in space-y-8 bg-white rounded-[3rem] p-6 sm:p-10 border border-gray-100 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-orange-600">
+                Gestione Piatti & Descrizioni
+              </h3>
+              <p className="text-black text-sm mt-1 leading-relaxed font-medium">
+                Modifica nome, descrizione, prezzo, ingredienti e foto di ogni piatto in catalogo o aggiungine di nuovi per ciascun cuoco.
+              </p>
+            </div>
+            {onUpdateChef && chefs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingDishKey(null);
+                  setIsAddingNewDish(!isAddingNewDish);
+                  setNewDishChefId(chefs[0].id);
+                  setDishFormName('');
+                  setDishFormDesc('');
+                  setDishFormPrice('12.00');
+                  setDishFormImage('');
+                  setDishFormTags('');
+                  setDishFormIngredients('');
+                  setDishFormPreparation('');
+                }}
+                className="px-5 py-3 bg-orange-600 hover:bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all shrink-0 w-fit"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Nuovo Piatto</span>
+              </button>
+            )}
+          </div>
+
+          {isAddingNewDish && (
+            <div className="bg-orange-50/40 border-2 border-orange-200 rounded-[2rem] p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-black text-base text-orange-600">Aggiungi Nuovo Piatto</h4>
+                <button onClick={() => setIsAddingNewDish(false)} className="p-1.5 rounded-full hover:bg-white text-gray-500">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Cuoco</label>
+                  <select
+                    value={newDishChefId}
+                    onChange={(e) => setNewDishChefId(e.target.value)}
+                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold"
+                  >
+                    {chefs.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Nome Piatto</label>
+                  <input
+                    type="text"
+                    value={dishFormName}
+                    onChange={(e) => setDishFormName(e.target.value)}
+                    placeholder="es. Lasagna della Tradizione"
+                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Prezzo (€)</label>
+                  <input
+                    type="text"
+                    value={dishFormPrice}
+                    onChange={(e) => setDishFormPrice(e.target.value)}
+                    placeholder="12.50"
+                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold font-mono"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Descrizione</label>
+                <textarea
+                  rows={2}
+                  value={dishFormDesc}
+                  onChange={(e) => setDishFormDesc(e.target.value)}
+                  placeholder="Descrizione dettagliata del piatto..."
+                  className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-medium"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Ingredienti (virgola)</label>
+                  <input
+                    type="text"
+                    value={dishFormIngredients}
+                    onChange={(e) => setDishFormIngredients(e.target.value)}
+                    placeholder="Pasta, Ragù, Besciamella"
+                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Tag (virgola)</label>
+                  <input
+                    type="text"
+                    value={dishFormTags}
+                    onChange={(e) => setDishFormTags(e.target.value)}
+                    placeholder="Carne, Pasta"
+                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">URL Immagine</label>
+                  <input
+                    type="text"
+                    value={dishFormImage}
+                    onChange={(e) => setDishFormImage(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingNewDish(false)}
+                  className="px-4 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-black uppercase tracking-wider"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateNewDish}
+                  className="px-5 py-2.5 bg-black hover:bg-orange-600 text-white rounded-xl text-xs font-black uppercase tracking-wider"
+                >
+                  Salva Nuovo Piatto
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between border-b border-gray-100 pb-6">
+            <div className="relative w-full sm:max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Cerca piatto per nome, descrizione, ingrediente o cuoco..."
+                value={dishSearch}
+                onChange={(e) => setDishSearch(e.target.value)}
+                className="w-full pl-11 pr-4 py-3.5 border border-gray-200 rounded-2xl bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none text-xs font-bold"
+              />
+            </div>
+
+            <select
+              value={dishChefFilter}
+              onChange={(e) => setDishChefFilter(e.target.value)}
+              className="w-full sm:w-64 p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="all">Tutti i Cuochi ({allDishes.length} piatti)</option>
+              {chefs.map(c => (
+                <option key={c.id} value={c.id}>{c.name} ({c.dishes.length})</option>
+              ))}
+            </select>
+          </div>
+
+          {filteredDishes.length === 0 ? (
+            <div className="py-16 text-center text-gray-400 font-bold border-2 border-dashed border-gray-200 rounded-[2.5rem] bg-gray-50/50 space-y-2">
+              <UtensilsCrossed className="w-10 h-10 text-gray-300 mx-auto" />
+              <p className="text-base font-black text-gray-700">Nessun piatto trovato.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filteredDishes.map(({ dish, chef }) => {
+                const dishKey = `${chef.id}::${dish.id}`;
+                const isEditingDish = editingDishKey === dishKey;
+
+                return (
+                  <div key={dishKey} className="bg-gray-50 rounded-[2rem] p-5 border border-gray-200 flex flex-col justify-between gap-4">
+                    {isEditingDish ? (
+                      <div className="bg-white p-4 rounded-2xl border border-orange-200 space-y-3 text-left">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">
+                            Modifica Piatto — {chef.name}
+                          </span>
+                          <button onClick={() => setEditingDishKey(null)} className="text-gray-400 hover:text-gray-700">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2.5">
+                          <div className="col-span-2">
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Nome Piatto</label>
+                            <input
+                              type="text"
+                              value={dishFormName}
+                              onChange={(e) => setDishFormName(e.target.value)}
+                              className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Prezzo (€)</label>
+                            <input
+                              type="text"
+                              value={dishFormPrice}
+                              onChange={(e) => setDishFormPrice(e.target.value)}
+                              className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Descrizione</label>
+                          <textarea
+                            rows={3}
+                            value={dishFormDesc}
+                            onChange={(e) => setDishFormDesc(e.target.value)}
+                            className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-medium resize-none"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Ingredienti</label>
+                            <input
+                              type="text"
+                              value={dishFormIngredients}
+                              onChange={(e) => setDishFormIngredients(e.target.value)}
+                              className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Tag</label>
+                            <input
+                              type="text"
+                              value={dishFormTags}
+                              onChange={(e) => setDishFormTags(e.target.value)}
+                              className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Preparazione</label>
+                          <textarea
+                            rows={2}
+                            value={dishFormPreparation}
+                            onChange={(e) => setDishFormPreparation(e.target.value)}
+                            className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-medium resize-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">URL Immagine</label>
+                          <input
+                            type="text"
+                            value={dishFormImage}
+                            onChange={(e) => setDishFormImage(e.target.value)}
+                            className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
+                          />
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingDishKey(null)}
+                            className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-wider"
+                          >
+                            Annulla
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveDishEdit(chef, dish.id)}
+                            className="px-4 py-2 bg-black hover:bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider"
+                          >
+                            Salva Piatto
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex gap-4">
+                          <img
+                            src={dish.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'}
+                            alt={dish.name}
+                            referrerPolicy="no-referrer"
+                            className="w-24 h-24 rounded-2xl object-cover shrink-0 border border-gray-200"
+                          />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="font-black text-base text-orange-600 leading-tight">{dish.name}</h4>
+                              <span className="font-mono font-black text-sm text-gray-900 shrink-0">€ {dish.price.toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
+                              <CountryFlag flag={chef.nationality} title={chef.countryName} size="xs" />
+                              <span>{chef.name}</span>
+                            </div>
+                            <p className="text-xs text-black leading-relaxed line-clamp-3">
+                              {dish.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-200/70">
+                          <div className="flex flex-wrap gap-1">
+                            {dish.tags.slice(0, 3).map(tag => (
+                              <span key={tag} className="px-2 py-0.5 bg-white border border-gray-200 rounded-lg text-[9px] font-black uppercase text-gray-600">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                          {onUpdateChef && (
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => startEditingDish(dish, chef.id)}
+                                className="px-3.5 py-2 bg-black hover:bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                              >
+                                <Pencil className="w-3 h-3" />
+                                <span>Modifica</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDishFromChef(chef, dish.id)}
+                                className="p-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 rounded-xl transition-all"
+                                title={`Elimina ${dish.name}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* TAB 1: CANDIDATURE & VERIFICHE CUOCHI (MAIN FEATURE) */}
       {adminTab === 'applications' && (
         <div className="animate-fade-in space-y-8 bg-white rounded-[3rem] p-6 sm:p-10 border border-gray-100 shadow-sm">
           <div>
             <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
-              <h3 className="text-2xl sm:text-3xl font-black italic tracking-tight text-gray-900">
+              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-orange-600">
                 Valutazione & Attivazione Candidature Cuochi
               </h3>
               <span className="bg-orange-100 text-orange-800 text-xs font-black px-4 py-2 rounded-2xl border border-orange-200 uppercase tracking-wider">
                 Sincronizzato in Tempo Reale
               </span>
             </div>
-            <p className="text-gray-500 text-sm leading-relaxed max-w-3xl font-medium">
+            <p className="text-black text-sm leading-relaxed max-w-3xl font-medium">
               Esamina le registrazioni inviate dalla sezione <strong>"Diventa Chef"</strong>. Verifica i documenti igienico-sanitari (HACCP e Carta d'Identità) ed <strong>attiva il profilo</strong> per pubblicare il cuoco ed i suoi piatti direttamente nel catalogo pubblico MESA.
             </p>
           </div>
@@ -315,7 +994,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <h4 className="font-black text-xl text-gray-900 leading-tight">
                             {app.brandName}
                           </h4>
-                          <span className="text-lg" title={app.countryName}>{app.nationality}</span>
+                          <CountryFlag flag={app.nationality} title={app.countryName} size="md" />
                           <span className="text-[10px] font-mono bg-gray-200 text-gray-700 font-bold px-2 py-0.5 rounded-md">
                             ID: {app.id}
                           </span>
@@ -497,6 +1176,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           Rifiuta / Richiedi Info
                         </button>
                       )}
+
+                      {onDeleteApplication && (
+                        <button
+                          onClick={() => onDeleteApplication(app.id)}
+                          className="p-4 bg-gray-800 hover:bg-red-700 text-gray-400 hover:text-white rounded-2xl transition-all"
+                          title="Elimina candidatura"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -511,8 +1200,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {adminTab === 'chefs' && (
         <div className="animate-fade-in space-y-8 bg-white rounded-[3rem] p-6 sm:p-10 border border-gray-100 shadow-sm">
           <div>
-            <h3 className="text-3xl font-black italic tracking-tight mb-2">Cuochi Attivi nel Catalogo MESA</h3>
-            <p className="text-gray-500 text-sm leading-relaxed max-w-3xl font-medium">
+            <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Cuochi Attivi nel Catalogo MESA</h3>
+            <p className="text-black text-sm leading-relaxed max-w-3xl font-medium">
               Gestisci i profili dei cuochi attualmente pubblicati. Puoi modificarne indirizzo, recapiti telefonici, credenziali d'accesso oppure eliminarli dal catalogo.
             </p>
           </div>
@@ -557,6 +1246,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               const handleSave = () => {
                 const normalizedEmail = (editEmail || '').trim().toLowerCase();
+                const trimmedFlag = editNationality.trim();
+                const resolvedCountry = editCountryName.trim() || getCountryNameByFlag(trimmedFlag) || 'Italia';
                 if (onUpdateChef) {
                   onUpdateChef({
                     ...chef,
@@ -566,8 +1257,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     bio: editBio.trim(),
                     email: normalizedEmail,
                     password: editPassword.trim(),
-                    nationality: editNationality.trim(),
-                    countryName: editCountryName.trim()
+                    nationality: trimmedFlag,
+                    countryName: resolvedCountry,
+                    continent: editContinent
                   });
                   setEditingChefId(null);
                 }
@@ -585,9 +1277,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         referrerPolicy="no-referrer"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-extrabold text-base text-gray-900 truncate leading-none">{chef.name}</h4>
-                          <span className="text-lg" title={chef.nationality}>{chef.nationality}</span>
+                          <CountryFlag flag={chef.nationality} title={chef.countryName || chef.nationality} size="md" />
+                          {chef.countryName && (
+                            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600">
+                              {chef.countryName}
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1 font-bold uppercase tracking-wider">{chef.continent} • {chef.specialties.slice(0, 2).join(', ')}</p>
                       </div>
@@ -619,6 +1316,72 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               onChange={(e) => setEditPhone(e.target.value)}
                               className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-black font-mono"
                             />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Assegna Paese Rapido</label>
+                          <select
+                            value={COUNTRY_FLAG_PRESETS.some(p => p.flag === editNationality && p.countryName === editCountryName) ? editNationality : ''}
+                            onChange={(e) => {
+                              const preset = COUNTRY_FLAG_PRESETS.find(p => p.flag === e.target.value);
+                              if (preset) {
+                                setEditNationality(preset.flag);
+                                setEditCountryName(preset.countryName);
+                                setEditContinent(preset.continent);
+                              }
+                            }}
+                            className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold mb-3"
+                          >
+                            <option value="">-- Seleziona paese e bandiera --</option>
+                            {COUNTRY_FLAG_PRESETS.map(p => (
+                              <option key={`${p.flag}-${p.countryName}`} value={p.flag}>
+                                {p.flag} {p.countryName} ({p.continent})
+                              </option>
+                            ))}
+                          </select>
+
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Bandiera</label>
+                              <div className="flex items-center gap-2 p-2 border border-gray-200 rounded-xl bg-gray-50">
+                                <CountryFlag flag={editNationality} title={editCountryName} size="sm" />
+                                <input
+                                  type="text"
+                                  value={editNationality}
+                                  onChange={(e) => {
+                                    const nextFlag = e.target.value;
+                                    setEditNationality(nextFlag);
+                                    const matched = getCountryNameByFlag(nextFlag);
+                                    if (matched) setEditCountryName(matched);
+                                  }}
+                                  className="w-full bg-transparent text-xs text-center font-bold outline-none"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Paese</label>
+                              <input
+                                type="text"
+                                value={editCountryName}
+                                onChange={(e) => setEditCountryName(e.target.value)}
+                                className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-black"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Continente</label>
+                              <select
+                                value={editContinent}
+                                onChange={(e) => setEditContinent(e.target.value as Continent)}
+                                className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
+                              >
+                                <option value="Europa">Europa</option>
+                                <option value="Africa">Africa</option>
+                                <option value="Asia">Asia</option>
+                                <option value="Americhe">Americhe</option>
+                                <option value="Oceania">Oceania</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
 
@@ -696,21 +1459,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             setEditEmail(chef.email || '');
                             setEditPassword(chef.password || 'demo123');
                             setEditNationality(chef.nationality || '🇮🇹');
-                            setEditCountryName(chef.countryName || 'Italia');
+                            setEditCountryName(chef.countryName || getCountryNameByFlag(chef.nationality) || 'Italia');
+                            setEditContinent(chef.continent || 'Europa');
                           }}
                           className="px-4 py-2 bg-black text-white hover:bg-orange-600 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
                         >
                           Modifica Profilo
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setDishChefFilter(chef.id);
-                            setAdminTab('dishes');
-                          }}
-                          className="px-4 py-2 bg-orange-600 text-black hover:bg-black hover:text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5"
-                        >
-                          <UtensilsCrossed className="w-3.5 h-3.5" /> Piatti ({chef.dishes.length})
                         </button>
 
                         {onDeleteChef && (
@@ -740,68 +1494,183 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {adminTab === 'dishes' && (
-        <AdminDishesPanel
-          chefs={chefs}
-          onSaveChefDishes={onSaveChefDishes}
-          chefFilter={dishChefFilter}
-          onChefFilterChange={setDishChefFilter}
-        />
-      )}
-
       {/* TAB 3: UTENTI & INDIRIZZI */}
       {adminTab === 'users' && (
         <div className="animate-fade-in space-y-8 bg-white rounded-[3rem] p-6 sm:p-10 border border-gray-100 shadow-sm">
-          <div>
-            <h3 className="text-3xl font-black italic tracking-tight mb-2">Utenti Registrati & Indirizzi Convalidati</h3>
-            <p className="text-gray-500 text-sm leading-relaxed max-w-3xl font-medium">
-              Convalida o revoca la copertura e l'idoneità degli indirizzi di consegna per ciascun utente.
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Utenti Registrati & Indirizzi Convalidati</h3>
+              <p className="text-black text-sm leading-relaxed max-w-3xl font-medium">
+                Monitora in tempo reale Clienti e Cuochi registrati, verifica le candidature collegate e convalida gli indirizzi di consegna.
+              </p>
+            </div>
+            <span className="bg-orange-100 text-orange-800 text-xs font-black px-4 py-2 rounded-2xl border border-orange-200 uppercase tracking-wider self-start sm:self-auto">
+              {registeredUsers.length} Account Totali
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-6">
-            {registeredUsers.map(user => (
-              <div key={user.id} className="bg-gray-50 rounded-[2.5rem] p-6 border border-gray-200 space-y-4">
-                <div className="flex items-center justify-between border-b pb-4">
-                  <div>
-                    <h4 className="font-extrabold text-lg text-gray-900">{user.name} {user.lastName}</h4>
-                    <p className="text-xs text-gray-500">{user.email} • Role: {user.role}</p>
-                  </div>
-                  {onDeleteUser && user.role !== 'admin' && (
-                    <button 
-                      onClick={() => onDeleteUser(user.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 rounded-xl"
-                      title="Elimina Utente"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between border-b border-gray-100 pb-6">
+            <div className="relative w-full sm:max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Cerca utente per nome, email, telefono o indirizzo..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="w-full pl-11 pr-4 py-3.5 border border-gray-200 rounded-2xl bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none text-xs font-bold"
+              />
+            </div>
 
-                <div className="space-y-2">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Indirizzi Registrati ({user.addresses.length})</p>
-                  {user.addresses.map(addr => (
-                    <div key={addr.id} className="p-3 bg-white rounded-2xl border border-gray-200 flex items-center justify-between text-xs">
-                      <div>
-                        <p className="font-bold text-gray-900">{addr.street}, {addr.city}</p>
-                        <span className={`text-[9px] font-black uppercase ${addr.isVerified ? 'text-green-600' : 'text-amber-600'}`}>
-                          {addr.isVerified ? '✓ Verificato MESA' : '⚠ Da Convalidare'}
-                        </span>
+            <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
+              {(['all', 'client', 'chef', 'admin'] as const).map(r => (
+                <button
+                  key={r}
+                  onClick={() => setRoleFilter(r)}
+                  className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all shrink-0 ${
+                    roleFilter === r
+                      ? 'bg-black text-white border-black'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {r === 'all' && `Tutti (${registeredUsers.length})`}
+                  {r === 'client' && `Clienti (${totalRegisteredClients})`}
+                  {r === 'chef' && `Cuochi (${totalRegisteredChefs})`}
+                  {r === 'admin' && `Admin (${registeredUsers.filter(u => u.role === 'admin').length})`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredUsers.length === 0 ? (
+            <div className="py-16 text-center text-gray-400 font-bold border-2 border-dashed border-gray-200 rounded-[2.5rem] bg-gray-50/50 space-y-2">
+              <Users className="w-10 h-10 text-gray-300 mx-auto" />
+              <p className="text-base font-black text-gray-700">Nessun utente trovato con i filtri selezionati.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              {filteredUsers.map(user => {
+                const linkedApp = chefApplications.find(
+                  a =>
+                    (a.userId && a.userId === user.id) ||
+                    a.email.trim().toLowerCase() === user.email.trim().toLowerCase()
+                );
+                const linkedChef = chefs.find(
+                  c =>
+                    c.id === `chef-${user.id}` ||
+                    c.id === user.id ||
+                    (c.email && c.email.trim().toLowerCase() === user.email.trim().toLowerCase())
+                );
+
+                return (
+                  <div key={user.id} className="bg-gray-50 rounded-[2.5rem] p-6 border border-gray-200 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200/70 pb-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-extrabold text-lg text-gray-900">{user.name} {user.lastName}</h4>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                            user.role === 'chef'
+                              ? 'bg-orange-100 text-orange-800 border-orange-200'
+                              : user.role === 'admin'
+                                ? 'bg-black text-orange-400 border-black'
+                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            {user.role === 'chef' ? 'Cuoco' : user.role === 'admin' ? 'Admin' : 'Cliente'}
+                          </span>
+                          {linkedChef && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-green-100 text-green-800 border border-green-200">
+                              ✓ Catalogo Attivo
+                            </span>
+                          )}
+                          {linkedApp && !linkedChef && (
+                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                              linkedApp.status === 'pending'
+                                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                : linkedApp.status === 'rejected'
+                                  ? 'bg-red-100 text-red-800 border-red-200'
+                                  : 'bg-green-100 text-green-800 border-green-200'
+                            }`}>
+                              {linkedApp.status === 'pending'
+                                ? 'Candidatura In Attesa'
+                                : linkedApp.status === 'rejected'
+                                  ? 'Candidatura Respinta'
+                                  : 'Candidatura Approvata'}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-600 font-bold">
+                          {user.email}
+                          {user.phone ? ` • Tel: ${user.phone}` : ''}
+                          {user.brandName ? ` • Cucina: ${user.brandName}` : ''}
+                          {user.createdAt ? ` • Registrato: ${user.createdAt}` : ''}
+                        </p>
                       </div>
-                      <button
-                        onClick={() => onVerifyAddress(user.id, addr.id, !addr.isVerified)}
-                        className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider ${
-                          addr.isVerified ? 'bg-red-100 text-red-700' : 'bg-black text-white hover:bg-orange-600'
-                        }`}
-                      >
-                        {addr.isVerified ? 'Revoca' : 'Convalida'}
-                      </button>
+
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        {linkedApp && linkedApp.status !== 'approved' && onApproveApplication && (
+                          <button
+                            onClick={() => onApproveApplication(linkedApp.id)}
+                            className="px-3.5 py-2 bg-orange-600 hover:bg-orange-500 text-black rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm"
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <span>Attiva Cuoco</span>
+                          </button>
+                        )}
+                        {linkedApp && (
+                          <button
+                            onClick={() => {
+                              setAppStatusFilter('all');
+                              setAppSearch(user.email);
+                              setAdminTab('applications');
+                            }}
+                            className="px-3 py-2 bg-white border border-gray-200 hover:border-orange-500 text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-wider"
+                          >
+                            Candidatura
+                          </button>
+                        )}
+                        {onDeleteUser && user.role !== 'admin' && (
+                          <button 
+                            onClick={() => onDeleteUser(user.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+                            title="Elimina Utente"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Indirizzi Registrati ({user.addresses.length})</p>
+                      {user.addresses.length === 0 ? (
+                        <p className="text-xs text-gray-500 italic bg-white p-3 rounded-2xl border border-gray-200">
+                          Nessun indirizzo registrato per questo account.
+                        </p>
+                      ) : (
+                        user.addresses.map(addr => (
+                          <div key={addr.id} className="p-3 bg-white rounded-2xl border border-gray-200 flex items-center justify-between text-xs gap-3">
+                            <div>
+                              <p className="font-bold text-gray-900">{addr.street}, {addr.city}{addr.zip ? ` (${addr.zip})` : ''}</p>
+                              <span className={`text-[9px] font-black uppercase ${addr.isVerified ? 'text-green-600' : 'text-amber-600'}`}>
+                                {addr.isVerified ? '✓ Verificato MESA' : '⚠ Da Convalidare'}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => onVerifyAddress(user.id, addr.id, !addr.isVerified)}
+                              className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider shrink-0 ${
+                                addr.isVerified ? 'bg-red-100 text-red-700' : 'bg-black text-white hover:bg-orange-600'
+                              }`}
+                            >
+                              {addr.isVerified ? 'Revoca' : 'Convalida'}
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -828,9 +1697,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             })}
           </div>
 
-          <div className="grid grid-cols-1 gap-8">
-            <div className="bg-white rounded-[3.5rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-6">
-              <h3 className="text-2xl font-black italic tracking-tight">Checklist Operativa MESA</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 bg-white rounded-[3.5rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-6">
+              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-orange-600">Checklist Operativa MESA</h3>
               <div className="space-y-3">
                 {marketChecklist.map(item => (
                   <div key={item.id} className="p-4 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-100 text-xs font-bold">
@@ -842,6 +1711,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="bg-black text-white rounded-[3.5rem] p-8 sm:p-10 border border-orange-600 space-y-6">
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-6 h-6 text-orange-500" />
+                <h3 className="text-xl font-black italic text-orange-500">AI Strategy Report</h3>
+              </div>
+              <p className="text-xs font-medium text-gray-300 leading-relaxed italic">
+                {aiReport || "Generazione report in corso..."}
+              </p>
+              <button onClick={generateAiReport} className="w-full py-4 bg-orange-600 text-black font-black uppercase text-xs rounded-2xl hover:bg-orange-500">
+                Aggiorna Report
+              </button>
             </div>
           </div>
         </div>
@@ -925,7 +1807,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <h5 className="font-black text-base text-gray-900 truncate">{chefToDelete.name}</h5>
-                    <span>{chefToDelete.nationality}</span>
+                    <CountryFlag flag={chefToDelete.nationality} title={chefToDelete.countryName} size="sm" />
                   </div>
                   <p className="text-xs font-bold text-gray-500 truncate">{chefToDelete.location}</p>
                   <p className="text-[10px] font-black text-orange-600 uppercase tracking-wider mt-1">

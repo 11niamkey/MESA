@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Heart, ShoppingBag, ArrowRight } from 'lucide-react';
 import { Chef, Dish } from '../types';
+import { CountryFlag } from './CountryFlag';
 
 interface FavoritesSectionProps {
   favorites: string[];
@@ -41,11 +42,11 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
 
   return (
     <div className="animate-fade-in px-2">
-      <div className="flex items-center space-x-3 mb-10">
-        <div className="p-3 bg-red-100 rounded-2xl">
-          <Heart className="w-6 h-6 text-red-600 fill-current" />
+      <div className="flex items-center space-x-3 mb-6">
+        <div className="p-2.5 bg-red-100 rounded-xl shrink-0">
+          <Heart className="w-5 h-5 text-red-600 fill-current" />
         </div>
-        <h2 className="text-3xl font-black text-gray-900 tracking-tight">Salvati per dopo</h2>
+        <h2 className="text-lg sm:text-2xl font-black text-orange-600 tracking-tight whitespace-nowrap truncate">Salvati per dopo</h2>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
@@ -70,16 +71,16 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
               >
                 <Heart className="w-5 h-5 text-red-500 fill-current" />
               </button>
-              <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-2xl text-xs font-black text-gray-900 shadow-xl flex items-center border border-white">
-                 <span className="mr-2 text-xl">{dish.chefNationality}</span>
-                 {dish.chefName}
+              <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-2xl text-xs font-black text-gray-900 shadow-xl flex items-center gap-2 border border-white">
+                 <CountryFlag flag={dish.chefNationality} size="sm" />
+                 <span>{dish.chefName}</span>
               </div>
             </div>
             
             <div className="p-7 flex flex-col h-full">
               <div className="flex justify-between items-start mb-4">
                 <h3 
-                  className="text-xl font-black text-gray-900 leading-tight cursor-pointer hover:text-orange-600 transition-colors"
+                  className="text-xl font-black text-orange-600 leading-tight cursor-pointer hover:text-orange-700 transition-colors truncate"
                   onClick={() => onAddDish(dish)}
                 >
                   {dish.name}
@@ -87,7 +88,7 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
                 <span className="text-xl font-black text-orange-600 ml-4">€{dish.price.toFixed(2)}</span>
               </div>
               
-              <p className="text-sm text-gray-500 line-clamp-2 mb-6 flex-grow leading-relaxed">
+              <p className="text-sm text-black line-clamp-2 mb-6 flex-grow leading-relaxed">
                 {dish.description}
               </p>
 

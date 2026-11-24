@@ -1,7 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Chef, Dish } from '../types';
-import { Star, MapPin, Utensils, Share2, ShoppingBag, ShieldCheck, ArrowLeft, Heart } from 'lucide-react';
+import { Star, MapPin, Utensils, Share2, ShoppingBag, ShieldCheck, ArrowLeft, Heart, Compass } from 'lucide-react';
+import { HeritageJourney } from './HeritageJourney';
+import { CountryFlag } from './CountryFlag';
 
 interface PublicStorefrontProps {
   chef: Chef;
@@ -12,6 +14,8 @@ interface PublicStorefrontProps {
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 
 export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddDish, onExit }) => {
+  const [heritageDish, setHeritageDish] = useState<Dish | null>(null);
+
   const handleShare = () => {
     const url = window.location.href;
     if (navigator.share) {
@@ -70,7 +74,9 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                 className="w-32 h-32 md:w-44 md:h-44 rounded-[3rem] border-8 border-white shadow-2xl object-cover -rotate-2" 
                 alt={chef.name} 
               />
-              <span className="absolute -bottom-2 -right-2 text-4xl bg-white rounded-2xl p-2 shadow-xl border border-gray-100">{chef.nationality}</span>
+              <span className="absolute -bottom-2 -right-2 bg-white rounded-2xl p-2.5 shadow-xl border border-gray-100 flex items-center justify-center">
+                <CountryFlag flag={chef.nationality} title={chef.countryName} size="lg" />
+              </span>
             </div>
             <div className="flex-1 mb-2">
               <div className="flex items-center gap-3 mb-3">
@@ -80,10 +86,10 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                     {chef.rating}
                  </div>
               </div>
-              <h1 className="text-4xl md:text-6xl font-black italic text-gray-900 tracking-tighter leading-[0.9] mb-4">
+              <h1 className="text-4xl md:text-6xl font-black italic text-orange-600 tracking-tighter leading-[0.9] mb-4">
                 La Cucina <br/>di {chef.name}
               </h1>
-              <div className="flex flex-wrap items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
+              <div className="flex flex-wrap items-center gap-4 text-[10px] font-black uppercase tracking-widest text-black">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-orange-600" />
                   {chef.location}
@@ -105,8 +111,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
           {/* Menu Section */}
           <div className="lg:col-span-8 space-y-10">
             <div className="flex items-center justify-between mb-2">
-               <h2 className="text-3xl font-black italic tracking-tight border-l-8 border-orange-600 pl-6">I Piatti dello Chef</h2>
-               <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{chef.dishes.length} Proposte</span>
+               <h2 className="text-xl sm:text-2xl font-black italic tracking-tight border-l-8 border-orange-600 pl-6 text-orange-600 whitespace-nowrap truncate">I Piatti dello Chef</h2>
+               <span className="text-[10px] font-black text-black uppercase tracking-[0.2em] shrink-0">{chef.dishes.length} Proposte</span>
             </div>
 
             <div className="grid grid-cols-1 gap-8">
@@ -122,11 +128,18 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                     <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-[11px] font-black text-white uppercase tracking-widest">
                        € {dish.price.toFixed(2)}
                     </div>
+                    <button 
+                      onClick={() => setHeritageDish(dish)}
+                      className="absolute bottom-4 right-4 p-3 bg-orange-600 text-white rounded-2xl shadow-xl hover:scale-110 transition-all flex items-center gap-2"
+                    >
+                      <Compass className="w-5 h-5" />
+                      <span className="text-[10px] font-black uppercase">Scopri Eredità</span>
+                    </button>
                   </div>
                   <div className="p-8 flex flex-col justify-between flex-1">
                     <div>
-                      <h3 className="text-2xl font-black italic text-gray-900 group-hover:text-orange-600 transition-colors mb-3">{dish.name}</h3>
-                      <p className="text-gray-500 text-sm leading-relaxed mb-6 italic font-medium">
+                      <h3 className="text-2xl font-black italic text-orange-600 group-hover:text-orange-700 transition-colors mb-3 truncate">{dish.name}</h3>
+                      <p className="text-black text-sm leading-relaxed mb-6 italic font-medium">
                         "{dish.description}"
                       </p>
                       <div className="flex flex-wrap gap-2 mb-8">
@@ -173,7 +186,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                <div className="absolute top-0 right-0 p-8 opacity-10">
                   <ShieldCheck className="w-24 h-24" />
                </div>
-               <h3 className="text-xl font-black italic mb-4">Garantito da MESA</h3>
+               <h3 className="text-xl font-black italic mb-4 text-orange-500">Garantito da MESA</h3>
                <p className="text-xs text-gray-400 font-medium leading-relaxed mb-8">
                  Ordina con fiducia. Ogni cuoco su MESA è certificato HACCP e la qualità dei piatti è verificata dalla community.
                </p>
@@ -193,6 +206,14 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
 
         </div>
       </div>
+
+      {heritageDish && (
+        <HeritageJourney 
+          dish={heritageDish} 
+          chef={chef} 
+          onClose={() => setHeritageDish(null)} 
+        />
+      )}
     </div>
   );
 };

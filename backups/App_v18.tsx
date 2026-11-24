@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { db, auth, isFirebaseConfigured } from './firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, getDoc, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
@@ -7,6 +7,7 @@ import { Header } from './components/Header';
 import { AddressGateModal } from './components/AddressGateModal';
 import { ChefCard } from './components/ChefCard';
 import { CartDrawer } from './components/CartDrawer';
+import { AiMenuCreator } from './components/AiMenuCreator';
 import { FilterBar, nationalityNames } from './components/FilterBar';
 import { ChefProfile } from './components/ChefProfile';
 import { BookingModal } from './components/BookingModal';
@@ -20,24 +21,24 @@ import { FavoritesSection } from './components/FavoritesSection';
 import { Footer } from './components/Footer';
 import { NotificationToast } from './components/NotificationToast';
 import { BottomNav } from './components/BottomNav';
+import { InfoPage } from './components/InfoPage';
+import { OrderTracking } from './components/OrderTracking';
 import { OrderReviewModal } from './components/OrderReviewModal';
 import { ShareModal } from './components/ShareModal';
+import { AdminDashboard } from './components/AdminDashboard';
 import { LaunchTour } from './components/LaunchTour';
+import { AiConcierge } from './components/AiConcierge';
 import { ChefOnboarding } from './components/ChefOnboarding';
 import { ChefGroupSection } from './components/ChefGroupSection';
 import { PublicStorefront } from './components/PublicStorefront';
 import { HeritageMenu } from './components/HeritageMenu';
 import { LandingPage } from './components/LandingPage';
+import { PersonalArea } from './components/PersonalArea';
 import { DishCatalogByOrigin } from './components/DishCatalogByOrigin';
+import { CountryFlag } from './components/CountryFlag';
 import { MOCK_CHEFS } from './constants';
-
-// View-specific screens are split into separate chunks so first load stays light
-const InfoPage = lazy(() => import('./components/InfoPage').then(m => ({ default: m.InfoPage })));
-const OrderTracking = lazy(() => import('./components/OrderTracking').then(m => ({ default: m.OrderTracking })));
-const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
-const PersonalArea = lazy(() => import('./components/PersonalArea').then(m => ({ default: m.PersonalArea })));
 import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderStatus, Continent, AppUser, UserAddress, ChefApplication } from './types';
-import { SearchX, ShoppingBag, X } from 'lucide-react';
+import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock } from 'lucide-react';
 
 const DEFAULT_APPLICATIONS: ChefApplication[] = [
   {
@@ -170,34 +171,31 @@ const DEFAULT_USERS: AppUser[] = [
 // ---------------------------------------------------------------------------
 const normalizeChef = (chef: Chef): Chef => {
   const cleanName = chef.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const mappedCountry = nationalityNames[chef.nationality]?.[0];
+  const resolvedCountry =
+    chef.countryName && !(chef.countryName === 'Italia' && chef.nationality !== '🇮🇹')
+      ? chef.countryName
+      : mappedCountry || chef.countryName || 'Italia';
   return {
     ...chef,
     email: chef.email || `chef.${cleanName}@mesa.com`,
     password: chef.password || 'demo123',
-    countryName: chef.countryName || 'Italia'
+    countryName: resolvedCountry
   };
 };
 
-const firestoreWrite = async (collectionName: string, id: string, data: any, merge = false): Promise<boolean> => {
-  if (!isFirebaseConfigured) return true;
+const firestoreWrite = async (collectionName: string, id: string, data: any, merge = false) => {
+  if (!isFirebaseConfigured) return;
   try {
     if (merge) {
       await setDoc(doc(db, collectionName, id), data, { merge: true });
     } else {
       await setDoc(doc(db, collectionName, id), data);
     }
-    return true;
   } catch (err) {
     console.error(`Firestore write failed (${collectionName}/${id})`, err);
-    return false;
   }
 };
-
-// Dish photos uploaded by the admin are stored inline (data: URLs) in the chef
-// document. Don't copy them into carts/orders: those documents would bloat
-// towards Firestore's 1 MB limit. The image is looked up from the catalogue instead.
-const withoutInlineImages = (items: CartItem[]): CartItem[] =>
-  items.map(item => (item.image?.startsWith('data:') ? { ...item, image: '' } : item));
 
 const firestoreDelete = async (collectionName: string, id: string) => {
   if (!isFirebaseConfigured) return;
@@ -241,15 +239,6 @@ const seedFirestoreDefaults = async () => {
   }
 };
 
-// Key-order independent serialization, used to tell whether a Firestore
-// snapshot actually differs from local state (Firestore doesn't preserve key order).
-const stableStringify = (value: unknown): string =>
-  JSON.stringify(value, (_key, val) =>
-    val && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date)
-      ? Object.keys(val).sort().reduce<Record<string, unknown>>((acc, k) => { acc[k] = (val as Record<string, unknown>)[k]; return acc; }, {})
-      : val
-  ) ?? '';
-
 function App() {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
   const [verifiedAddress, setVerifiedAddress] = useState<string>('Milano (MI), Centro');
@@ -270,11 +259,6 @@ function App() {
   });
 
   const [registeredUsers, setRegisteredUsers] = useState<AppUser[]>(DEFAULT_USERS);
-  // Users exactly as Firestore holds them (null until the first snapshot).
-  // Kept apart from registeredUsers, which also carries optimistic local edits.
-  const [firestoreUsers, setFirestoreUsers] = useState<AppUser[] | null>(null);
-  // Last version of the current user both this session and Firestore agreed on
-  const lastSyncedUserRef = useRef<string>(stableStringify(currentUser));
 
   const [chefApplications, setChefApplications] = useState<ChefApplication[]>(DEFAULT_APPLICATIONS);
 
@@ -294,7 +278,6 @@ function App() {
       unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
         const users: AppUser[] = snapshot.docs.map(d => d.data() as AppUser);
         setRegisteredUsers(users);
-        setFirestoreUsers(users);
       });
 
       // Listen to Firebase chefs (catalogo)
@@ -337,86 +320,12 @@ function App() {
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('mesa_current_user', JSON.stringify(currentUser));
+      // Auto-migrate current user to Firebase if they only exist locally
+      firestoreWrite('users', currentUser.id, currentUser, true);
     } else {
       localStorage.removeItem('mesa_current_user');
     }
   }, [currentUser]);
-
-  // Two-way sync of the signed-in user's profile across every open session:
-  // - changed here since the last sync  -> push it to Firestore
-  // - changed elsewhere (other tab/device, admin) -> adopt the Firestore copy
-  // On first load the Firestore copy wins over the (possibly stale) localStorage one.
-  useEffect(() => {
-    if (!isFirebaseConfigured || !currentUser || !firestoreUsers) return;
-    const local = stableStringify(currentUser);
-    const remoteUser = firestoreUsers.find(u => u.id === currentUser.id);
-    if (!remoteUser) {
-      // Exists only locally (e.g. demo account): migrate it to Firestore
-      lastSyncedUserRef.current = local;
-      firestoreWrite('users', currentUser.id, currentUser);
-      return;
-    }
-    const remote = stableStringify(remoteUser);
-    if (local === remote) {
-      lastSyncedUserRef.current = local;
-    } else if (lastSyncedUserRef.current === local) {
-      setCurrentUser(remoteUser);
-    } else {
-      lastSyncedUserRef.current = local;
-      firestoreWrite('users', currentUser.id, currentUser);
-    }
-  }, [currentUser, firestoreUsers]);
-
-  // Cart: stored per user in carts/{userId} and kept live across sessions
-  const cartRef = useRef(cart);
-  cartRef.current = cart;
-  const cartSyncRef = useRef<{ userId: string | null; synced: string }>({ userId: null, synced: '' });
-  const previousUserIdRef = useRef<string | null>(currentUser?.id ?? null);
-
-  useEffect(() => {
-    const userId = currentUser?.id ?? null;
-    if (previousUserIdRef.current && previousUserIdRef.current !== userId) {
-      // Signed out or switched account: don't carry the previous user's cart over
-      setCart([]);
-    }
-    previousUserIdRef.current = userId;
-    if (!isFirebaseConfigured || !userId) return;
-
-    const unsub = onSnapshot(doc(db, 'carts', userId), (snap) => {
-      // Our own not-yet-confirmed writes echo back here: local state already has them
-      if (snap.metadata.hasPendingWrites) return;
-      const remoteItems = ((snap.data()?.items ?? []) as CartItem[]);
-      const remoteKey = stableStringify(remoteItems);
-      const sync = cartSyncRef.current;
-
-      if (sync.userId !== userId) {
-        // First snapshot after sign-in: keep anything added as a guest
-        const local = cartRef.current;
-        const remoteKeys = new Set(remoteItems.map(i => stableStringify(i)));
-        const merged = [...remoteItems, ...local.filter(i => !remoteKeys.has(stableStringify(i)))];
-        cartSyncRef.current = { userId, synced: remoteKey };
-        setCart(merged);
-        return;
-      }
-      if (remoteKey !== stableStringify(cartRef.current)) {
-        sync.synced = remoteKey;
-        setCart(remoteItems);
-      }
-    });
-    return () => {
-      unsub();
-      cartSyncRef.current = { userId: null, synced: '' };
-    };
-  }, [currentUser?.id]);
-
-  useEffect(() => {
-    const sync = cartSyncRef.current;
-    if (!isFirebaseConfigured || !currentUser || sync.userId !== currentUser.id) return;
-    const key = stableStringify(cart);
-    if (key === sync.synced) return;
-    sync.synced = key;
-    firestoreWrite('carts', currentUser.id, { items: withoutInlineImages(cart) });
-  }, [cart, currentUser?.id]);
 
   // Derive the verified address from the (Firestore-backed) user record
   useEffect(() => {
@@ -428,15 +337,10 @@ function App() {
     }
   }, [currentUser]);
 
-  // Favorites live on the user profile, so they follow it across sessions
-  const favoritesKey = currentUser ? JSON.stringify(currentUser.favoriteDishIds || []) : null;
+  // Load favorites from the signed-in user's profile
   useEffect(() => {
-    if (favoritesKey !== null) setFavorites(JSON.parse(favoritesKey));
-    else setFavorites([]);
-  }, [favoritesKey]);
-
-  // The open chef page always shows the latest catalogue data
-  const liveSelectedChef = selectedChef ? (chefs.find(c => c.id === selectedChef.id) ?? selectedChef) : null;
+    setFavorites(currentUser?.favoriteDishIds || []);
+  }, [currentUser?.id]);
 
   const handleAddressVerified = (addressString: string) => {
     setVerifiedAddress(addressString);
@@ -472,10 +376,8 @@ function App() {
     setChefs(prev => prev.map(c => c.id === updatedChef.id ? updatedChef : c));
     firestoreWrite('chefs', updatedChef.id, updatedChef, true);
     
-    // Auto-propagate changes to registeredUsers list (and persist them, so every
-    // session sees the updated chef account)
-    const updatedLinkedUsers: AppUser[] = [];
-    const nextUsers = registeredUsers.map(u => {
+    // Auto-propagate changes to registeredUsers list
+    setRegisteredUsers(prev => prev.map(u => {
       const isMatch = u.id === updatedChef.id.replace('chef-', '') || 
                       u.email.trim().toLowerCase() === (updatedChef.email || '').trim().toLowerCase() ||
                       u.name.trim().toLowerCase() === updatedChef.name.trim().toLowerCase() ||
@@ -502,29 +404,12 @@ function App() {
         if (currentUser && currentUser.id === u.id) {
           setCurrentUser(updatedUser);
         }
-        updatedLinkedUsers.push(updatedUser);
         return updatedUser;
       }
       return u;
-    });
-    setRegisteredUsers(nextUsers);
-    updatedLinkedUsers.forEach(u => firestoreWrite('users', u.id, u, true));
+    }));
 
     showNotification(`Profilo di Chef ${updatedChef.name} aggiornato e sincronizzato! 🧑‍🍳`);
-  };
-
-  // Admin dish editor: only the dishes array changes, nothing else on the chef
-  // or its linked user account is touched.
-  const handleSaveChefDishes = async (chefId: string, dishes: Dish[]): Promise<boolean> => {
-    const previous = chefs.find(c => c.id === chefId)?.dishes;
-    setChefs(prev => prev.map(c => (c.id === chefId ? { ...c, dishes } : c)));
-    const ok = await firestoreWrite('chefs', chefId, { dishes }, true);
-    if (ok) {
-      showNotification('Menu aggiornato: le modifiche sono già visibili a tutti ✓');
-    } else if (previous) {
-      setChefs(prev => prev.map(c => (c.id === chefId ? { ...c, dishes: previous } : c)));
-    }
-    return ok;
   };
 
   const handleAddChef = (newChef: Chef) => {
@@ -762,11 +647,6 @@ function App() {
   };
   
   const [orders, setOrders] = useState<Order[]>([]);
-  // "I Miei Ordini" must only list the signed-in user's orders (admins see all)
-  const myOrders = useMemo(
-    () => currentUser?.role === 'admin' ? orders : orders.filter(o => !!currentUser && o.userId === currentUser.id),
-    [orders, currentUser]
-  );
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
 
@@ -940,7 +820,7 @@ function App() {
     const newOrder: Order = {
       id: `MESA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       userId: currentUser?.id,
-      items: withoutInlineImages(cart),
+      items: [...cart],
       total: checkoutTotal,
       status: 'PLACED',
       timestamp: new Date(),
@@ -973,29 +853,110 @@ function App() {
 
   const baseChefs = chefs;
 
-  const filteredChefs = useMemo(() => {
-    const query = filters.search.toLowerCase().trim();
-    return baseChefs.filter(chef => {
-      const matchesCountry = filters.countries.length === 0 || filters.countries.includes(chef.nationality);
-      if (!matchesCountry) return false;
-      if (!query) return true;
-      
-      const countryKeywords = nationalityNames[chef.nationality] || [];
-      const matchesCountryName = countryKeywords.some(keyword => keyword.toLowerCase().includes(query)) ||
-                                (chef.countryName && chef.countryName.toLowerCase().includes(query));
-      const matchesChefName = chef.name.toLowerCase().includes(query);
-      const matchesBio = chef.bio.toLowerCase().includes(query);
-      const matchesSpecialties = chef.specialties.some(s => s.toLowerCase().includes(query));
-      
-      const hasMatchingDish = chef.dishes.some(dish => {
-        const matchesDishName = dish.name.toLowerCase().includes(query);
-        const matchesDishDesc = dish.description.toLowerCase().includes(query);
-        const matchesDishTags = dish.tags.some(tag => tag.toLowerCase().includes(query));
-        return matchesDishName || matchesDishDesc || matchesDishTags;
-      });
-      
-      return matchesCountryName || matchesChefName || matchesBio || matchesSpecialties || hasMatchingDish;
+  const normalizeSearchText = (value?: string) =>
+    (value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+  const dishMatchesCategories = (dish: Dish, categories: string[]): boolean => {
+    if (!categories || categories.length === 0) return true;
+    const tags = dish.tags.map(t => normalizeSearchText(t));
+    const text = normalizeSearchText(`${dish.name} ${dish.description} ${(dish.ingredients || []).join(' ')}`);
+    return categories.every(cat => {
+      const c = normalizeSearchText(cat);
+      if (c === 'carne') {
+        return tags.includes('carne') || tags.includes('pollo') ||
+          /\b(carne|manzo|pollo|agnello|maiale|anatra|vitello|salsiccia|ragu|kebab|bratwurst|pulled pork|asado|burger|meatballs|bolognese|carbonara|amatriciana)\b/.test(text);
+      }
+      if (c === 'pesce') {
+        return tags.includes('pesce') || tags.includes('sushi') ||
+          /\b(pesce|gamber|salmone|merluzzo|tonno|baccala|calamar|cozze|vongole|marisco|sushi|ceviche|gravlax|poisson|orata|branzino)\b/.test(text);
+      }
+      if (c === 'piccante') {
+        return tags.includes('piccante') || tags.includes('spicy') ||
+          /\b(piccante|peperoncino|spicy|curry|berbere|harissa|chili|jalapeno|nduja|zighini)\b/.test(text);
+      }
+      if (c === 'vegetariano') {
+        return tags.includes('vegetariano') || tags.includes('vegano') || tags.includes('veg') || tags.includes('vegetariana');
+      }
+      return tags.includes(c) || text.includes(c);
     });
+  };
+
+  const hasActiveFilters = Boolean(
+    filters.search.trim() ||
+    filters.countries.length > 0 ||
+    filters.categories.length > 0 ||
+    filters.maxPrice < 50
+  );
+
+  const { filteredChefs, matchingDishes } = useMemo(() => {
+    const tokens = normalizeSearchText(filters.search).split(/\s+/).filter(Boolean);
+    const matchedChefs: Chef[] = [];
+    const matchedDishes: { dish: Dish; chef: Chef; score: number }[] = [];
+
+    baseChefs.forEach(chef => {
+      const matchesCountry = filters.countries.length === 0 || filters.countries.includes(chef.nationality);
+      if (!matchesCountry) return;
+
+      const countryKeywords = nationalityNames[chef.nationality] || [];
+      const chefText = normalizeSearchText([
+        chef.name,
+        chef.bio,
+        chef.location,
+        chef.continent,
+        chef.countryName,
+        ...countryKeywords,
+        ...chef.specialties
+      ].join(' '));
+
+      const chefMatchingDishes: Dish[] = [];
+
+      chef.dishes.forEach(dish => {
+        if (dish.price > filters.maxPrice) return;
+        if (!dishMatchesCategories(dish, filters.categories)) return;
+
+        const dishNameNorm = normalizeSearchText(dish.name);
+        const dishText = normalizeSearchText([
+          dish.name,
+          dish.description,
+          ...(dish.ingredients || []),
+          ...dish.tags,
+          dish.preparation || ''
+        ].join(' '));
+        const combinedText = `${dishText} ${chefText}`;
+
+        const matchesTokens = tokens.length === 0 || tokens.every(token => combinedText.includes(token));
+        if (!matchesTokens) return;
+
+        let score = 0;
+        if (tokens.length > 0) {
+          tokens.forEach(token => {
+            if (dishNameNorm.includes(token)) score += 10;
+            else if (dishText.includes(token)) score += 5;
+            else score += 1;
+          });
+        }
+
+        chefMatchingDishes.push(dish);
+        matchedDishes.push({ dish, chef, score });
+      });
+
+      if (chefMatchingDishes.length > 0) {
+        matchedChefs.push({
+          ...chef,
+          dishes: chefMatchingDishes
+        });
+      }
+    });
+
+    if (tokens.length > 0) {
+      matchedDishes.sort((a, b) => b.score - a.score || a.dish.price - b.dish.price);
+    }
+
+    return { filteredChefs: matchedChefs, matchingDishes: matchedDishes };
   }, [filters, baseChefs]);
 
   const chefsByContinent = useMemo(() => {
@@ -1042,11 +1003,11 @@ function App() {
     );
   }
 
-  if (currentView === ViewState.PUBLIC_STOREFRONT && liveSelectedChef) {
+  if (currentView === ViewState.PUBLIC_STOREFRONT && selectedChef) {
     return (
       <div className="min-h-screen bg-white font-sans text-gray-900">
         <PublicStorefront 
-          chef={liveSelectedChef} 
+          chef={selectedChef} 
           onAddDish={handleInitiateBooking} 
           onExit={() => navigateTo(ViewState.HOME)} 
         />
@@ -1055,7 +1016,7 @@ function App() {
             isOpen={true} 
             onClose={() => setBookingDish(null)} 
             dish={bookingDish} 
-            chef={liveSelectedChef} 
+            chef={selectedChef} 
             onConfirm={handleConfirmBooking} 
           />
         )}
@@ -1094,19 +1055,18 @@ function App() {
         onChangeAddress={() => setIsAddressGateOpen(true)}
       />
       
-      {currentView === ViewState.HOME && <FilterBar filters={filters} onFilterChange={setFilters} />}
+      {currentView === ViewState.HOME && <FilterBar filters={filters} onFilterChange={setFilters} chefs={chefs} />}
 
       <main className="max-w-6xl mx-auto px-4 py-6 flex-grow w-full mb-8">
-        <Suspense fallback={<div className="py-24 flex justify-center" aria-busy="true"><div className="w-10 h-10 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin" /></div>}>
         {currentView === ViewState.HOME && (
           <div className="animate-fade-in">
-            {!filters.search ? (
+            {!hasActiveFilters ? (
               <>
-                <DailySpecials chefs={filteredChefs.length === chefs.length ? chefs : filteredChefs} onAddDish={handleInitiateBooking} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
+                <DailySpecials chefs={chefs} onAddDish={handleInitiateBooking} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
                 
                 {/* Active Interactive Dish Catalog Subdivided By Provenance */}
                 <DishCatalogByOrigin 
-                  chefs={filteredChefs} 
+                  chefs={chefs} 
                   onAddDish={handleInitiateBooking} 
                   favorites={favorites} 
                   onToggleFavorite={handleToggleFavorite} 
@@ -1120,27 +1080,180 @@ function App() {
               </>
             ) : (
               <div className="space-y-10">
-                <div className="flex items-center justify-between border-b pb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-6">
                   <div>
-                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">Risultati per "{filters.search}"</h2>
-                    <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mt-1">{filteredChefs.length} cuochi trovati</p>
+                    <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                      {filters.search.trim() ? `Risultati per "${filters.search.trim()}"` : 'Piatti Filtrati'}
+                    </h2>
+                    <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mt-1">
+                      {matchingDishes.length} {matchingDishes.length === 1 ? 'piatto trovato' : 'piatti trovati'} • {filteredChefs.length} {filteredChefs.length === 1 ? 'cuoco' : 'cuochi'}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {filters.countries.map(flag => (
+                        <button
+                          key={flag}
+                          onClick={() => setFilters({ ...filters, countries: filters.countries.filter(c => c !== flag) })}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-xs font-bold text-orange-900 hover:bg-orange-100"
+                        >
+                          <CountryFlag flag={flag} title={nationalityNames[flag]?.[0] || 'Paese'} size="sm" />
+                          <span>{nationalityNames[flag]?.[0] || 'Paese'}</span>
+                          <X className="w-3 h-3" />
+                        </button>
+                      ))}
+                      {filters.categories.map(cat => (
+                        <button
+                          key={cat}
+                          onClick={() => setFilters({ ...filters, categories: filters.categories.filter(c => c !== cat) })}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-bold text-gray-800 hover:bg-gray-200"
+                        >
+                          <span>{cat}</span>
+                          <X className="w-3 h-3" />
+                        </button>
+                      ))}
+                      {filters.maxPrice < 50 && (
+                        <button
+                          onClick={() => setFilters({ ...filters, maxPrice: 50 })}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-200 text-xs font-bold text-green-900 hover:bg-green-100"
+                        >
+                          <span>Max € {filters.maxPrice}</span>
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <button onClick={() => setFilters({ ...filters, search: '' })} className="text-xs font-black text-orange-600 uppercase">Torna alla Home</button>
+                  <button
+                    onClick={() => setFilters({ search: '', maxPrice: 50, dietary: [], categories: [], countries: [] })}
+                    className="self-start sm:self-center px-5 py-2.5 bg-black hover:bg-orange-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0"
+                  >
+                    Azzera Filtri
+                  </button>
                 </div>
 
-                {filteredChefs.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-12">
-                    {filteredChefs.map(chef => (
-                      <ChefCard key={chef.id} chef={chef} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
-                    ))}
-                  </div>
+                {matchingDishes.length > 0 ? (
+                  <>
+                    {/* Risultati Diretti per Piatto */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {matchingDishes.map(({ dish, chef }) => {
+                        const isFav = favorites.includes(dish.id);
+                        return (
+                          <div
+                            key={`${chef.id}-${dish.id}`}
+                            onClick={() => handleInitiateBooking(dish)}
+                            className="group bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-200 cursor-pointer"
+                          >
+                            <div className="relative h-56 overflow-hidden">
+                              <img
+                                src={dish.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'}
+                                alt={dish.name}
+                                referrerPolicy="no-referrer"
+                                onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'; }}
+                                className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
+
+                              <div className="absolute top-4 left-4 bg-black/85 backdrop-blur-md text-white text-[11px] font-black px-3.5 py-1.5 rounded-2xl uppercase tracking-widest shadow-xl">
+                                € {dish.price.toFixed(2)}
+                              </div>
+
+                              <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm text-black text-[10px] font-black px-3 py-1.5 rounded-2xl uppercase tracking-wider shadow-md flex items-center gap-1.5">
+                                <CountryFlag flag={chef.nationality} title={chef.countryName} size="sm" />
+                                <span className="text-gray-800 tracking-tight">{chef.countryName}</span>
+                              </div>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleFavorite(dish.id);
+                                }}
+                                className="absolute top-4 right-4 p-2.5 bg-white/95 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all z-10"
+                              >
+                                <Heart className={`w-5 h-5 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+                              </button>
+                            </div>
+
+                            <div className="p-6 flex-1 flex flex-col justify-between">
+                              <div>
+                                <h3 className="font-black italic text-gray-900 text-lg leading-tight group-hover:text-orange-600 transition-colors mb-2">
+                                  {dish.name}
+                                </h3>
+                                <p className="text-gray-500 text-xs leading-relaxed mb-3 line-clamp-2 italic font-medium">
+                                  "{dish.description}"
+                                </p>
+                                <div className="flex flex-wrap gap-1.5 mb-4">
+                                  <span className="px-2.5 py-1 bg-orange-50 text-orange-800 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-orange-600" /> 25-35 min
+                                  </span>
+                                  {dish.tags.map(tag => (
+                                    <span key={tag} className="px-2.5 py-1 bg-gray-50 border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-500">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewProfile(chef);
+                                  }}
+                                  className="flex items-center justify-between p-2.5 bg-gray-50 hover:bg-orange-50/60 rounded-2xl border border-gray-100 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <img src={chef.avatar} alt={chef.name} className="w-8 h-8 rounded-xl object-cover shrink-0" />
+                                    <div className="min-w-0">
+                                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none">Chef</p>
+                                      <span className="text-xs font-bold text-gray-800 truncate block">{chef.name}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="flex items-center gap-0.5 bg-amber-400/15 text-amber-800 px-2 py-0.5 rounded-lg text-[9px] font-black">
+                                      <Star className="w-2.5 h-2.5 fill-current text-amber-500" />
+                                      {chef.rating}
+                                    </span>
+                                    <span className="flex items-center gap-0.5 text-gray-500 text-[9px] font-bold">
+                                      <MapPin className="w-2.5 h-2.5 text-orange-600" />
+                                      {chef.distance} km
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <button className="w-full py-3 rounded-2xl bg-orange-600 hover:bg-black text-white font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all shadow-md active:scale-95">
+                                  <ShoppingBag className="w-4 h-4" />
+                                  <span>Scegli e Prenota</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Cuochi corrispondenti */}
+                    <div className="pt-8 border-t border-gray-100 space-y-6">
+                      <h3 className="text-xl font-black text-gray-900 tracking-tight">
+                        Cuochi Corrispondenti ({filteredChefs.length})
+                      </h3>
+                      <div className="grid grid-cols-1 gap-8">
+                        {filteredChefs.map(chef => (
+                          <ChefCard key={chef.id} chef={chef} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 ) : (
-                  <div className="py-24 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200">
+                  <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200 px-6">
                     <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
                       <SearchX className="w-10 h-10 text-gray-400" />
                     </div>
-                    <h3 className="text-2xl font-black text-gray-400 mb-2">Nessun cuoco trovato</h3>
-                    <p className="text-gray-500 font-medium">Prova a cercare termini diversi o esplora le categorie.</p>
+                    <h3 className="text-2xl font-black text-gray-700 mb-2">Nessun piatto trovato</h3>
+                    <p className="text-gray-500 font-medium mb-6">Prova a cercare un altro ingrediente, paese o riduci i filtri attivi.</p>
+                    <button
+                      onClick={() => setFilters({ search: '', maxPrice: 50, dietary: [], categories: [], countries: [] })}
+                      className="px-6 py-3 bg-orange-600 hover:bg-black text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all"
+                    >
+                      Mostra Tutti i Piatti
+                    </button>
                   </div>
                 )}
               </div>
@@ -1166,7 +1279,7 @@ function App() {
             : (
               <div className="animate-fade-in space-y-6">
                 <h2 className="text-3xl font-black text-gray-900 mb-8 tracking-tight">I Miei Ordini</h2>
-                {myOrders.length === 0 ? <p className="text-gray-400 font-bold py-20 text-center bg-gray-50 rounded-[3rem]">Nessun ordine attivo.</p> : myOrders.map(order => (
+                {orders.length === 0 ? <p className="text-gray-400 font-bold py-20 text-center bg-gray-50 rounded-[3rem]">Nessun ordine attivo.</p> : orders.map(order => (
                   <div key={order.id} onClick={() => setSelectedOrder(order)} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all cursor-pointer flex justify-between items-center group">
                     <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{order.id.split('-')[0]}</p>
@@ -1181,9 +1294,10 @@ function App() {
               </div>
             )
         )}
-        {currentView === ViewState.CHEF_PROFILE && liveSelectedChef && (
-          <ChefProfile chef={liveSelectedChef} onBack={() => navigateTo(ViewState.HOME)} onAddDish={handleInitiateBooking} favorites={favorites} onToggleFavorite={handleToggleFavorite} onNavigateToCulture={() => navigateTo(ViewState.CULTURE)} />
+        {currentView === ViewState.CHEF_PROFILE && selectedChef && (
+          <ChefProfile chef={selectedChef} onBack={() => navigateTo(ViewState.HOME)} onAddDish={handleInitiateBooking} favorites={favorites} onToggleFavorite={handleToggleFavorite} onNavigateToCulture={() => navigateTo(ViewState.CULTURE)} />
         )}
+        {currentView === ViewState.AI_MENU_CREATOR && <AiMenuCreator />}
         
         {currentView === ViewState.PROFILE && currentUser && (
           <PersonalArea 
@@ -1216,14 +1330,12 @@ function App() {
             onDeleteUser={handleDeleteUser}
             onApproveApplication={handleApproveApplication}
             onRejectApplication={handleRejectApplication}
-            onSaveChefDishes={handleSaveChefDishes}
           />
         )}
 
         {[ViewState.ABOUT, ViewState.SAFETY, ViewState.BECOME_CHEF, ViewState.HELP, ViewState.TERMS, ViewState.PRIVACY].includes(currentView) && (
           <InfoPage view={currentView} onBack={() => navigateTo(ViewState.HOME)} onOpenOnboarding={() => setIsOnboardingOpen(true)} />
         )}
-        </Suspense>
       </main>
 
       <Footer onNavigate={navigateTo} />
@@ -1318,6 +1430,7 @@ function App() {
           localStorage.setItem('mesa_launch_tour_v60', 'true'); 
         }} />
       )}
+      <AiConcierge />
     </div>
   );
 }

@@ -99,7 +99,26 @@ export interface Chef {
   documents?: ChefDocument[];
 }
 
-export type OrderStatus = 'PLACED' | 'PREPARING' | 'READY' | 'DELIVERING' | 'COMPLETED';
+export type OrderStatus =
+  | 'PENDING_CONFIRMATION'
+  | 'CONFIRMED'
+  | 'REJECTED'
+  | 'PLACED'
+  | 'PREPARING'
+  | 'READY'
+  | 'DELIVERING'
+  | 'COMPLETED';
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  PENDING_CONFIRMATION: 'In attesa di conferma',
+  CONFIRMED: 'Confermato',
+  REJECTED: 'Rifiutato',
+  PLACED: 'Confermato',
+  PREPARING: 'In Cucina',
+  READY: 'Pronto',
+  DELIVERING: 'In Consegna',
+  COMPLETED: 'Completato'
+};
 
 export interface Message {
   id: string;
@@ -111,6 +130,8 @@ export interface Message {
 export interface Order {
   id: string;
   userId?: string;
+  customerName?: string;
+  customerEmail?: string;
   items: CartItem[];
   total: number;
   status: OrderStatus;
@@ -180,6 +201,8 @@ export interface AppUser {
   name: string;
   lastName: string;
   email: string;
+  phone?: string;
+  brandName?: string;
   role: 'client' | 'chef' | 'admin';
   addresses: UserAddress[];
   createdAt: string;
@@ -187,6 +210,13 @@ export interface AppUser {
   favoriteDishIds?: string[];
 }
 
+
+export interface HeritageStoryResponse {
+  story: string;
+  sensoryDetails: string;
+  ritual: string;
+  pairing: string;
+}
 
 export interface FilterState {
   search: string;

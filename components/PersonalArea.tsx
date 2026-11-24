@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, MapPin, ShieldCheck, ShieldAlert, Trash2, 
   Plus, LogOut, ChefHat, Calendar, ClipboardList, 
-  Clock, CheckCircle, Smartphone, Mail, Globe, Check 
+  Clock, CheckCircle, Smartphone, Mail, Globe, Check, XCircle, Sparkles, AlertCircle 
 } from 'lucide-react';
-import { AppUser, UserAddress, Order, ViewState, Chef } from '../types';
+import { AppUser, UserAddress, Order, OrderStatus, ViewState, Chef, ChefApplication, ORDER_STATUS_LABELS } from '../types';
+import { CountryFlag } from './CountryFlag';
 
 interface PersonalAreaProps {
   currentUser: AppUser;
@@ -15,7 +16,10 @@ interface PersonalAreaProps {
   onSelectOrder: (order: Order) => void;
   chefs: Chef[];
   onUpdateChef?: (updatedChef: Chef) => void;
+  onUpdateOrderStatus?: (orderId: string, status: OrderStatus) => Promise<void> | void;
   registeredUsers?: AppUser[];
+  chefApplications?: ChefApplication[];
+  onOpenOnboarding?: () => void;
 }
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
@@ -29,9 +33,24 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   onSelectOrder,
   chefs,
   onUpdateChef,
-  registeredUsers = []
+  onUpdateOrderStatus,
+  registeredUsers = [],
+  chefApplications = [],
+  onOpenOnboarding
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'orders' | 'kitchen' | 'chef-orders' | 'chef-menu' | 'chef-wallet' | 'client-payments'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'orders' | 'kitchen' | 'chef-orders' | 'chef-menu' | 'chef-wallet' | 'client-payments'>(
+    currentUser.role === 'chef' ? 'chef-orders' : 'profile'
+  );
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (currentUser.role === 'chef') {
+      setActiveTab('chef-orders');
+    } else if (activeTab === 'chef-orders' || activeTab === 'kitchen' || activeTab === 'chef-menu' || activeTab === 'chef-wallet') {
+      setActiveTab('profile');
+    }
+  }, [currentUser.id, currentUser.role]);
   
   // States for adding address
   const [street, setStreet] = useState('');
@@ -48,20 +67,30 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   // Chef-specific settings state (loaded if user is a chef)
   const matchingChef = chefs.find(c => {
     const chefEmailMatch = c.email && currentUser.email && c.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim();
-    const chefIdMatch = c.id === `chef-${currentUser.id}` || c.id === currentUser.id;
+    const chefIdMatch =
+      c.id === `chef-${currentUser.id}` ||
+      c.id === currentUser.id ||
+      `usr-${c.id}` === currentUser.id ||
+      `usr-${c.id.replace('chef-', '')}` === currentUser.id;
     const fullNameString = `${currentUser.name} ${currentUser.lastName}`.trim().toLowerCase();
     const chefNameMatch = c.name.trim().toLowerCase() === fullNameString ||
                           c.name.trim().toLowerCase() === currentUser.name.trim().toLowerCase();
     return chefEmailMatch || chefIdMatch || chefNameMatch;
   });
+
+  const matchingApplication = chefApplications.find(
+    a =>
+      (a.userId && a.userId === currentUser.id) ||
+      a.email.trim().toLowerCase() === currentUser.email.trim().toLowerCase()
+  );
   
-  const [chefName, setChefName] = useState(matchingChef?.name || `${currentUser.name} ${currentUser.lastName}`);
-  const [chefNationality, setChefNationality] = useState(matchingChef?.nationality || '🇮🇹');
-  const [chefCountryName, setChefCountryName] = useState(matchingChef?.countryName || 'Italia');
+  const [chefName, setChefName] = useState(matchingChef?.name || matchingApplication?.brandName || currentUser.brandName || `${currentUser.name} ${currentUser.lastName}`);
+  const [chefNationality, setChefNationality] = useState(matchingChef?.nationality || matchingApplication?.nationality || '🇮🇹');
+  const [chefCountryName, setChefCountryName] = useState(matchingChef?.countryName || matchingApplication?.countryName || 'Italia');
   const [chefEmail, setChefEmail] = useState(matchingChef?.email || currentUser.email);
   const [chefPassword, setChefPassword] = useState(matchingChef?.password || currentUser.password || 'demo123');
-  const [chefSpecialties, setChefSpecialties] = useState(matchingChef?.specialties.join(', ') || 'Cucina Tradizionale');
-  const [chefBio, setChefBio] = useState(matchingChef?.bio || 'Passione per la cucina casalinga preparata con ingredienti freschi.');
+  const [chefSpecialties, setChefSpecialties] = useState(matchingChef?.specialties.join(', ') || matchingApplication?.specialties?.join(', ') || 'Cucina Tradizionale');
+  const [chefBio, setChefBio] = useState(matchingChef?.bio || matchingApplication?.bio || 'Passione per la cucina casalinga preparata con ingredienti freschi.');
   
   const defaultNumbers: Record<string, string> = {
     'c1': '+393475552026',
@@ -76,11 +105,75 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
     'c41': '+393395556677'
   };
 
-  const [chefPhone, setChefPhone] = useState(matchingChef?.phone || (matchingChef ? defaultNumbers[matchingChef.id] : '') || '+393475552026');
-  const [chefLocation, setChefLocation] = useState(matchingChef?.location || 'Milano, Centro');
+  const [chefPhone, setChefPhone] = useState(
+    matchingChef?.phone || matchingApplication?.phone || currentUser.phone || (matchingChef ? defaultNumbers[matchingChef.id] : '') || '+393475552026'
+  );
+  const [chefLocation, setChefLocation] = useState(
+    matchingChef?.location || matchingApplication?.location || currentUser.addresses?.[0]?.street || 'Pordenone (PN), Centro'
+  );
   const [haccpStatus, setHaccpStatus] = useState(true);
 
-  const userOrders = orders.filter(o => o.chefId === `chef-${currentUser.id}` || o.id.includes(currentUser.id.slice(0, 4)));
+  useEffect(() => {
+    setProfileName(currentUser.name);
+    setProfileLastName(currentUser.lastName);
+    setProfileEmail(currentUser.email);
+    setProfilePassword(currentUser.password || 'demo123');
+  }, [currentUser.id, currentUser.name, currentUser.lastName, currentUser.email, currentUser.password]);
+
+  useEffect(() => {
+    if (matchingChef) {
+      setChefName(matchingChef.name);
+      setChefNationality(matchingChef.nationality || '🇮🇹');
+      setChefCountryName(matchingChef.countryName || 'Italia');
+      setChefEmail(matchingChef.email || currentUser.email);
+      setChefPassword(matchingChef.password || currentUser.password || 'demo123');
+      setChefSpecialties(matchingChef.specialties.join(', '));
+      setChefBio(matchingChef.bio);
+      if (matchingChef.phone) setChefPhone(matchingChef.phone);
+      setChefLocation(matchingChef.location);
+    } else if (matchingApplication) {
+      setChefName(matchingApplication.brandName || matchingApplication.fullName);
+      setChefNationality(matchingApplication.nationality || '🇮🇹');
+      setChefCountryName(matchingApplication.countryName || 'Italia');
+      setChefEmail(matchingApplication.email);
+      setChefPhone(matchingApplication.phone || currentUser.phone || '+393475552026');
+      setChefLocation(matchingApplication.location);
+      setChefSpecialties(matchingApplication.specialties.join(', '));
+      setChefBio(matchingApplication.bio);
+    }
+  }, [matchingChef?.id, matchingChef?.name, matchingChef?.location, matchingChef?.phone, matchingApplication?.id, currentUser.id]);
+
+  const clientOrders = orders.filter(
+    o => o.userId === currentUser.id
+  );
+
+  const chefOrders = orders.filter(o => {
+    if (matchingChef) {
+      return (
+        o.chefId === matchingChef.id ||
+        o.chefName?.trim().toLowerCase() === matchingChef.name.trim().toLowerCase()
+      );
+    }
+    const fullName = `${currentUser.name} ${currentUser.lastName}`.trim().toLowerCase();
+    return (
+      o.chefId === currentUser.id ||
+      o.chefId === `chef-${currentUser.id}` ||
+      o.chefName?.trim().toLowerCase() === fullName
+    );
+  });
+
+  const pendingChefOrdersCount = chefOrders.filter(o => o.status === 'PENDING_CONFIRMATION').length;
+  const userOrders = currentUser.role === 'chef' ? chefOrders : clientOrders;
+
+  const handleChefStatusChange = async (orderId: string, nextStatus: OrderStatus) => {
+    if (!onUpdateOrderStatus) return;
+    setUpdatingOrderId(orderId);
+    try {
+      await onUpdateOrderStatus(orderId, nextStatus);
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
 
   const handleAddAddress = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +213,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     if (!profileName.trim() || !profileLastName.trim() || !profileEmail.trim() || !profilePassword.trim()) {
-      alert('Tutti i campi sono obbligatori.');
+      setFeedbackMsg({ type: 'error', text: 'Tutti i campi sono obbligatori.' });
       return;
     }
 
@@ -129,7 +222,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
       u => u.id !== currentUser.id && u.email.toLowerCase() === profileEmail.trim().toLowerCase()
     );
     if (isEmailTaken) {
-      alert('Questa email è già registrata da un altro utente della piattaforma.');
+      setFeedbackMsg({ type: 'error', text: 'Questa email è già registrata da un altro utente della piattaforma.' });
       return;
     }
 
@@ -142,13 +235,13 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
     };
 
     onUpdateUser(updatedUser);
-    alert('Profilo personale aggiornato con successo!');
+    setFeedbackMsg({ type: 'success', text: 'Profilo personale aggiornato e sincronizzato con successo!' });
   };
 
   const handleSaveChefSettings = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chefName.trim() || !chefPhone.trim() || !chefLocation.trim() || !chefEmail.trim() || !chefPassword.trim()) {
-      alert('I campi principali sono obbligatori.');
+      setFeedbackMsg({ type: 'error', text: 'I campi principali sono obbligatori.' });
       return;
     }
 
@@ -157,50 +250,42 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
       u => u.id !== currentUser.id && u.email.toLowerCase() === chefEmail.trim().toLowerCase()
     );
     if (isEmailTaken) {
-      alert('Questa email è già registrata da un altro utente della piattaforma.');
+      setFeedbackMsg({ type: 'error', text: 'Questa email è già registrata da un altro utente della piattaforma.' });
       return;
     }
 
-    if (onUpdateChef) {
-      const activeChefId = matchingChef?.id || `chef-${currentUser.id}`;
-      const nameParts = chefName.trim().split(' ');
-      const first = nameParts[0] || currentUser.name;
-      const last = nameParts.slice(1).join(' ');
+    const activeChefId = matchingChef?.id || `chef-${currentUser.id}`;
+    const nameParts = chefName.trim().split(' ');
+    const first = nameParts[0] || currentUser.name;
+    const last = nameParts.slice(1).join(' ');
 
-      const updatedUser: AppUser = {
-        ...currentUser,
-        name: first,
-        lastName: last,
-        email: chefEmail.trim().toLowerCase(),
-        password: chefPassword.trim()
-      };
-      
-      onUpdateUser(updatedUser);
+    const updatedUser: AppUser = {
+      ...currentUser,
+      name: first,
+      lastName: last,
+      phone: chefPhone.trim(),
+      brandName: chefName.trim(),
+      email: chefEmail.trim().toLowerCase(),
+      password: chefPassword.trim()
+    };
+    onUpdateUser(updatedUser);
 
+    if (onUpdateChef && matchingChef) {
       onUpdateChef({
+        ...matchingChef,
         id: activeChefId,
         name: chefName.trim(),
         nationality: chefNationality.trim(),
         countryName: chefCountryName.trim(),
         email: chefEmail.trim().toLowerCase(),
         password: chefPassword.trim(),
-        continent: matchingChef?.continent || 'Europa',
-        avatar: matchingChef?.avatar || 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=400&q=80',
-        rating: matchingChef?.rating || 4.8,
         location: chefLocation.trim(),
         phone: chefPhone.trim(),
-        specialties: chefSpecialties.split(',').map(s => s.trim()),
+        specialties: chefSpecialties.split(',').map(s => s.trim()).filter(Boolean),
         bio: chefBio.trim(),
-        availability: matchingChef?.availability || ['19:00 - 22:00'],
-        availableDays: matchingChef?.availableDays || [1, 2, 3, 4, 5, 6],
-        reviews: matchingChef?.reviews || [],
-        dishes: matchingChef?.dishes || [],
-        distance: matchingChef?.distance || 1.0
       });
-      alert('Tutte le informazioni e le credenziali di accesso sono state salvate e sincronizzate con successo!');
-    } else {
-      alert('Informazioni della cucina aggiornate con successo!');
     }
+    setFeedbackMsg({ type: 'success', text: 'Tutte le informazioni e le credenziali di accesso sono state salvate e sincronizzate!' });
   };
 
   return (
@@ -212,7 +297,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-orange-600 text-black rounded-3xl flex items-center justify-center shadow-xl">
+            <div className="w-20 h-20 bg-orange-600 text-black rounded-3xl flex items-center justify-center shadow-xl shrink-0">
               {currentUser.role === 'chef' ? (
                 <ChefHat className="w-10 h-10 stroke-2" />
               ) : currentUser.role === 'admin' ? (
@@ -225,12 +310,18 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
               <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
                 <span className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border ${
                   currentUser.role === 'chef' 
-                    ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' 
+                    ? matchingChef
+                      ? 'bg-orange-500/10 text-orange-500 border-orange-500/20'
+                      : 'bg-amber-500/15 text-amber-300 border-amber-400/30'
                     : currentUser.role === 'admin'
                       ? 'bg-red-500/10 text-red-500 border-red-500/20'
                       : 'bg-green-500/10 text-green-500 border-green-500/20'
                 }`}>
-                  {currentUser.role === 'chef' ? 'Cuoco Partner' : currentUser.role === 'admin' ? 'Amministratore' : 'Cliente Verificato'}
+                  {currentUser.role === 'chef'
+                    ? matchingChef ? 'Cuoco Partner Attivo' : 'Cuoco in Verifica Admin'
+                    : currentUser.role === 'admin'
+                      ? 'Amministratore'
+                      : 'Cliente MESA'}
                 </span>
                 <span className="text-[10px] text-gray-400 font-bold">Registrato il {currentUser.createdAt}</span>
               </div>
@@ -247,6 +338,95 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Live Sync Banner for Chef Approval / Onboarding */}
+      {(currentUser.role === 'chef' && !matchingChef) && (
+        <div className={`p-5 rounded-3xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left ${
+          matchingApplication?.status === 'rejected'
+            ? 'bg-red-50 border-red-200 text-red-900'
+            : 'bg-amber-50 border-amber-200 text-amber-900'
+        }`}>
+          <div className="flex items-start gap-3">
+            {matchingApplication?.status === 'rejected' ? (
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            ) : (
+              <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            )}
+            <div>
+              <p className="font-black text-xs uppercase tracking-wider">
+                {matchingApplication?.status === 'rejected'
+                  ? 'Candidatura Cuoco da Completare / Respinta'
+                  : 'Profilo Cuoco in Attesa di Approvazione Admin'}
+              </p>
+              <p className="text-xs font-medium mt-0.5">
+                {matchingApplication?.adminNotes
+                  ? `Note Admin: ${matchingApplication.adminNotes}`
+                  : 'Il tuo account è già sincronizzato nell\'Area Admin. Non appena l\'Amministratore attiverà il tuo profilo, comparirai nel catalogo pubblico MESA.'}
+              </p>
+            </div>
+          </div>
+          {onOpenOnboarding && (
+            <button
+              type="button"
+              onClick={onOpenOnboarding}
+              className="px-4 py-2.5 bg-black hover:bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{matchingApplication ? 'Completa / Aggiorna Candidatura' : 'Compila Candidatura & HACCP'}</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {currentUser.role === 'client' && onOpenOnboarding && (
+        <div className={`p-5 rounded-3xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left ${
+          matchingApplication
+            ? 'bg-orange-50 border-orange-200 text-orange-950'
+            : 'bg-gray-50 border-gray-200 text-gray-900'
+        }`}>
+          <div className="flex items-start gap-3">
+            <ChefHat className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-black text-xs uppercase tracking-wider">
+                {matchingApplication
+                  ? `Candidatura Diventa Chef (${matchingApplication.id}): ${
+                      matchingApplication.status === 'approved'
+                        ? 'Approvata'
+                        : matchingApplication.status === 'rejected'
+                          ? 'Respinta'
+                          : 'In attesa di verifica Admin'
+                    }`
+                  : 'Vuoi cucinare su MESA?'}
+              </p>
+              <p className="text-xs text-gray-600 font-medium mt-0.5">
+                {matchingApplication
+                  ? 'La tua richiesta è sincronizzata in tempo reale con l\'Area Amministratore.'
+                  : 'Invia la tua candidatura da Chef MESA con documenti HACCP e il tuo primo piatto.'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenOnboarding}
+            className="px-4 py-2.5 bg-orange-600 hover:bg-black text-black hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-wider shrink-0 transition-colors"
+          >
+            {matchingApplication ? 'Apri Modulo Chef' : 'Diventa Chef MESA'}
+          </button>
+        </div>
+      )}
+
+      {feedbackMsg && (
+        <div className={`p-4 rounded-2xl border text-xs font-bold flex items-center justify-between gap-3 ${
+          feedbackMsg.type === 'success'
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-700'
+        }`}>
+          <span>{feedbackMsg.text}</span>
+          <button type="button" onClick={() => setFeedbackMsg(null)} className="text-[10px] font-black uppercase underline">
+            Chiudi
+          </button>
+        </div>
+      )}
 
       {/* Tabs di Navigazione Area Personale */}
       <div className="flex border-b border-gray-100 overflow-x-auto pb-px">
@@ -311,6 +491,11 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
               }`}
             >
               <ClipboardList className="w-4 h-4" /> Gestione Ordini
+              {pendingChefOrdersCount > 0 && (
+                <span className="ml-1 px-2 py-0.5 text-[10px] bg-red-600 text-white rounded-full font-black animate-pulse">
+                  {pendingChefOrdersCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab('chef-menu')}
@@ -339,8 +524,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         {activeTab === 'profile' && (
           <form onSubmit={handleSaveProfile} className="space-y-8 animate-fade-in text-left">
             <div>
-              <h3 className="text-2xl font-black italic tracking-tight mb-2">Modifica Profilo e Credenziali</h3>
-              <p className="text-gray-500 text-sm leading-relaxed">Ottimizza le tue informazioni di anagrafica personali e le credenziali di accesso. Modifica i dettagli e salva per aggiornarli su tutta la piattaforma.</p>
+              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Modifica Profilo e Credenziali</h3>
+              <p className="text-black text-sm leading-relaxed">Ottimizza le tue informazioni di anagrafica personali e le credenziali di accesso. Modifica i dettagli e salva per aggiornarli su tutta la piattaforma.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -415,8 +600,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           <div className="space-y-8 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h3 className="text-2xl font-black italic tracking-tight mb-2">I Miei Indirizzi</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">
+                <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">I Miei Indirizzi</h3>
+                <p className="text-black text-sm leading-relaxed">
                   {currentUser.role === 'chef' 
                     ? 'Indica l\'indirizzo della cucina di casa in cui prepari i tuoi capolavori.' 
                     : 'Aggiungi o rimuovi gli indirizzi per la consegna a domicilio dei tuoi ordini casalinghi.'}
@@ -538,8 +723,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         {/* TAB 3: STORIA ORDINI (FOR CLIENTS) */}
         {activeTab === 'orders' && currentUser.role === 'client' && (
           <div className="space-y-6 animate-fade-in">
-            <h3 className="text-2xl font-black italic tracking-tight mb-2">Storia dei tuoi Ordini</h3>
-            <p className="text-gray-500 text-sm mb-6 leading-relaxed">Ecco gli ordini che hai prenotato dai nostri cuochi locali MESA.</p>
+            <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Storia dei tuoi Ordini</h3>
+            <p className="text-black text-sm mb-6 leading-relaxed">Ecco gli ordini che hai prenotato dai nostri cuochi locali MESA.</p>
             
             {userOrders.length === 0 ? (
               <div className="py-12 bg-gray-50 rounded-3xl text-center border-2 border-dashed border-gray-200">
@@ -570,14 +755,18 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                     <div className="flex items-center gap-4">
                       <div className="text-right hidden sm:block">
                         <p className="text-[10px] text-gray-400 font-bold">Stato Attuale</p>
-                        <p className="text-xs font-black text-gray-900 tracking-wider uppercase">{order.status}</p>
+                        <p className="text-xs font-black text-gray-900 tracking-wider uppercase">{ORDER_STATUS_LABELS[order.status] || order.status}</p>
                       </div>
                       <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                        order.status === 'COMPLETED' 
+                        order.status === 'COMPLETED' || order.status === 'CONFIRMED' || order.status === 'PLACED'
                           ? 'bg-green-50 text-green-700 border-green-200' 
-                          : 'bg-orange-50 text-orange-700 border-orange-200 animate-pulse'
+                          : order.status === 'REJECTED'
+                            ? 'bg-red-50 text-red-700 border-red-200'
+                            : order.status === 'PENDING_CONFIRMATION'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-orange-50 text-orange-700 border-orange-200 animate-pulse'
                       }`}>
-                        {order.status === 'COMPLETED' ? 'Completato' : 'In Consegna'}
+                        {ORDER_STATUS_LABELS[order.status] || order.status}
                       </span>
                     </div>
                   </div>
@@ -590,8 +779,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         {/* TAB CLIENT PAYMENTS */}
         {activeTab === 'client-payments' && currentUser.role === 'client' && (
           <div className="space-y-6 animate-fade-in relative text-left">
-            <h3 className="text-2xl font-black italic tracking-tight mb-2">Metodi di Pagamento</h3>
-            <p className="text-gray-500 text-sm mb-6 leading-relaxed">Gestisci le tue carte e metodi di pagamento per ordini veloci.</p>
+            <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Metodi di Pagamento</h3>
+            <p className="text-black text-sm mb-6 leading-relaxed">Gestisci le tue carte e metodi di pagamento per ordini veloci.</p>
             
             <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-4">
@@ -620,8 +809,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         {activeTab === 'kitchen' && currentUser.role === 'chef' && (
           <div className="space-y-8 animate-fade-in">
             <div>
-              <h3 className="text-2xl font-black italic tracking-tight mb-2">Pannello Direzionale Cuoco</h3>
-              <p className="text-gray-500 text-sm leading-relaxed">Gestisci le informazioni sul tuo profilo pubblico di Chef partner MESA, visualizza recensioni o modifica le tue impostazioni casalinghe.</p>
+              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Pannello Direzionale Cuoco</h3>
+              <p className="text-black text-sm leading-relaxed">Gestisci le informazioni sul tuo profilo pubblico di Chef partner MESA, visualizza recensioni o modifica le tue impostazioni casalinghe.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-6">
@@ -686,14 +875,17 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   <div className="col-span-1">
                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Bandiera</label>
-                    <input 
-                      type="text" 
-                      value={chefNationality}
-                      onChange={(e) => setChefNationality(e.target.value)}
-                      className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold text-center"
-                      placeholder="es. 🇮🇹"
-                      required
-                    />
+                    <div className="flex items-center gap-2 p-3 border border-gray-100 rounded-2xl bg-gray-50 focus-within:ring-2 focus-within:ring-orange-500">
+                      <CountryFlag flag={chefNationality} title={chefCountryName} size="sm" />
+                      <input 
+                        type="text" 
+                        value={chefNationality}
+                        onChange={(e) => setChefNationality(e.target.value)}
+                        className="w-full bg-transparent outline-none text-sm font-bold text-center"
+                        placeholder="es. 🇮🇹"
+                        required
+                      />
+                    </div>
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Paese di Origine</label>
@@ -821,7 +1013,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                     <div key={sampleChef.id} className="bg-gray-50 border border-gray-100/55 rounded-2xl p-5 flex flex-col justify-between hover:border-orange-500/10 transition-all text-left">
                       <div>
                         <div className="flex items-center gap-3 mb-2">
-                          <span className="text-lg">{sampleChef.nationality}</span>
+                          <CountryFlag flag={sampleChef.nationality} title={sampleChef.countryName} size="sm" />
                           <p className="text-xs font-black text-gray-900">{sampleChef.name}</p>
                           <span className="text-[9px] text-gray-400 capitalize ml-auto font-black">{sampleChef.continent}</span>
                         </div>
@@ -841,7 +1033,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                             setChefBio(sampleChef.bio);
                             setChefLocation(sampleChef.location);
                             setChefPhone(samplePhone);
-                            alert(`Modello di spunto caricato! Adesso modifica i campi indirizzo e telefono qui sopra con i tuoi veri dati e clicca "Salva Configurazione Cucina" per salvare.`);
+                            setFeedbackMsg({ type: 'success', text: 'Modello di spunto caricato! Modifica i campi e salva la configurazione.' });
                           }}
                           className="px-3 py-1.5 bg-black text-white hover:text-black hover:bg-orange-600 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-1"
                         >
@@ -851,8 +1043,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                           type="button"
                           onClick={() => {
                             const templateText = `Nome d'Arte: ${sampleChef.name}\nSpecialità: ${sampleChef.specialties.join(', ')}\nBio: ${sampleChef.bio}\nIndirizzo: ${sampleChef.location}\nTelefono: ${samplePhone}`;
-                            navigator.clipboard.writeText(templateText);
-                            alert(`DATI MODELLO COPIATI!\n\nPuoi incollarli dove preferisci per usarli come spunto per la tua registrazione.\n\nNome d'Arte: ${sampleChef.name}\nTelefono: ${samplePhone}\nIndirizzo: ${sampleChef.location}`);
+                            navigator.clipboard?.writeText(templateText).catch(() => {});
+                            setFeedbackMsg({ type: 'success', text: `Dati modello di ${sampleChef.name} copiati negli appunti.` });
                           }}
                           className="px-3 py-1.5 bg-white text-gray-600 border border-gray-150 text-[9px] font-black uppercase tracking-widest rounded-lg hover:bg-gray-50 transition-all"
                         >
@@ -870,28 +1062,176 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         {/* TAB 5: CHEF ORDERS */}
         {activeTab === 'chef-orders' && currentUser.role === 'chef' && (
           <div className="space-y-6 animate-fade-in relative text-left">
-            <h3 className="text-2xl font-black italic tracking-tight mb-2">Ordini in Arrivo</h3>
-            <p className="text-gray-500 text-sm mb-6 leading-relaxed">Gestisci gli ordini dei tuoi clienti in tempo reale.</p>
-            {userOrders.length === 0 ? (
-               <div className="py-12 bg-gray-50 rounded-3xl text-center border-2 border-dashed border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-orange-600">
+                  Ordini in Arrivo {matchingChef ? `— ${matchingChef.name}` : ''}
+                </h3>
+                <p className="text-black text-sm mt-1 leading-relaxed">
+                  Conferma o rifiuta le prenotazioni ricevute in tempo reale. Lo stato si aggiorna subito anche per il cliente e nell'Area Admin.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="px-3.5 py-2 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-black uppercase tracking-widest">
+                  In attesa: {pendingChefOrdersCount}
+                </span>
+                <span className="px-3.5 py-2 rounded-2xl bg-gray-100 border border-gray-200 text-gray-800 text-[10px] font-black uppercase tracking-widest">
+                  Totali: {chefOrders.length}
+                </span>
+              </div>
+            </div>
+
+            {chefOrders.length === 0 ? (
+              <div className="py-12 bg-gray-50 rounded-3xl text-center border-2 border-dashed border-gray-200">
                 <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="font-bold text-gray-400 text-sm">Nessun ordine ricevuto al momento.</p>
+                <p className="text-xs text-gray-500 mt-1">Quando un cliente prenota un tuo piatto apparirà qui in tempo reale.</p>
               </div>
             ) : (
-               <div className="space-y-4">
-                {userOrders.map((order) => (
-                  <div key={order.id} className="p-6 bg-white border border-gray-100 hover:border-orange-500/20 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                     <div>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{order.id}</span>
-                        <h4 className="font-bold text-lg text-gray-900 mt-1">{order.items.length} Piatti da preparare</h4>
-                        <p className="text-xs text-gray-500">Stimato per: {order.estimatedTime}</p>
-                     </div>
-                     <div className="flex gap-2">
-                         <span className="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-xl text-[10px] font-black uppercase border border-orange-100">{order.status}</span>
-                     </div>
-                  </div>
-                ))}
-               </div>
+              <div className="space-y-4">
+                {chefOrders.map((order) => {
+                  const firstItem = order.items[0];
+                  const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status;
+                  const isBusy = updatingOrderId === order.id;
+                  const isConfirmed = order.status === 'CONFIRMED' || order.status === 'PLACED';
+
+                  return (
+                    <div
+                      key={order.id}
+                      className={`p-6 bg-white border-2 rounded-[2rem] shadow-sm transition-all space-y-4 ${
+                        order.status === 'PENDING_CONFIRMATION'
+                          ? 'border-amber-300 bg-amber-50/20'
+                          : order.status === 'REJECTED'
+                            ? 'border-red-200 bg-red-50/15'
+                            : isConfirmed || order.status === 'COMPLETED'
+                              ? 'border-green-200'
+                              : 'border-gray-100'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono">
+                              #{order.id.split('-')[0]}
+                            </span>
+                            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-orange-50 text-orange-700 border border-orange-200">
+                              {order.deliveryMode === 'delivery' ? 'Consegna a domicilio' : 'Ritiro in sede'}
+                            </span>
+                            {order.customerName && (
+                              <span className="text-[10px] font-bold text-gray-700">
+                                Cliente: <strong>{order.customerName}</strong>
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="space-y-1 pt-1">
+                            {order.items.map((item, idx) => (
+                              <div key={idx} className="text-sm font-black text-gray-900">
+                                {item.name} <span className="text-orange-600">x{item.quantity}</span>
+                                <span className="text-xs font-mono text-gray-500 ml-2">€ {(item.price * item.quantity).toFixed(2)}</span>
+                                {item.preferences?.notes && (
+                                  <p className="text-xs font-medium text-black/75 mt-0.5">Note: "{item.preferences.notes}"</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-black pt-1">
+                            <span className="flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-orange-600" />
+                              {firstItem?.scheduledDate ? `${firstItem.scheduledDate} ore ${firstItem.scheduledTime}` : order.estimatedTime}
+                            </span>
+                            <span className="font-mono font-black text-orange-600">
+                              Totale: € {order.total.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-start sm:items-end gap-3 shrink-0">
+                          <span className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                            order.status === 'PENDING_CONFIRMATION'
+                              ? 'bg-amber-100 text-amber-900 border-amber-300'
+                              : isConfirmed || order.status === 'COMPLETED'
+                                ? 'bg-green-100 text-green-800 border-green-300'
+                                : order.status === 'REJECTED'
+                                  ? 'bg-red-100 text-red-800 border-red-300'
+                                  : 'bg-orange-100 text-orange-800 border-orange-300'
+                          }`}>
+                            {statusLabel}
+                          </span>
+
+                          {order.status === 'PENDING_CONFIRMATION' && onUpdateOrderStatus && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleChefStatusChange(order.id, 'CONFIRMED')}
+                                className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-md transition-all active:scale-95 disabled:opacity-50"
+                              >
+                                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                <span>Conferma</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleChefStatusChange(order.id, 'REJECTED')}
+                                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-md transition-all active:scale-95 disabled:opacity-50"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                <span>Rifiuta</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {isConfirmed && onUpdateOrderStatus && (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleChefStatusChange(order.id, 'PREPARING')}
+                              className="px-4 py-2 bg-orange-600 hover:bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                            >
+                              Passa In Cucina
+                            </button>
+                          )}
+
+                          {order.status === 'PREPARING' && onUpdateOrderStatus && (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleChefStatusChange(order.id, 'READY')}
+                              className="px-4 py-2 bg-orange-600 hover:bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                            >
+                              Segna Pronto
+                            </button>
+                          )}
+
+                          {order.status === 'READY' && onUpdateOrderStatus && (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleChefStatusChange(order.id, order.deliveryMode === 'delivery' ? 'DELIVERING' : 'COMPLETED')}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                            >
+                              {order.deliveryMode === 'delivery' ? 'Avvia Consegna' : 'Segna Completato'}
+                            </button>
+                          )}
+
+                          {order.status === 'DELIVERING' && onUpdateOrderStatus && (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleChefStatusChange(order.id, 'COMPLETED')}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                            >
+                              Segna Consegnato
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}

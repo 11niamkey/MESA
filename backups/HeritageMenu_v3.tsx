@@ -16,6 +16,8 @@ import {
   UtensilsCrossed,
   Globe
 } from 'lucide-react';
+import { HeritageJourney } from './HeritageJourney';
+import { CountryFlag } from './CountryFlag';
 
 interface HeritageMenuProps {
   chefs: Chef[];
@@ -124,6 +126,7 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
   onToggleFavorite 
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedHeritageDish, setSelectedHeritageDish] = useState<{chef: Chef, dish: Dish} | null>(null);
 
   // Raccogliamo tutti i piatti in una lista piana, arricchendoli dei dati del cuoco e del loro aneddoto storico unico
   const allHeritageDishes = useMemo(() => {
@@ -242,7 +245,7 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
                 {/* Titoli Sopra l'immagine */}
                 <div className="absolute bottom-5 left-6 right-6 text-white text-left">
                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-2xl filter drop-shadow">{dish.chefNationality}</span>
+                      <CountryFlag flag={dish.chefNationality} title={dish.chefData.countryName} size="md" className="drop-shadow" />
                       <span className="text-[10px] font-black uppercase tracking-widest text-orange-500 font-mono">Ricetta del Cuore</span>
                    </div>
                    <h3 className="text-2xl sm:text-3xl font-black italic tracking-tighter leading-none font-sans uppercase">
@@ -301,7 +304,14 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
                     <span className="text-[9px] font-black uppercase tracking-wider text-orange-500 pr-2">Profilo ▸</span>
                   </div>
 
-                  <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => setSelectedHeritageDish({ chef: dish.chefData, dish })}
+                      className="w-full py-3 border-2 border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-black rounded-xl font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
+                    >
+                      <Compass className="w-3.5 h-3.5 shrink-0" /> Vivi Rituale AI
+                    </button>
+
                     <button 
                       onClick={() => onAddDish(dish)}
                       className="w-full py-3 bg-black hover:bg-orange-600 text-white hover:text-black rounded-xl font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
@@ -347,6 +357,15 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
             <div className="flex items-center gap-1.5"><ChefHat className="w-4 h-4 text-orange-500" /> Cuochi Nazionali Selezionati</div>
          </div>
       </div>
+
+      {/* Modal del Percorso Culturale delle Radici (Immersion Multimediale) */}
+      {selectedHeritageDish && (
+        <HeritageJourney 
+          dish={selectedHeritageDish.dish} 
+          chef={selectedHeritageDish.chef} 
+          onClose={() => setSelectedHeritageDish(null)} 
+        />
+      )}
     </div>
   );
 };
