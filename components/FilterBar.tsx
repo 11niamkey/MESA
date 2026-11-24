@@ -179,24 +179,24 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
       <div className="max-w-6xl mx-auto px-4">
         {/* Search Header Container */}
         <div className="flex items-center gap-2.5">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-4.5 flex items-center pointer-events-none">
-              <Search className="h-4.5 w-4.5 text-orange-500" />
+          <div className="relative flex-1 min-w-0 overflow-hidden rounded-[1.3rem] md:rounded-[1.8rem]">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-orange-500" />
             </div>
             <input
               type="text"
-              placeholder="Cerca piatti, ingredienti, paesi o cuochi (es. Lasagna, Jollof, Giappone)..."
-              className="block w-full pl-11 pr-10 py-3 md:py-4 border-2 border-gray-100 rounded-[1.3rem] md:rounded-[1.8rem] bg-gray-50/50 text-xs md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:bg-white transition-all shadow-inner placeholder-gray-400"
+              placeholder="Cerca piatti o ingredienti..."
+              className="block w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap pl-10 sm:pl-11 pr-9 sm:pr-10 py-3 md:py-4 border-2 border-gray-100 rounded-[1.3rem] md:rounded-[1.8rem] bg-gray-50/50 text-xs md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:bg-white transition-all shadow-inner placeholder-gray-400"
               value={filters.search}
               onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
             />
             {filters.search && (
               <button 
                 onClick={() => onFilterChange({ ...filters, search: '' })}
-                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-orange-600"
+                className="absolute inset-y-0 right-0 pr-3.5 sm:pr-4 flex items-center text-gray-400 hover:text-orange-600"
                 title="Pulisci ricerca"
               >
-                <X className="h-4.5 w-4.5" />
+                <X className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
               </button>
             )}
           </div>
@@ -238,7 +238,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
               )}
             </div>
 
-            <div className="flex overflow-x-auto space-x-2 md:space-x-3.5 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 md:gap-3.5 pb-1">
               {categoryOptions.map(cat => {
                 const Icon = cat.icon;
                 const isActive = filters.categories.includes(cat.name);
@@ -246,7 +246,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
                   <button
                     key={cat.name}
                     onClick={() => toggleCategory(cat.name)}
-                    className={`relative flex-none w-[132px] sm:w-44 h-14 sm:h-20 rounded-xl sm:rounded-[1.4rem] overflow-hidden border-2 transition-all group cursor-pointer ${
+                    className={`relative w-full h-16 sm:h-20 rounded-2xl overflow-hidden border-2 transition-all group cursor-pointer ${
                       isActive 
                         ? 'border-orange-500 shadow-lg ring-2 ring-orange-500/20' 
                         : 'border-transparent hover:border-orange-200 hover:shadow-md'
@@ -261,14 +261,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
                       isActive ? 'from-orange-600/90 to-black/35 opacity-95' : 'from-black/80 via-black/45 to-transparent'
                     }`}></div>
 
-                    <div className="absolute inset-0 p-2 md:p-3 flex flex-col justify-end text-left z-10">
-                      <div className="flex items-center gap-1 md:gap-1.5 mb-0.5">
-                        <Icon className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isActive ? 'text-black' : 'text-orange-500'}`} />
-                        <span className={`text-[11px] md:text-[13px] font-black tracking-tight uppercase leading-none ${isActive ? 'text-black' : 'text-white'}`}>
+                    <div className="absolute inset-0 p-2.5 md:p-3 flex flex-col justify-end text-left z-10 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5 min-w-0">
+                        <Icon className={`w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 ${isActive ? 'text-black' : 'text-orange-500'}`} />
+                        <span className={`text-[11px] md:text-[13px] font-black tracking-tight uppercase leading-none truncate ${isActive ? 'text-black' : 'text-white'}`}>
                           {cat.name}
                         </span>
                       </div>
-                      <span className={`text-[8px] md:text-[9.5px] font-medium leading-none ${isActive ? 'text-orange-950 font-bold' : 'text-gray-300'}`}>
+                      <span className={`text-[9px] md:text-[10px] font-medium leading-tight truncate ${isActive ? 'text-orange-950 font-bold' : 'text-gray-200'}`}>
                         {cat.description}
                       </span>
                     </div>

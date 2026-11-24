@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { Chef, AppUser, ChefApplication, ChefDocument, Continent } from '../types';
 import { CountryFlag } from './CountryFlag';
+import { ImagePickerBox } from './ImagePickerBox';
+import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, normalizeLocationToPordenone } from './italianTerritoryData';
 
 interface ChefOnboardingProps {
   isOpen: boolean;
@@ -86,7 +88,7 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
   const [continent, setContinent] = useState<Continent>('Europa');
   const [location, setLocation] = useState(
     currentUser?.addresses?.[0]
-      ? `${currentUser.addresses[0].street}, ${currentUser.addresses[0].city}`
+      ? normalizeLocationToPordenone(`${currentUser.addresses[0].street}, ${currentUser.addresses[0].city}`)
       : 'Pordenone (PN), Centro'
   );
   const [bio, setBio] = useState('');
@@ -131,6 +133,7 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
   const [proposedDishName, setProposedDishName] = useState('Specialità Tradizionale della Casa');
   const [proposedDishDesc, setProposedDishDesc] = useState('Piatto preparato fresco su ordinazione con ingredienti selezionati.');
   const [proposedDishPrice, setProposedDishPrice] = useState<number>(14.50);
+  const [proposedDishImage, setProposedDishImage] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
@@ -143,8 +146,9 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
         setBrandName(currentUser.brandName || `${currentUser.name} Home Chef`);
         setEmail(currentUser.email);
         if (currentUser.phone) setPhone(currentUser.phone);
+        if (currentUser.avatarUrl) setAvatarUrl(currentUser.avatarUrl);
         if (currentUser.addresses?.[0]) {
-          setLocation(`${currentUser.addresses[0].street}, ${currentUser.addresses[0].city}`);
+          setLocation(normalizeLocationToPordenone(`${currentUser.addresses[0].street}, ${currentUser.addresses[0].city}`));
         }
       }
     }
@@ -186,19 +190,6 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
   };
 
   // File upload handlers (compressed to keep Firestore documents lightweight & well under 1MB)
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const compressed = await compressImageFile(file, 480, 0.72);
-      if (compressed) {
-        setAvatarUrl(compressed);
-        setErrorMsg('');
-      }
-    } catch {
-      setErrorMsg('Impossibile leggere la foto profilo selezionata.');
-    }
-  };
 
   const handleKitchenPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -270,6 +261,10 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
         setErrorMsg('Compila tutti i campi obbligatori (*) di Profilo, Email, Telefono e Sede Cucina prima di continuare.');
         return;
       }
+      if (!isPordenoneLocation(location)) {
+        setErrorMsg('L\'area di competenza è riservata alla Provincia di Pordenone (PN). Seleziona un comune della Provincia di Pordenone.');
+        return;
+      }
       if (!currentUser && password.trim().length > 0 && password.trim().length < 4) {
         setErrorMsg('La password (se inserita) deve contenere almeno 4 caratteri.');
         return;
@@ -282,6 +277,11 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
     setErrorMsg('');
     if (!fullName.trim() || !brandName.trim() || !email.trim() || !phone.trim() || !location.trim()) {
       setErrorMsg('Completa tutti i campi anagrafici obbligatori nello Step 1.');
+      setStep(1);
+      return;
+    }
+    if (!isPordenoneLocation(location)) {
+      setErrorMsg('La sede della cucina deve trovarsi nella Provincia di Pordenone (PN).');
       setStep(1);
       return;
     }
@@ -306,12 +306,13 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
       location: location.trim(),
       bio: bio.trim() || 'Appassionato/a di cucina autentica casalinga.',
       specialties: specialties.length > 0 ? specialties : ['Cucina Casalinga'],
-      avatarUrl: avatarUrl,
+      avatarUrl: avatarUrl || 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=400&q=80',
       kitchenPhotos: kitchenPhotos,
       documents: documents,
       proposedDishName: proposedDishName.trim(),
       proposedDishDesc: proposedDishDesc.trim() || 'Piatto preparato fresco su ordinazione.',
       proposedDishPrice: proposedDishPrice || 14.50,
+      ...(proposedDishImage.trim() ? { proposedDishImage: proposedDishImage.trim() } : {}),
       availableDays: selectedDays.length > 0 ? selectedDays : [1, 2, 3, 4, 5, 6],
       availabilitySlots: selectedSlots.length > 0 ? selectedSlots : ['12:00 - 15:00', '19:00 - 22:00'],
       status: 'pending',
@@ -531,16 +532,44 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Indirizzo Sede Cucina (Città & Quartiere) *</label>
+                      <div className="space-y-2.5 bg-orange-50/50 border border-orange-100 rounded-2xl p-4">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <label className="block text-[9px] font-black text-gray-600 uppercase tracking-widest">
+                            Sede Cucina — Provincia di Pordenone (PN) *
+                          </label>
+                          <span className="text-[9px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded-full">
+                            Solo Provincia di Pordenone
+                          </span>
+                        </div>
+                        <select
+                          value={findPordenoneComune(location)?.name || ''}
+                          onChange={(e) => {
+                            const chosen = PORDENONE_COMUNI.find(c => c.name === e.target.value);
+                            if (chosen) {
+                              setLocation(`${chosen.name} (PN), Centro`);
+                              setErrorMsg('');
+                            }
+                          }}
+                          className="w-full p-3.5 bg-white border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 font-bold text-xs text-gray-900"
+                        >
+                          <option value="">-- Seleziona un comune della Provincia di Pordenone --</option>
+                          {PORDENONE_COMUNI.map(c => (
+                            <option key={c.name} value={c.name}>
+                              {c.name} (PN) • CAP {c.zip}
+                            </option>
+                          ))}
+                        </select>
                         <input 
                           type="text" 
                           value={location} 
                           onChange={(e) => setLocation(e.target.value)} 
-                          placeholder="es. Milano, Zona Certosa / Porta Venezia" 
-                          className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 font-bold text-sm" 
+                          placeholder="es. Pordenone (PN), Centro o Sacile (PN), Centro" 
+                          className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 font-bold text-sm" 
                           required 
                         />
+                        <p className="text-[10px] text-gray-500 font-medium">
+                          Tutti i cuochi MESA operano esclusivamente nella Provincia di Pordenone (PN). Puoi specificare quartiere o frazione dopo il comune.
+                        </p>
                       </div>
 
                       <div>
@@ -569,25 +598,14 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
 
                    <div className="space-y-6">
                       {/* Avatar Upload */}
-                      <div>
-                        <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2">Foto Profilo dello Chef *</label>
-                        <div className="flex flex-col sm:flex-row items-center gap-4 p-5 bg-gray-50 border border-gray-200 rounded-3xl">
-                          <img 
-                            src={avatarUrl} 
-                            alt="Avatar Preview" 
-                            className="w-20 h-20 rounded-2xl object-cover shadow-md border-2 border-orange-500/30 shrink-0" 
-                          />
-                          <div className="flex-1 space-y-2 text-center sm:text-left">
-                            <p className="text-xs font-bold text-gray-900">Seleziona o carica una foto del tuo volto o abito da cucina</p>
-                            <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
-                              <label className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow transition-all flex items-center gap-1.5">
-                                <Upload className="w-3.5 h-3.5" /> Carica dal dispositivo
-                                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <ImagePickerBox
+                        variant="avatar"
+                        value={avatarUrl}
+                        onChange={setAvatarUrl}
+                        fallbackImage="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=400&q=80"
+                        label="Foto Profilo dello Chef *"
+                        helperText="Carica una foto dal tuo dispositivo oppure incolla un link URL per il profilo pubblico."
+                      />
 
                       {/* Kitchen Photos */}
                       <div>
@@ -597,6 +615,7 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                             <div key={idx} className="relative group rounded-2xl overflow-hidden border border-gray-200 h-28 bg-gray-100">
                               <img src={photo} alt={`Kitchen ${idx}`} className="w-full h-full object-cover" />
                               <button 
+                                type="button"
                                 onClick={() => setKitchenPhotos(prev => prev.filter((_, i) => i !== idx))}
                                 className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                               >
@@ -607,7 +626,15 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                           <label className="border-2 border-dashed border-gray-300 hover:border-orange-500 rounded-2xl h-28 flex flex-col items-center justify-center p-3 text-center cursor-pointer transition-colors bg-gray-50 hover:bg-orange-50/30">
                             <Upload className="w-6 h-6 text-gray-400 mb-1" />
                             <span className="text-[10px] font-black text-gray-600 uppercase">Aggiungi Foto</span>
-                            <input type="file" accept="image/*" className="hidden" onChange={handleKitchenPhotoUpload} />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                handleKitchenPhotoUpload(e);
+                                e.target.value = '';
+                              }}
+                            />
                           </label>
                         </div>
                       </div>
@@ -1011,6 +1038,14 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                           required 
                         />
                       </div>
+
+                      <ImagePickerBox
+                        variant="card"
+                        value={proposedDishImage}
+                        onChange={setProposedDishImage}
+                        label="Foto del Primo Piatto (opzionale)"
+                        helperText="Carica una foto reale del tuo piatto forte o incolla un link immagine."
+                      />
 
                       {/* Summary Box */}
                       <div className="p-5 bg-gray-900 text-white rounded-3xl space-y-3">

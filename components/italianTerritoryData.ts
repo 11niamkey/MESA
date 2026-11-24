@@ -311,3 +311,110 @@ export const findLocationByInput = (query: string) => {
 
   return null;
 };
+
+export interface PordenoneComune {
+  name: string;
+  zip: string;
+  zoneExample?: string;
+}
+
+export const PORDENONE_COMUNI: PordenoneComune[] = [
+  { name: 'Pordenone', zip: '33170', zoneExample: 'Centro / Torre / Rorai Grande' },
+  { name: 'Sacile', zip: '33077', zoneExample: 'Centro / San Giovanni del Tempio' },
+  { name: 'Cordenons', zip: '33084', zoneExample: 'Centro / Sclavons' },
+  { name: 'Porcia', zip: '33080', zoneExample: 'Centro / Palse' },
+  { name: 'Azzano Decimo', zip: '33082', zoneExample: 'Centro / Tiezzo' },
+  { name: 'San Vito al Tagliamento', zip: '33078', zoneExample: 'Centro / Ligugnana' },
+  { name: 'Spilimbergo', zip: '33097', zoneExample: 'Centro / Tauriano' },
+  { name: 'Maniago', zip: '33085', zoneExample: 'Centro / Maniagolibero' },
+  { name: 'Fontanafredda', zip: '33074', zoneExample: 'Centro / Vigonovo' },
+  { name: 'Fiume Veneto', zip: '33080', zoneExample: 'Centro / Bannia' },
+  { name: 'Aviano', zip: '33081', zoneExample: 'Centro / Castello' },
+  { name: 'Casarsa della Delizia', zip: '33072', zoneExample: 'Centro / San Giovanni' },
+  { name: 'Zoppola', zip: '33080', zoneExample: 'Centro / Orcenico' },
+  { name: 'Brugnera', zip: '33070', zoneExample: 'Centro / Maron' },
+  { name: 'Prata di Pordenone', zip: '33080', zoneExample: 'Centro / Ghirano' },
+  { name: 'Pasiano di Pordenone', zip: '33087', zoneExample: 'Centro / Cecchini' },
+  { name: 'Roveredo in Piano', zip: '33080', zoneExample: 'Centro' },
+  { name: 'San Quirino', zip: '33080', zoneExample: 'Centro / Sedrano' },
+  { name: 'Caneva', zip: '33070', zoneExample: 'Centro / Sarone' },
+  { name: 'Polcenigo', zip: '33070', zoneExample: 'Centro / Coltura' },
+  { name: 'Valvasone Arzene', zip: '33098', zoneExample: 'Centro' },
+  { name: 'Cordovado', zip: '33075', zoneExample: 'Centro' },
+  { name: 'Sesto al Reghena', zip: '33079', zoneExample: 'Centro' },
+  { name: 'Chions', zip: '33083', zoneExample: 'Centro' },
+  { name: 'Morsano al Tagliamento', zip: '33075', zoneExample: 'Centro' },
+  { name: 'Pravisdomini', zip: '33076', zoneExample: 'Centro' },
+  { name: 'San Martino al Tagliamento', zip: '33098', zoneExample: 'Centro' },
+  { name: 'Sequals', zip: '33090', zoneExample: 'Centro' },
+  { name: 'Pinzano al Tagliamento', zip: '33094', zoneExample: 'Centro' },
+  { name: 'Travesio', zip: '33090', zoneExample: 'Centro' },
+  { name: 'Castelnovo del Friuli', zip: '33090', zoneExample: 'Centro' },
+  { name: 'Montereale Valcellina', zip: '33086', zoneExample: 'Centro' },
+  { name: 'Budoia', zip: '33070', zoneExample: 'Centro' },
+  { name: 'Barcis', zip: '33080', zoneExample: 'Centro' },
+  { name: 'Claut', zip: '33080', zoneExample: 'Centro' },
+  { name: 'Cimolais', zip: '33080', zoneExample: 'Centro' },
+  { name: 'Erto e Casso', zip: '33080', zoneExample: 'Centro' },
+  { name: 'Andreis', zip: '33080', zoneExample: 'Centro' },
+  { name: 'Frisanco', zip: '33080', zoneExample: 'Centro' },
+  { name: 'Cavasso Nuovo', zip: '33092', zoneExample: 'Centro' },
+  { name: 'Fanna', zip: '33092', zoneExample: 'Centro' },
+  { name: 'Arba', zip: '33090', zoneExample: 'Centro' },
+  { name: 'Vivaro', zip: '33099', zoneExample: 'Centro' },
+  { name: 'San Giorgio della Richinvelda', zip: '33095', zoneExample: 'Centro' },
+  { name: 'Vajont', zip: '33080', zoneExample: 'Centro' },
+  { name: 'Meduno', zip: '33092', zoneExample: 'Centro' },
+  { name: 'Tramonti di Sopra', zip: '33090', zoneExample: 'Centro' },
+  { name: 'Tramonti di Sotto', zip: '33090', zoneExample: 'Centro' },
+  { name: 'Clauzetto', zip: '33090', zoneExample: 'Centro' },
+  { name: 'Vito d\'Asio', zip: '33090', zoneExample: 'Centro' }
+];
+
+const PORDENONE_ZIP_SET = new Set(PORDENONE_COMUNI.map(c => c.zip));
+
+const normalizeLocText = (value?: string) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+export const findPordenoneComune = (value?: string): PordenoneComune | undefined => {
+  const norm = normalizeLocText(value);
+  if (!norm) return undefined;
+  return PORDENONE_COMUNI.find(c => norm.includes(normalizeLocText(c.name)));
+};
+
+export const isPordenoneLocation = (value?: string, zip?: string): boolean => {
+  const cleanZip = (zip || '').trim();
+  if (cleanZip && PORDENONE_ZIP_SET.has(cleanZip)) return true;
+
+  const norm = normalizeLocText(value);
+  if (!norm) return false;
+
+  if (/\b(pn|pordenone)\b/.test(norm)) return true;
+  if (PORDENONE_COMUNI.some(c => norm.includes(normalizeLocText(c.name)))) return true;
+
+  // Check for PN postal codes inside free text (33070-33099, 33170)
+  const zipMatch = norm.match(/\b(330[7-9]\d|33170)\b/);
+  if (zipMatch) return true;
+
+  return false;
+};
+
+export const resolvePordenoneZip = (value?: string): string => {
+  const matched = findPordenoneComune(value);
+  return matched?.zip || '33170';
+};
+
+export const normalizeLocationToPordenone = (
+  value?: string,
+  fallback = 'Pordenone (PN), Centro'
+): string => {
+  if (isPordenoneLocation(value)) {
+    return (value || '').trim() || fallback;
+  }
+  return fallback;
+};
+

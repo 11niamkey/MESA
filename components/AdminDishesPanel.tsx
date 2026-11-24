@@ -56,6 +56,8 @@ interface Draft {
   price: string;
   image: string;
   tags: string;
+  ingredients: string;
+  preparation: string;
 }
 
 interface AdminDishesPanelProps {
@@ -63,9 +65,20 @@ interface AdminDishesPanelProps {
   onSaveChefDishes: (chefId: string, dishes: Dish[]) => Promise<boolean>;
   chefFilter: string;
   onChefFilterChange: (chefId: string) => void;
+  singleChefMode?: boolean;
+  title?: string;
+  subtitle?: string;
 }
 
-export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({ chefs, onSaveChefDishes, chefFilter, onChefFilterChange }) => {
+export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({
+  chefs,
+  onSaveChefDishes,
+  chefFilter,
+  onChefFilterChange,
+  singleChefMode = false,
+  title = 'Piatti del Catalogo',
+  subtitle = 'Tocca un piatto per cambiarne foto, nome, descrizione e prezzo. Le modifiche sono visibili subito a tutti.'
+}) => {
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
 
@@ -91,6 +104,8 @@ export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({ chefs, onSav
       price: dish.price.toFixed(2),
       image: dish.image,
       tags: (dish.tags || []).join(', '),
+      ingredients: (dish.ingredients || []).join(', '),
+      preparation: dish.preparation || '',
     });
 
   const openNew = () =>
@@ -102,15 +117,17 @@ export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({ chefs, onSav
       price: '',
       image: '',
       tags: '',
+      ingredients: '',
+      preparation: '',
     });
 
   return (
     <div className="animate-fade-in space-y-8 bg-white rounded-[3rem] p-6 sm:p-10 border border-gray-100 shadow-sm">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
-          <h3 className="text-3xl font-black italic tracking-tight mb-2">Piatti del Catalogo</h3>
+          <h3 className="text-3xl font-black italic tracking-tight mb-2">{title}</h3>
           <p className="text-gray-500 text-sm leading-relaxed max-w-2xl font-medium">
-            Tocca un piatto per cambiarne foto, nome, descrizione e prezzo. Le modifiche sono visibili subito a tutti.
+            {subtitle}
           </p>
         </div>
         <button
@@ -133,16 +150,18 @@ export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({ chefs, onSav
             className="w-full pl-11 pr-4 py-3.5 border border-gray-200 rounded-2xl bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none text-xs font-bold"
           />
         </div>
-        <select
-          value={chefFilter}
-          onChange={(e) => onChefFilterChange(e.target.value)}
-          className="sm:w-72 px-4 py-3.5 border border-gray-200 rounded-2xl bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none text-xs font-bold"
-        >
-          <option value="all">Tutti i cuochi ({chefs.length})</option>
-          {chefs.map(c => (
-            <option key={c.id} value={c.id}>{c.nationality} {c.name} · {c.dishes.length} piatti</option>
-          ))}
-        </select>
+        {!singleChefMode && (
+          <select
+            value={chefFilter}
+            onChange={(e) => onChefFilterChange(e.target.value)}
+            className="sm:w-72 px-4 py-3.5 border border-gray-200 rounded-2xl bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none text-xs font-bold"
+          >
+            <option value="all">Tutti i cuochi ({chefs.length})</option>
+            {chefs.map(c => (
+              <option key={c.id} value={c.id}>{c.nationality} {c.name} · {c.dishes.length} piatti</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {rows.length === 0 ? (
@@ -162,6 +181,7 @@ export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({ chefs, onSav
                 <img
                   src={dish.image || DEFAULT_FOOD_IMAGE}
                   alt={dish.name}
+                  referrerPolicy="no-referrer"
                   onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_FOOD_IMAGE; }}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
@@ -190,6 +210,7 @@ export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({ chefs, onSav
         <DishEditorModal
           draft={draft}
           chefs={chefs}
+          singleChefMode={singleChefMode}
           onChange={setDraft}
           onClose={() => setDraft(null)}
           onSaveChefDishes={onSaveChefDishes}
@@ -202,12 +223,13 @@ export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({ chefs, onSav
 interface DishEditorModalProps {
   draft: Draft;
   chefs: Chef[];
+  singleChefMode?: boolean;
   onChange: (draft: Draft) => void;
   onClose: () => void;
   onSaveChefDishes: (chefId: string, dishes: Dish[]) => Promise<boolean>;
 }
 
-const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, onChange, onClose, onSaveChefDishes }) => {
+const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, singleChefMode = false, onChange, onClose, onSaveChefDishes }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -263,6 +285,8 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, onChang
   const handleSave = () => {
     if (!chef || !canSave) return;
     const tags = draft.tags.split(',').map(t => t.trim()).filter(Boolean);
+    const ingredients = draft.ingredients.split(',').map(i => i.trim()).filter(Boolean);
+    const preparation = draft.preparation.trim();
     const dish: Dish = {
       ...(draft.original ?? { id: `d-${Date.now().toString(36)}`, chefId: chef.id }),
       chefId: chef.id,
@@ -271,7 +295,11 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, onChang
       price: Math.round(priceValue * 100) / 100,
       image: draft.image.trim(),
       tags,
+      ...(ingredients.length > 0 ? { ingredients } : {}),
+      ...(preparation ? { preparation } : {}),
     } as Dish;
+    if (ingredients.length === 0) delete dish.ingredients;
+    if (!preparation) delete dish.preparation;
     const dishes = isNew
       ? [...chef.dishes, dish]
       : chef.dishes.map(d => (d.id === dish.id ? dish : d));
@@ -320,6 +348,7 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, onChang
                   <img
                     src={draft.image}
                     alt="Anteprima piatto"
+                    referrerPolicy="no-referrer"
                     onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_FOOD_IMAGE; }}
                     className="w-full h-full object-cover"
                   />
@@ -377,7 +406,7 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, onChang
 
             {/* Fields */}
             <div className="space-y-5">
-              {isNew && (
+              {isNew && !singleChefMode && (
                 <Field label="Cuoco">
                   <select
                     value={draft.chefId}
@@ -388,7 +417,7 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, onChang
                   </select>
                 </Field>
               )}
-              {!isNew && chef && (
+              {(!isNew || singleChefMode) && chef && (
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                   Cuoco: <span className="text-orange-600">{chef.nationality} {chef.name}</span>
                 </p>
@@ -433,6 +462,27 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, onChang
                     onChange={(e) => set({ tags: e.target.value })}
                     placeholder="Piccante, Vegano"
                     className="w-full p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-sm font-bold focus:ring-2 focus:ring-orange-500 outline-none"
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Ingredienti" hint="separati da virgola">
+                  <input
+                    type="text"
+                    value={draft.ingredients}
+                    onChange={(e) => set({ ingredients: e.target.value })}
+                    placeholder="Pomodoro, Basilico, Olio EVO"
+                    className="w-full p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-xs font-bold focus:ring-2 focus:ring-orange-500 outline-none"
+                  />
+                </Field>
+                <Field label="Preparazione">
+                  <input
+                    type="text"
+                    value={draft.preparation}
+                    onChange={(e) => set({ preparation: e.target.value })}
+                    placeholder="Cottura lenta per 3 ore..."
+                    className="w-full p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-xs font-bold focus:ring-2 focus:ring-orange-500 outline-none"
                   />
                 </Field>
               </div>

@@ -8,6 +8,8 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
 } from 'firebase/auth';
+import { ImagePickerBox } from './ImagePickerBox';
+import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, resolvePordenoneZip } from './italianTerritoryData';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -36,6 +38,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [lastName, setLastName] = useState('');
   const [brandName, setBrandName] = useState('');
   const [phone, setPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -89,7 +92,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   // Build an AppUser record from a Firebase Auth user
   const buildUserFromFirebase = (
-    fbUser: { uid: string; email?: string | null; displayName?: string | null },
+    fbUser: { uid: string; email?: string | null; displayName?: string | null; photoURL?: string | null },
     targetRole: 'client' | 'chef' | 'admin'
   ): AppUser => {
     const displayName = fbUser.displayName || '';
@@ -99,6 +102,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       name: fbName.trim() || 'Utente',
       lastName: fbLastNameParts.join(' ').trim() || 'Mesa',
       email: (fbUser.email || email).trim().toLowerCase(),
+      ...(fbUser.photoURL ? { avatarUrl: fbUser.photoURL } : {}),
       role: targetRole,
       addresses: [],
       createdAt: new Date().toLocaleDateString('it-IT'),
@@ -193,7 +197,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               brandName: chefMatch.name,
               role: 'chef',
               addresses: chefMatch.location
-                ? [{ id: `addr-${chefMatch.id}`, street: chefMatch.location, city: 'Italia', zip: '33170', isVerified: true }]
+                ? [{
+                    id: `addr-${chefMatch.id}`,
+                    street: chefMatch.location,
+                    city: `${findPordenoneComune(chefMatch.location)?.name || 'Pordenone'} (PN)`,
+                    zip: resolvePordenoneZip(chefMatch.location),
+                    isVerified: true
+                  }]
                 : [],
               createdAt: new Date().toLocaleDateString('it-IT'),
               password: expectedPassword
@@ -217,6 +227,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
         if (role === 'chef' && !phone.trim()) {
           setErrorMsg('Inserisci un numero di telefono / WhatsApp per le verifiche cuoco.');
+          return;
+        }
+        if (role === 'chef' && (!isPordenoneLocation(city) || (zip.trim() !== '' && !isPordenoneLocation('', zip)))) {
+          setErrorMsg('I cuochi MESA operano esclusivamente nella Provincia di Pordenone (PN). Seleziona un comune della Provincia di Pordenone.');
           return;
         }
 
@@ -264,6 +278,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: normalizedInputEmail,
           ...(phone.trim() ? { phone: phone.trim() } : {}),
           ...(role === 'chef' && brandName.trim() ? { brandName: brandName.trim() } : {}),
+          ...(avatarUrl.trim() ? { avatarUrl: avatarUrl.trim() } : {}),
           role: role,
           addresses: addresses,
           createdAt: new Date().toLocaleDateString('it-IT'),
@@ -271,6 +286,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         };
 
         await onRegisterUser(newUser);
+        setAvatarUrl('');
         onLoginSuccess(newUser, true);
         onClose();
       }
@@ -436,6 +452,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       </div>
                     </div>
                   )}
+
+                  <ImagePickerBox
+                    variant="avatar"
+                    compact
+                    value={avatarUrl}
+                    onChange={setAvatarUrl}
+                    label={role === 'chef' ? 'Foto Profilo Cuoco (consigliata)' : 'Foto Profilo (opzionale)'}
+                    helperText={
+                      role === 'chef'
+                        ? 'Carica una tua foto dal dispositivo o incolla un link per il tuo profilo cuoco.'
+                        : 'Personalizza il tuo account caricando una foto profilo.'
+                    }
+                  />
                 </>
               )}
               
@@ -496,12 +525,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {/* Campi Indirizzo durante la registrazione */}
               {mode === 'register' && role !== 'admin' && (
                 <div className="space-y-3 bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 mt-4 pt-5">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <MapPin className="w-4 h-4 text-orange-600" />
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      {role === 'chef' ? 'Sede della tua Cucina' : 'Sede del tuo Indirizzo'}
-                    </span>
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-orange-600" />
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        {role === 'chef' ? 'Sede della tua Cucina (Provincia di Pordenone)' : 'Sede del tuo Indirizzo'}
+                      </span>
+                    </div>
+                    {role === 'chef' && (
+                      <span className="text-[9px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded-full border border-orange-200">
+                        Competenza: Provincia di Pordenone (PN)
+                      </span>
+                    )}
                   </div>
+
+                  {role === 'chef' && (
+                    <div>
+                      <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">
+                        Comune della Provincia di Pordenone *
+                      </label>
+                      <select
+                        value={findPordenoneComune(city)?.name || ''}
+                        onChange={(e) => {
+                          const chosen = PORDENONE_COMUNI.find(c => c.name === e.target.value);
+                          if (chosen) {
+                            setCity(`${chosen.name} (PN)`);
+                            setZip(chosen.zip);
+                            setErrorMsg('');
+                          }
+                        }}
+                        className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white text-xs font-bold text-gray-900"
+                      >
+                        <option value="">-- Seleziona un comune della Provincia di Pordenone --</option>
+                        {PORDENONE_COMUNI.map(c => (
+                          <option key={c.name} value={c.name}>
+                            {c.name} (PN) • CAP {c.zip}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   
                   <input 
                     type="text" 
@@ -515,7 +578,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <div className="grid grid-cols-2 gap-3">
                     <input 
                       type="text" 
-                      placeholder="Città" 
+                      placeholder={role === 'chef' ? 'Comune es. Pordenone (PN)' : 'Città (es. Pordenone)'} 
                       value={city}
                       onChange={e => setCity(e.target.value)}
                       className="w-full p-3 border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-white text-xs font-bold"
@@ -533,7 +596,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
                   <p className="text-[9px] text-gray-400 font-bold italic leading-tight mt-1">
                     {role === 'chef'
-                      ? 'La tua registrazione cuoco e questo indirizzo saranno subito visibili nell\'Area Admin per la convalida e l\'attivazione.'
+                      ? 'Tutti i cuochi MESA operano nella Provincia di Pordenone (PN). La registrazione sarà subito visibile nell\'Area Admin per la convalida.'
                       : 'L\'indirizzo inserito verrà registrato nell\'Area Admin per la verifica prima degli ordini a domicilio.'}
                   </p>
                 </div>

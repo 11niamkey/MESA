@@ -4,8 +4,11 @@ import {
   Plus, LogOut, ChefHat, Calendar, ClipboardList, 
   Clock, CheckCircle, Smartphone, Mail, Globe, Check, XCircle, Sparkles, AlertCircle 
 } from 'lucide-react';
-import { AppUser, UserAddress, Order, OrderStatus, ViewState, Chef, ChefApplication, ORDER_STATUS_LABELS } from '../types';
+import { AppUser, UserAddress, Order, OrderStatus, ViewState, Chef, Dish, ChefApplication, ORDER_STATUS_LABELS } from '../types';
 import { CountryFlag } from './CountryFlag';
+import { ImagePickerBox } from './ImagePickerBox';
+import { AdminDishesPanel } from './AdminDishesPanel';
+import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, normalizeLocationToPordenone } from './italianTerritoryData';
 
 interface PersonalAreaProps {
   currentUser: AppUser;
@@ -15,7 +18,8 @@ interface PersonalAreaProps {
   onNavigate: (view: ViewState) => void;
   onSelectOrder: (order: Order) => void;
   chefs: Chef[];
-  onUpdateChef?: (updatedChef: Chef) => void;
+  onUpdateChef?: (updatedChef: Chef) => Promise<boolean> | void;
+  onSaveChefDishes?: (chefId: string, dishes: Dish[]) => Promise<boolean>;
   onUpdateOrderStatus?: (orderId: string, status: OrderStatus) => Promise<void> | void;
   registeredUsers?: AppUser[];
   chefApplications?: ChefApplication[];
@@ -33,6 +37,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   onSelectOrder,
   chefs,
   onUpdateChef,
+  onSaveChefDishes,
   onUpdateOrderStatus,
   registeredUsers = [],
   chefApplications = [],
@@ -63,6 +68,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   const [profileLastName, setProfileLastName] = useState(currentUser.lastName);
   const [profileEmail, setProfileEmail] = useState(currentUser.email);
   const [profilePassword, setProfilePassword] = useState(currentUser.password || 'demo123');
+  const [profileAvatar, setProfileAvatar] = useState(currentUser.avatarUrl || '');
 
   // Chef-specific settings state (loaded if user is a chef)
   const matchingChef = chefs.find(c => {
@@ -85,6 +91,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   );
   
   const [chefName, setChefName] = useState(matchingChef?.name || matchingApplication?.brandName || currentUser.brandName || `${currentUser.name} ${currentUser.lastName}`);
+  const [chefAvatar, setChefAvatar] = useState(matchingChef?.avatar || matchingApplication?.avatarUrl || currentUser.avatarUrl || '');
   const [chefNationality, setChefNationality] = useState(matchingChef?.nationality || matchingApplication?.nationality || '🇮🇹');
   const [chefCountryName, setChefCountryName] = useState(matchingChef?.countryName || matchingApplication?.countryName || 'Italia');
   const [chefEmail, setChefEmail] = useState(matchingChef?.email || currentUser.email);
@@ -109,7 +116,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
     matchingChef?.phone || matchingApplication?.phone || currentUser.phone || (matchingChef ? defaultNumbers[matchingChef.id] : '') || '+393475552026'
   );
   const [chefLocation, setChefLocation] = useState(
-    matchingChef?.location || matchingApplication?.location || currentUser.addresses?.[0]?.street || 'Pordenone (PN), Centro'
+    normalizeLocationToPordenone(matchingChef?.location || matchingApplication?.location || currentUser.addresses?.[0]?.street)
   );
   const [haccpStatus, setHaccpStatus] = useState(true);
 
@@ -118,11 +125,13 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
     setProfileLastName(currentUser.lastName);
     setProfileEmail(currentUser.email);
     setProfilePassword(currentUser.password || 'demo123');
-  }, [currentUser.id, currentUser.name, currentUser.lastName, currentUser.email, currentUser.password]);
+    setProfileAvatar(currentUser.avatarUrl || matchingChef?.avatar || matchingApplication?.avatarUrl || '');
+  }, [currentUser.id, currentUser.name, currentUser.lastName, currentUser.email, currentUser.password, currentUser.avatarUrl, matchingChef?.avatar, matchingApplication?.avatarUrl]);
 
   useEffect(() => {
     if (matchingChef) {
       setChefName(matchingChef.name);
+      setChefAvatar(matchingChef.avatar || currentUser.avatarUrl || '');
       setChefNationality(matchingChef.nationality || '🇮🇹');
       setChefCountryName(matchingChef.countryName || 'Italia');
       setChefEmail(matchingChef.email || currentUser.email);
@@ -130,18 +139,19 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
       setChefSpecialties(matchingChef.specialties.join(', '));
       setChefBio(matchingChef.bio);
       if (matchingChef.phone) setChefPhone(matchingChef.phone);
-      setChefLocation(matchingChef.location);
+      setChefLocation(normalizeLocationToPordenone(matchingChef.location));
     } else if (matchingApplication) {
       setChefName(matchingApplication.brandName || matchingApplication.fullName);
+      setChefAvatar(matchingApplication.avatarUrl || currentUser.avatarUrl || '');
       setChefNationality(matchingApplication.nationality || '🇮🇹');
       setChefCountryName(matchingApplication.countryName || 'Italia');
       setChefEmail(matchingApplication.email);
       setChefPhone(matchingApplication.phone || currentUser.phone || '+393475552026');
-      setChefLocation(matchingApplication.location);
+      setChefLocation(normalizeLocationToPordenone(matchingApplication.location));
       setChefSpecialties(matchingApplication.specialties.join(', '));
       setChefBio(matchingApplication.bio);
     }
-  }, [matchingChef?.id, matchingChef?.name, matchingChef?.location, matchingChef?.phone, matchingApplication?.id, currentUser.id]);
+  }, [matchingChef?.id, matchingChef?.name, matchingChef?.avatar, matchingChef?.location, matchingChef?.phone, matchingApplication?.id, matchingApplication?.avatarUrl, currentUser.id]);
 
   const clientOrders = orders.filter(
     o => o.userId === currentUser.id
@@ -231,17 +241,22 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
       name: profileName.trim(),
       lastName: profileLastName.trim(),
       email: profileEmail.trim().toLowerCase(),
-      password: profilePassword.trim()
+      password: profilePassword.trim(),
+      avatarUrl: profileAvatar.trim() || undefined
     };
 
     onUpdateUser(updatedUser);
-    setFeedbackMsg({ type: 'success', text: 'Profilo personale aggiornato e sincronizzato con successo!' });
+    setFeedbackMsg({ type: 'success', text: 'Profilo personale e foto aggiornati e sincronizzati con successo!' });
   };
 
   const handleSaveChefSettings = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chefName.trim() || !chefPhone.trim() || !chefLocation.trim() || !chefEmail.trim() || !chefPassword.trim()) {
       setFeedbackMsg({ type: 'error', text: 'I campi principali sono obbligatori.' });
+      return;
+    }
+    if (!isPordenoneLocation(chefLocation)) {
+      setFeedbackMsg({ type: 'error', text: 'La sede della cucina deve trovarsi nella Provincia di Pordenone (PN).' });
       return;
     }
 
@@ -258,6 +273,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
     const nameParts = chefName.trim().split(' ');
     const first = nameParts[0] || currentUser.name;
     const last = nameParts.slice(1).join(' ');
+    const resolvedAvatar = chefAvatar.trim() || matchingChef?.avatar || currentUser.avatarUrl;
 
     const updatedUser: AppUser = {
       ...currentUser,
@@ -266,7 +282,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
       phone: chefPhone.trim(),
       brandName: chefName.trim(),
       email: chefEmail.trim().toLowerCase(),
-      password: chefPassword.trim()
+      password: chefPassword.trim(),
+      ...(resolvedAvatar ? { avatarUrl: resolvedAvatar } : { avatarUrl: undefined })
     };
     onUpdateUser(updatedUser);
 
@@ -275,6 +292,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         ...matchingChef,
         id: activeChefId,
         name: chefName.trim(),
+        avatar: resolvedAvatar || matchingChef.avatar,
         nationality: chefNationality.trim(),
         countryName: chefCountryName.trim(),
         email: chefEmail.trim().toLowerCase(),
@@ -285,7 +303,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         bio: chefBio.trim(),
       });
     }
-    setFeedbackMsg({ type: 'success', text: 'Tutte le informazioni e le credenziali di accesso sono state salvate e sincronizzate!' });
+    setFeedbackMsg({ type: 'success', text: 'Tutte le informazioni, la foto e le credenziali sono state salvate e sincronizzate!' });
   };
 
   return (
@@ -297,15 +315,24 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-orange-600 text-black rounded-3xl flex items-center justify-center shadow-xl shrink-0">
-              {currentUser.role === 'chef' ? (
-                <ChefHat className="w-10 h-10 stroke-2" />
-              ) : currentUser.role === 'admin' ? (
-                <ShieldCheck className="w-10 h-10 stroke-2" />
-              ) : (
-                <User className="w-10 h-10 stroke-2" />
-              )}
-            </div>
+            {(matchingChef?.avatar || matchingApplication?.avatarUrl || currentUser.avatarUrl) ? (
+              <img
+                src={matchingChef?.avatar || matchingApplication?.avatarUrl || currentUser.avatarUrl}
+                alt={`${currentUser.name} ${currentUser.lastName}`}
+                referrerPolicy="no-referrer"
+                className="w-20 h-20 rounded-3xl object-cover shadow-xl border-2 border-orange-500 shrink-0"
+              />
+            ) : (
+              <div className="w-20 h-20 bg-orange-600 text-black rounded-3xl flex items-center justify-center shadow-xl shrink-0">
+                {currentUser.role === 'chef' ? (
+                  <ChefHat className="w-10 h-10 stroke-2" />
+                ) : currentUser.role === 'admin' ? (
+                  <ShieldCheck className="w-10 h-10 stroke-2" />
+                ) : (
+                  <User className="w-10 h-10 stroke-2" />
+                )}
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
                 <span className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border ${
@@ -525,8 +552,16 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           <form onSubmit={handleSaveProfile} className="space-y-8 animate-fade-in text-left">
             <div>
               <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Modifica Profilo e Credenziali</h3>
-              <p className="text-black text-sm leading-relaxed">Ottimizza le tue informazioni di anagrafica personali e le credenziali di accesso. Modifica i dettagli e salva per aggiornarli su tutta la piattaforma.</p>
+              <p className="text-black text-sm leading-relaxed">Ottimizza le tue informazioni di anagrafica personali, la foto profilo e le credenziali di accesso. Modifica i dettagli e salva per aggiornarli su tutta la piattaforma.</p>
             </div>
+
+            <ImagePickerBox
+              variant="avatar"
+              value={profileAvatar}
+              onChange={setProfileAvatar}
+              label="Foto Profilo"
+              helperText="Carica una foto dal tuo dispositivo oppure incolla un link URL."
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -683,7 +718,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">CAP</label>
                     <input 
                       type="text" 
-                      placeholder="es. 00185"
+                      placeholder="es. 33170"
                       value={zip}
                       onChange={(e) => setZip(e.target.value)}
                       className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold"
@@ -697,7 +732,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Città</label>
                   <input 
                     type="text" 
-                    placeholder="es. Roma (RM)"
+                    placeholder="es. Pordenone (PN)"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold"
@@ -837,6 +872,14 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
 
             <form onSubmit={handleSaveChefSettings} className="space-y-6 border-t border-gray-100 pt-8 text-left">
               <h4 className="text-sm font-black text-gray-800 uppercase tracking-wider mb-2 italic">1. Dati Pubblici dello Chef</h4>
+              <ImagePickerBox
+                variant="avatar"
+                value={chefAvatar}
+                onChange={setChefAvatar}
+                fallbackImage={matchingChef?.avatar}
+                label="Foto Profilo Pubblica dello Chef"
+                helperText="Questa foto appare sulla tua scheda cuoco nel catalogo pubblico MESA."
+              />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Nome d'Arte o Nome Cuoco</label>
@@ -912,14 +955,38 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Indirizzo Fisico (Città, Zona)</label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      Sede Cucina — Provincia di Pordenone (PN)
+                    </label>
+                    <span className="text-[9px] font-black uppercase bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full">
+                      Solo PN
+                    </span>
+                  </div>
+                  <select
+                    value={findPordenoneComune(chefLocation)?.name || ''}
+                    onChange={(e) => {
+                      const chosen = PORDENONE_COMUNI.find(c => c.name === e.target.value);
+                      if (chosen) {
+                        setChefLocation(`${chosen.name} (PN), Centro`);
+                      }
+                    }}
+                    className="w-full p-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none bg-gray-50 text-xs font-bold text-gray-900"
+                  >
+                    <option value="">-- Seleziona Comune (Provincia di Pordenone) --</option>
+                    {PORDENONE_COMUNI.map(c => (
+                      <option key={c.name} value={c.name}>
+                        {c.name} (PN) • CAP {c.zip}
+                      </option>
+                    ))}
+                  </select>
                   <input 
                     type="text" 
                     value={chefLocation}
                     onChange={(e) => setChefLocation(e.target.value)}
                     className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold"
-                    placeholder="es. Roma, Trastevere"
+                    placeholder="es. Pordenone (PN), Centro"
                     required
                   />
                 </div>
@@ -1236,31 +1303,34 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           </div>
         )}
 
-        {/* TAB 6: CHEF MENU (MOCK/VIEW) */}
+        {/* TAB 6: CHEF MENU */}
         {activeTab === 'chef-menu' && currentUser.role === 'chef' && (
           <div className="space-y-6 animate-fade-in relative text-left">
-            <h3 className="text-2xl font-black italic tracking-tight mb-2">Il Mio Menu</h3>
-            <p className="text-gray-500 text-sm mb-6 leading-relaxed">I piatti che stai offrendo attualmente ai tuoi clienti.</p>
-            {(!matchingChef || matchingChef.dishes.length === 0) ? (
-              <div className="py-12 bg-gray-50 rounded-3xl text-center border-2 border-dashed border-gray-200">
-                <Plus className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="font-bold text-gray-400 text-sm">Nessun piatto attivo.</p>
+            {!matchingChef ? (
+              <div className="py-12 bg-gray-50 rounded-3xl text-center border-2 border-dashed border-gray-200 px-6">
+                <ChefHat className="w-12 h-12 text-orange-400 mx-auto mb-3" />
+                <p className="font-bold text-gray-700 text-sm">Il menu sarà modificabile non appena l'Admin approverà la tua candidatura cuoco.</p>
+                <p className="text-xs text-gray-500 mt-1">Puoi già aggiornare la tua candidatura e le foto dal banner qui sopra.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {matchingChef.dishes.map((dish) => (
-                  <div key={dish.id} className="p-4 bg-white border border-gray-100 rounded-3xl flex flex-col gap-3">
-                     <img 
-                       src={dish.image || DEFAULT_FOOD_IMAGE} 
-                       alt={dish.name} 
-                       onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_FOOD_IMAGE; }}
-                       className="w-full h-32 object-cover rounded-2xl" 
-                     />
-                     <h4 className="font-bold text-sm">{dish.name}</h4>
-                     <p className="font-black text-orange-600">€ {dish.price.toFixed(2)}</p>
-                  </div>
-                ))}
-              </div>
+              <AdminDishesPanel
+                chefs={[matchingChef]}
+                singleChefMode
+                chefFilter={matchingChef.id}
+                onChefFilterChange={() => {}}
+                onSaveChefDishes={async (chefId, dishes) => {
+                  if (onSaveChefDishes) {
+                    return await onSaveChefDishes(chefId, dishes);
+                  }
+                  if (onUpdateChef) {
+                    const res = await onUpdateChef({ ...matchingChef, dishes });
+                    return res !== false;
+                  }
+                  return false;
+                }}
+                title="Il Mio Menu"
+                subtitle="Tocca qualsiasi piatto per cambiarne foto, nome, descrizione, ingredienti e prezzo in tempo reale."
+              />
             )}
           </div>
         )}

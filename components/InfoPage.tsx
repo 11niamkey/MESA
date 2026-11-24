@@ -97,7 +97,7 @@ export const InfoPage: React.FC<InfoPageProps> = ({
                 Trasforma la tua cucina in una fonte di reddito.
               </p>
               <p className="text-black">
-                Sei il re del risotto o la regina delle lasagne? MESA ti offre gli strumenti per gestire il tuo piccolo business domestico senza stress, con sincronizzazione diretta con l'Area Amministratore per la verifica e l'attivazione del tuo menu.
+                Sei il re del risotto o la regina delle lasagne nella Provincia di Pordenone (PN)? MESA ti offre gli strumenti per gestire il tuo piccolo business domestico sul territorio pordenonese senza stress, con sincronizzazione diretta con l'Area Amministratore per la verifica e l'attivazione del tuo menu.
               </p>
 
               {userApplication && (

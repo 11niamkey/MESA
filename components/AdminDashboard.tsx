@@ -12,6 +12,9 @@ import { Chef, Dish, Order, OrderStatus, ORDER_STATUS_LABELS, AppUser, ChefAppli
 import { ShareModal } from './ShareModal';
 import { COUNTRY_FLAG_PRESETS, getCountryNameByFlag } from './FilterBar';
 import { CountryFlag } from './CountryFlag';
+import { AdminDishesPanel } from './AdminDishesPanel';
+import { ImagePickerBox } from './ImagePickerBox';
+import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation } from './italianTerritoryData';
 
 interface AdminDashboardProps {
   chefs: Chef[];
@@ -20,11 +23,14 @@ interface AdminDashboardProps {
   chefApplications?: ChefApplication[];
   onVerifyAddress: (userId: string, addressId: string, isVerified: boolean) => void;
   onDeleteUser?: (userId: string) => void;
-  onUpdateChef?: (updatedChef: Chef) => void;
+  onUpdateUser?: (updatedUser: AppUser) => Promise<void> | void;
+  onUpdateChef?: (updatedChef: Chef) => Promise<boolean> | void;
+  onSaveChefDishes?: (chefId: string, dishes: Dish[]) => Promise<boolean>;
   onDeleteChef?: (chefId: string, deleteLinkedUser?: boolean) => Promise<void> | void;
   onApproveApplication?: (appId: string) => void;
   onRejectApplication?: (appId: string, notes?: string) => void;
   onDeleteApplication?: (appId: string) => void;
+  onUpdateApplication?: (appId: string, patch: Partial<ChefApplication>) => Promise<void> | void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
@@ -34,35 +40,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   chefApplications = [],
   onVerifyAddress,
   onDeleteUser,
+  onUpdateUser,
   onUpdateChef,
+  onSaveChefDishes,
   onDeleteChef,
   onApproveApplication,
   onRejectApplication,
-  onDeleteApplication
+  onDeleteApplication,
+  onUpdateApplication
 }) => {
   const [adminTab, setAdminTab] = useState<'orders' | 'dishes' | 'applications' | 'users' | 'chefs' | 'cockpit'>('orders');
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'client' | 'chef' | 'admin'>('all');
   const [orderSearch, setOrderSearch] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | OrderStatus>('all');
-  const [dishSearch, setDishSearch] = useState('');
   const [dishChefFilter, setDishChefFilter] = useState<string>('all');
-  const [editingDishKey, setEditingDishKey] = useState<string | null>(null);
-  const [dishFormName, setDishFormName] = useState('');
-  const [dishFormDesc, setDishFormDesc] = useState('');
-  const [dishFormPrice, setDishFormPrice] = useState('');
-  const [dishFormImage, setDishFormImage] = useState('');
-  const [dishFormTags, setDishFormTags] = useState('');
-  const [dishFormIngredients, setDishFormIngredients] = useState('');
-  const [dishFormPreparation, setDishFormPreparation] = useState('');
-  const [isAddingNewDish, setIsAddingNewDish] = useState(false);
-  const [newDishChefId, setNewDishChefId] = useState('');
   
   // Applications tab states
   const [appStatusFilter, setAppStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [appSearch, setAppSearch] = useState('');
   const [selectedDocPreview, setSelectedDocPreview] = useState<ChefDocument | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState<{ [appId: string]: string }>({});
+  const [editingAppPhotoId, setEditingAppPhotoId] = useState<string | null>(null);
+  const [editingUserPhotoId, setEditingUserPhotoId] = useState<string | null>(null);
 
   const [aiReport, setAiReport] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -71,6 +71,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // States for interactive chef data management
   const [editingChefId, setEditingChefId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [editAvatar, setEditAvatar] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editLocation, setEditLocation] = useState('');
   const [editBio, setEditBio] = useState('');
@@ -79,6 +80,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editNationality, setEditNationality] = useState('');
   const [editCountryName, setEditCountryName] = useState('');
   const [editContinent, setEditContinent] = useState<Continent>('Europa');
+  const [editChefError, setEditChefError] = useState('');
   const [chefSearch, setChefSearch] = useState('');
   const [chefToDelete, setChefToDelete] = useState<Chef | null>(null);
   const [deleteLinkedUser, setDeleteLinkedUser] = useState(false);
@@ -113,103 +115,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const confirmedOrdersCount = orders.filter(o => o.status === 'CONFIRMED' || o.status === 'PLACED' || o.status === 'PREPARING' || o.status === 'READY' || o.status === 'DELIVERING' || o.status === 'COMPLETED').length;
   const rejectedOrdersCount = orders.filter(o => o.status === 'REJECTED').length;
   const allDishes = chefs.flatMap(chef => chef.dishes.map(dish => ({ dish, chef })));
-  const filteredDishes = allDishes.filter(({ dish, chef }) => {
-    const matchesChef = dishChefFilter === 'all' || chef.id === dishChefFilter;
-    const q = dishSearch.trim().toLowerCase();
-    const matchesQuery =
-      !q ||
-      dish.name.toLowerCase().includes(q) ||
-      dish.description.toLowerCase().includes(q) ||
-      chef.name.toLowerCase().includes(q) ||
-      dish.tags.some(t => t.toLowerCase().includes(q)) ||
-      (dish.ingredients || []).some(i => i.toLowerCase().includes(q));
-    return matchesChef && matchesQuery;
-  });
 
-  const startEditingDish = (dish: Dish, chefId: string) => {
-    setIsAddingNewDish(false);
-    setEditingDishKey(`${chefId}::${dish.id}`);
-    setDishFormName(dish.name);
-    setDishFormDesc(dish.description);
-    setDishFormPrice(dish.price.toFixed(2));
-    setDishFormImage(dish.image || '');
-    setDishFormTags((dish.tags || []).join(', '));
-    setDishFormIngredients((dish.ingredients || []).join(', '));
-    setDishFormPreparation(dish.preparation || '');
-  };
-
-  const handleSaveDishEdit = (chef: Chef, dishId: string) => {
-    if (!onUpdateChef || !dishFormName.trim()) return;
-    const parsedPrice = parseFloat(dishFormPrice.replace(',', '.'));
-    const nextPrice = Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : 12;
-    const tags = dishFormTags.split(',').map(t => t.trim()).filter(Boolean);
-    const ingredients = dishFormIngredients.split(',').map(i => i.trim()).filter(Boolean);
-
-    const updatedDishes = chef.dishes.map(d => {
-      if (d.id !== dishId) return d;
-      const updated: Dish = {
-        ...d,
-        name: dishFormName.trim(),
-        description: dishFormDesc.trim(),
-        price: nextPrice,
-        image: dishFormImage.trim() || d.image,
-        tags,
-        ...(ingredients.length > 0 ? { ingredients } : {}),
-        ...(dishFormPreparation.trim() ? { preparation: dishFormPreparation.trim() } : {})
-      };
-      if (ingredients.length === 0) delete updated.ingredients;
-      if (!dishFormPreparation.trim()) delete updated.preparation;
-      return updated;
-    });
-
-    onUpdateChef({ ...chef, dishes: updatedDishes });
-    setEditingDishKey(null);
-  };
-
-  const handleDeleteDishFromChef = (chef: Chef, dishId: string) => {
-    if (!onUpdateChef) return;
-    onUpdateChef({
-      ...chef,
-      dishes: chef.dishes.filter(d => d.id !== dishId)
-    });
-    if (editingDishKey === `${chef.id}::${dishId}`) {
-      setEditingDishKey(null);
+  const handleSaveDishesFallback = async (chefId: string, dishes: Dish[]): Promise<boolean> => {
+    if (onSaveChefDishes) {
+      return await onSaveChefDishes(chefId, dishes);
     }
-  };
-
-  const handleCreateNewDish = () => {
-    if (!onUpdateChef || !dishFormName.trim()) return;
-    const targetChef = chefs.find(c => c.id === newDishChefId) || chefs[0];
-    if (!targetChef) return;
-    const parsedPrice = parseFloat(dishFormPrice.replace(',', '.'));
-    const nextPrice = Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : 12;
-    const tags = dishFormTags.split(',').map(t => t.trim()).filter(Boolean);
-    const ingredients = dishFormIngredients.split(',').map(i => i.trim()).filter(Boolean);
-
-    const newDish: Dish = {
-      id: `dish-${Date.now().toString(36)}`,
-      name: dishFormName.trim(),
-      description: dishFormDesc.trim() || 'Piatto preparato al momento con ingredienti freschi.',
-      price: nextPrice,
-      image: dishFormImage.trim() || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
-      chefId: targetChef.id,
-      tags: tags.length > 0 ? tags : ['Tradizionale'],
-      ...(ingredients.length > 0 ? { ingredients } : {}),
-      ...(dishFormPreparation.trim() ? { preparation: dishFormPreparation.trim() } : {})
-    };
-
-    onUpdateChef({
-      ...targetChef,
-      dishes: [newDish, ...targetChef.dishes]
-    });
-    setIsAddingNewDish(false);
-    setDishFormName('');
-    setDishFormDesc('');
-    setDishFormPrice('');
-    setDishFormImage('');
-    setDishFormTags('');
-    setDishFormIngredients('');
-    setDishFormPreparation('');
+    const targetChef = chefs.find(c => c.id === chefId);
+    if (!targetChef || !onUpdateChef) return false;
+    const res = await onUpdateChef({ ...targetChef, dishes });
+    return res !== false;
   };
 
   const filteredOrders = orders.filter(order => {
@@ -569,340 +483,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB 0B: GESTIONE PIATTI & DESCRIZIONI */}
       {adminTab === 'dishes' && (
-        <div className="animate-fade-in space-y-8 bg-white rounded-[3rem] p-6 sm:p-10 border border-gray-100 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-orange-600">
-                Gestione Piatti & Descrizioni
-              </h3>
-              <p className="text-black text-sm mt-1 leading-relaxed font-medium">
-                Modifica nome, descrizione, prezzo, ingredienti e foto di ogni piatto in catalogo o aggiungine di nuovi per ciascun cuoco.
-              </p>
-            </div>
-            {onUpdateChef && chefs.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingDishKey(null);
-                  setIsAddingNewDish(!isAddingNewDish);
-                  setNewDishChefId(chefs[0].id);
-                  setDishFormName('');
-                  setDishFormDesc('');
-                  setDishFormPrice('12.00');
-                  setDishFormImage('');
-                  setDishFormTags('');
-                  setDishFormIngredients('');
-                  setDishFormPreparation('');
-                }}
-                className="px-5 py-3 bg-orange-600 hover:bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all shrink-0 w-fit"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Nuovo Piatto</span>
-              </button>
-            )}
-          </div>
-
-          {isAddingNewDish && (
-            <div className="bg-orange-50/40 border-2 border-orange-200 rounded-[2rem] p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-black text-base text-orange-600">Aggiungi Nuovo Piatto</h4>
-                <button onClick={() => setIsAddingNewDish(false)} className="p-1.5 rounded-full hover:bg-white text-gray-500">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Cuoco</label>
-                  <select
-                    value={newDishChefId}
-                    onChange={(e) => setNewDishChefId(e.target.value)}
-                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold"
-                  >
-                    {chefs.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Nome Piatto</label>
-                  <input
-                    type="text"
-                    value={dishFormName}
-                    onChange={(e) => setDishFormName(e.target.value)}
-                    placeholder="es. Lasagna della Tradizione"
-                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Prezzo (€)</label>
-                  <input
-                    type="text"
-                    value={dishFormPrice}
-                    onChange={(e) => setDishFormPrice(e.target.value)}
-                    placeholder="12.50"
-                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold font-mono"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Descrizione</label>
-                <textarea
-                  rows={2}
-                  value={dishFormDesc}
-                  onChange={(e) => setDishFormDesc(e.target.value)}
-                  placeholder="Descrizione dettagliata del piatto..."
-                  className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-medium"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Ingredienti (virgola)</label>
-                  <input
-                    type="text"
-                    value={dishFormIngredients}
-                    onChange={(e) => setDishFormIngredients(e.target.value)}
-                    placeholder="Pasta, Ragù, Besciamella"
-                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Tag (virgola)</label>
-                  <input
-                    type="text"
-                    value={dishFormTags}
-                    onChange={(e) => setDishFormTags(e.target.value)}
-                    placeholder="Carne, Pasta"
-                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">URL Immagine</label>
-                  <input
-                    type="text"
-                    value={dishFormImage}
-                    onChange={(e) => setDishFormImage(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddingNewDish(false)}
-                  className="px-4 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-black uppercase tracking-wider"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCreateNewDish}
-                  className="px-5 py-2.5 bg-black hover:bg-orange-600 text-white rounded-xl text-xs font-black uppercase tracking-wider"
-                >
-                  Salva Nuovo Piatto
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between border-b border-gray-100 pb-6">
-            <div className="relative w-full sm:max-w-md">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Cerca piatto per nome, descrizione, ingrediente o cuoco..."
-                value={dishSearch}
-                onChange={(e) => setDishSearch(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 border border-gray-200 rounded-2xl bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none text-xs font-bold"
-              />
-            </div>
-
-            <select
-              value={dishChefFilter}
-              onChange={(e) => setDishChefFilter(e.target.value)}
-              className="w-full sm:w-64 p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-orange-500"
-            >
-              <option value="all">Tutti i Cuochi ({allDishes.length} piatti)</option>
-              {chefs.map(c => (
-                <option key={c.id} value={c.id}>{c.name} ({c.dishes.length})</option>
-              ))}
-            </select>
-          </div>
-
-          {filteredDishes.length === 0 ? (
-            <div className="py-16 text-center text-gray-400 font-bold border-2 border-dashed border-gray-200 rounded-[2.5rem] bg-gray-50/50 space-y-2">
-              <UtensilsCrossed className="w-10 h-10 text-gray-300 mx-auto" />
-              <p className="text-base font-black text-gray-700">Nessun piatto trovato.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredDishes.map(({ dish, chef }) => {
-                const dishKey = `${chef.id}::${dish.id}`;
-                const isEditingDish = editingDishKey === dishKey;
-
-                return (
-                  <div key={dishKey} className="bg-gray-50 rounded-[2rem] p-5 border border-gray-200 flex flex-col justify-between gap-4">
-                    {isEditingDish ? (
-                      <div className="bg-white p-4 rounded-2xl border border-orange-200 space-y-3 text-left">
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">
-                            Modifica Piatto — {chef.name}
-                          </span>
-                          <button onClick={() => setEditingDishKey(null)} className="text-gray-400 hover:text-gray-700">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2.5">
-                          <div className="col-span-2">
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Nome Piatto</label>
-                            <input
-                              type="text"
-                              value={dishFormName}
-                              onChange={(e) => setDishFormName(e.target.value)}
-                              className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Prezzo (€)</label>
-                            <input
-                              type="text"
-                              value={dishFormPrice}
-                              onChange={(e) => setDishFormPrice(e.target.value)}
-                              className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold font-mono"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Descrizione</label>
-                          <textarea
-                            rows={3}
-                            value={dishFormDesc}
-                            onChange={(e) => setDishFormDesc(e.target.value)}
-                            className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-medium resize-none"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <div>
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Ingredienti</label>
-                            <input
-                              type="text"
-                              value={dishFormIngredients}
-                              onChange={(e) => setDishFormIngredients(e.target.value)}
-                              className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Tag</label>
-                            <input
-                              type="text"
-                              value={dishFormTags}
-                              onChange={(e) => setDishFormTags(e.target.value)}
-                              className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Preparazione</label>
-                          <textarea
-                            rows={2}
-                            value={dishFormPreparation}
-                            onChange={(e) => setDishFormPreparation(e.target.value)}
-                            className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-medium resize-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">URL Immagine</label>
-                          <input
-                            type="text"
-                            value={dishFormImage}
-                            onChange={(e) => setDishFormImage(e.target.value)}
-                            className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
-                          />
-                        </div>
-
-                        <div className="flex justify-end gap-2 pt-2">
-                          <button
-                            type="button"
-                            onClick={() => setEditingDishKey(null)}
-                            className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-wider"
-                          >
-                            Annulla
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSaveDishEdit(chef, dish.id)}
-                            className="px-4 py-2 bg-black hover:bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider"
-                          >
-                            Salva Piatto
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex gap-4">
-                          <img
-                            src={dish.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'}
-                            alt={dish.name}
-                            referrerPolicy="no-referrer"
-                            className="w-24 h-24 rounded-2xl object-cover shrink-0 border border-gray-200"
-                          />
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <h4 className="font-black text-base text-orange-600 leading-tight">{dish.name}</h4>
-                              <span className="font-mono font-black text-sm text-gray-900 shrink-0">€ {dish.price.toFixed(2)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
-                              <CountryFlag flag={chef.nationality} title={chef.countryName} size="xs" />
-                              <span>{chef.name}</span>
-                            </div>
-                            <p className="text-xs text-black leading-relaxed line-clamp-3">
-                              {dish.description}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-200/70">
-                          <div className="flex flex-wrap gap-1">
-                            {dish.tags.slice(0, 3).map(tag => (
-                              <span key={tag} className="px-2 py-0.5 bg-white border border-gray-200 rounded-lg text-[9px] font-black uppercase text-gray-600">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                          {onUpdateChef && (
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => startEditingDish(dish, chef.id)}
-                                className="px-3.5 py-2 bg-black hover:bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all"
-                              >
-                                <Pencil className="w-3 h-3" />
-                                <span>Modifica</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteDishFromChef(chef, dish.id)}
-                                className="p-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 rounded-xl transition-all"
-                                title={`Elimina ${dish.name}`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <AdminDishesPanel
+          chefs={chefs}
+          onSaveChefDishes={handleSaveDishesFallback}
+          chefFilter={dishChefFilter}
+          onChefFilterChange={setDishChefFilter}
+          title="Gestione Piatti, Foto & Descrizioni"
+          subtitle="Tocca qualsiasi piatto per cambiarne foto (da file o URL), nome, descrizione, ingredienti e prezzo. Le modifiche vengono sincronizzate subito nel catalogo."
+        />
       )}
 
       {/* TAB 1: CANDIDATURE & VERIFICHE CUOCHI (MAIN FEATURE) */}
@@ -1112,9 +700,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                     {/* Column 3: Proposta Primo Piatto */}
                     <div className="bg-white p-5 rounded-3xl border border-gray-200/80 space-y-3">
-                      <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5 border-b pb-2">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-600" /> Proposta Primo Piatto
-                      </h5>
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-purple-600" /> Proposta Primo Piatto
+                        </h5>
+                        {onUpdateApplication && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingAppPhotoId(editingAppPhotoId === app.id ? null : app.id)}
+                            className="text-[9px] font-black uppercase tracking-wider text-orange-600 hover:underline flex items-center gap-1"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            <span>{editingAppPhotoId === app.id ? 'Chiudi Foto' : 'Modifica Foto'}</span>
+                          </button>
+                        )}
+                      </div>
                       
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -1124,14 +724,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <p className="text-xs text-gray-600 font-medium leading-relaxed line-clamp-3">
                           {app.proposedDishDesc}
                         </p>
-                        {app.kitchenPhotos && app.kitchenPhotos.length > 0 && (
+                        {(app.proposedDishImage || (app.kitchenPhotos && app.kitchenPhotos.length > 0)) && (
                           <div className="flex gap-2 pt-1">
-                            {app.kitchenPhotos.slice(0, 2).map((img, i) => (
-                              <img key={i} src={img} alt="Dish" className="w-12 h-12 rounded-xl object-cover border border-gray-200" />
+                            {app.proposedDishImage && (
+                              <img src={app.proposedDishImage} alt={app.proposedDishName} className="w-12 h-12 rounded-xl object-cover border-2 border-orange-400" referrerPolicy="no-referrer" />
+                            )}
+                            {(app.kitchenPhotos || []).slice(0, 2).map((img, i) => (
+                              <img key={i} src={img} alt="Kitchen" className="w-12 h-12 rounded-xl object-cover border border-gray-200" referrerPolicy="no-referrer" />
                             ))}
                           </div>
                         )}
                       </div>
+
+                      {editingAppPhotoId === app.id && onUpdateApplication && (
+                        <div className="pt-3 border-t border-gray-100 space-y-3">
+                          <ImagePickerBox
+                            variant="avatar"
+                            compact
+                            value={app.avatarUrl || ''}
+                            onChange={(nextUrl) => onUpdateApplication(app.id, { avatarUrl: nextUrl })}
+                            label="Foto Profilo Candidato"
+                            helperText="Aggiorna la foto profilo dello chef."
+                          />
+                          <ImagePickerBox
+                            variant="card"
+                            value={app.proposedDishImage || ''}
+                            onChange={(nextUrl) => onUpdateApplication(app.id, { proposedDishImage: nextUrl })}
+                            label="Foto Piatto Proposto"
+                            helperText="Aggiorna la foto del piatto proposto."
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1199,11 +822,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* TAB 2: GESTIONE ANAGRAFICA CUOCHI ATTIVI */}
       {adminTab === 'chefs' && (
         <div className="animate-fade-in space-y-8 bg-white rounded-[3rem] p-6 sm:p-10 border border-gray-100 shadow-sm">
-          <div>
-            <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Cuochi Attivi nel Catalogo MESA</h3>
-            <p className="text-black text-sm leading-relaxed max-w-3xl font-medium">
-              Gestisci i profili dei cuochi attualmente pubblicati. Puoi modificarne indirizzo, recapiti telefonici, credenziali d'accesso oppure eliminarli dal catalogo.
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Cuochi Attivi nel Catalogo MESA</h3>
+              <p className="text-black text-sm leading-relaxed max-w-3xl font-medium">
+                Gestisci i profili dei cuochi attualmente pubblicati. Puoi modificarne indirizzo (Provincia di Pordenone), recapiti telefonici, credenziali d'accesso oppure eliminarli dal catalogo.
+              </p>
+            </div>
+            <span className="bg-orange-100 text-orange-800 text-[10px] font-black px-4 py-2 rounded-2xl border border-orange-200 uppercase tracking-widest shrink-0 self-start sm:self-auto">
+              Area di Competenza: Provincia di Pordenone (PN)
+            </span>
           </div>
 
           {/* Filtro di Ricerca Cuochi */}
@@ -1245,6 +873,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               const isEditing = editingChefId === chef.id;
 
               const handleSave = () => {
+                if (!isPordenoneLocation(editLocation)) {
+                  setEditChefError('La sede della cucina deve trovarsi nella Provincia di Pordenone (PN).');
+                  return;
+                }
+                setEditChefError('');
                 const normalizedEmail = (editEmail || '').trim().toLowerCase();
                 const trimmedFlag = editNationality.trim();
                 const resolvedCountry = editCountryName.trim() || getCountryNameByFlag(trimmedFlag) || 'Italia';
@@ -1252,6 +885,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onUpdateChef({
                     ...chef,
                     name: editName.trim(),
+                    avatar: editAvatar.trim() || chef.avatar,
                     phone: editPhone.trim(),
                     location: editLocation.trim(),
                     bio: editBio.trim(),
@@ -1271,7 +905,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {/* Avatar & Nome */}
                     <div className="flex items-center gap-4 mb-6 border-b border-gray-200/60 pb-4">
                       <img 
-                        src={chef.avatar} 
+                        src={(isEditing ? editAvatar : chef.avatar) || chef.avatar} 
                         alt={chef.name} 
                         className="w-14 h-14 rounded-2xl object-cover shadow-sm border-2 border-orange-600/20 shrink-0"
                         referrerPolicy="no-referrer"
@@ -1298,6 +932,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {/* Campi Editabili / Visualizzabili */}
                     {isEditing ? (
                       <div className="space-y-4 bg-white p-5 rounded-2xl border border-orange-200 mb-6 text-left">
+                        <ImagePickerBox
+                          variant="avatar"
+                          compact
+                          value={editAvatar}
+                          onChange={setEditAvatar}
+                          fallbackImage={chef.avatar}
+                          label="Foto Profilo Cuoco"
+                          helperText="Carica una nuova foto dal dispositivo o incolla un URL."
+                          allowRemove={false}
+                        />
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Nome d'Arte</label>
@@ -1385,14 +1029,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Indirizzo Sede Cucina</label>
+                        <div className="space-y-2">
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                            Indirizzo Sede Cucina (Provincia di Pordenone - PN)
+                          </label>
+                          <select
+                            value={findPordenoneComune(editLocation)?.name || ''}
+                            onChange={(e) => {
+                              const chosen = PORDENONE_COMUNI.find(c => c.name === e.target.value);
+                              if (chosen) {
+                                setEditLocation(`${chosen.name} (PN), Centro`);
+                                setEditChefError('');
+                              }
+                            }}
+                            className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold"
+                          >
+                            <option value="">-- Imposta comune Provincia di Pordenone --</option>
+                            {PORDENONE_COMUNI.map(c => (
+                              <option key={c.name} value={c.name}>
+                                {c.name} (PN) • CAP {c.zip}
+                              </option>
+                            ))}
+                          </select>
                           <input 
                             type="text" 
                             value={editLocation}
-                            onChange={(e) => setEditLocation(e.target.value)}
+                            onChange={(e) => {
+                              setEditLocation(e.target.value);
+                              if (editChefError) setEditChefError('');
+                            }}
+                            placeholder="es. Pordenone (PN), Centro"
                             className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-black"
                           />
+                          {editChefError && (
+                            <p className="text-[11px] font-bold text-red-600">{editChefError}</p>
+                          )}
                         </div>
 
                         <div>
@@ -1452,7 +1123,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <button
                           onClick={() => {
                             setEditingChefId(chef.id);
+                            setEditChefError('');
                             setEditName(chef.name);
+                            setEditAvatar(chef.avatar || '');
                             setEditPhone(currentPhone);
                             setEditLocation(chef.location);
                             setEditBio(chef.bio);
@@ -1561,51 +1234,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     (c.email && c.email.trim().toLowerCase() === user.email.trim().toLowerCase())
                 );
 
+                const resolvedAvatar = user.avatarUrl || linkedChef?.avatar || linkedApp?.avatarUrl || '';
+
                 return (
                   <div key={user.id} className="bg-gray-50 rounded-[2.5rem] p-6 border border-gray-200 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200/70 pb-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-extrabold text-lg text-gray-900">{user.name} {user.lastName}</h4>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                            user.role === 'chef'
-                              ? 'bg-orange-100 text-orange-800 border-orange-200'
-                              : user.role === 'admin'
-                                ? 'bg-black text-orange-400 border-black'
-                                : 'bg-blue-50 text-blue-700 border-blue-200'
-                          }`}>
-                            {user.role === 'chef' ? 'Cuoco' : user.role === 'admin' ? 'Admin' : 'Cliente'}
-                          </span>
-                          {linkedChef && (
-                            <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-green-100 text-green-800 border border-green-200">
-                              ✓ Catalogo Attivo
-                            </span>
-                          )}
-                          {linkedApp && !linkedChef && (
+                      <div className="flex items-start gap-3.5">
+                        {resolvedAvatar ? (
+                          <img
+                            src={resolvedAvatar}
+                            alt={`${user.name} ${user.lastName}`}
+                            referrerPolicy="no-referrer"
+                            className="w-12 h-12 rounded-2xl object-cover border border-orange-500/30 shrink-0 shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-700 font-black text-sm flex items-center justify-center shrink-0 uppercase">
+                            {user.name[0]}{user.lastName[0] || ''}
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-extrabold text-lg text-gray-900">{user.name} {user.lastName}</h4>
                             <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                              linkedApp.status === 'pending'
-                                ? 'bg-amber-100 text-amber-900 border-amber-300'
-                                : linkedApp.status === 'rejected'
-                                  ? 'bg-red-100 text-red-800 border-red-200'
-                                  : 'bg-green-100 text-green-800 border-green-200'
+                              user.role === 'chef'
+                                ? 'bg-orange-100 text-orange-800 border-orange-200'
+                                : user.role === 'admin'
+                                  ? 'bg-black text-orange-400 border-black'
+                                  : 'bg-blue-50 text-blue-700 border-blue-200'
                             }`}>
-                              {linkedApp.status === 'pending'
-                                ? 'Candidatura In Attesa'
-                                : linkedApp.status === 'rejected'
-                                  ? 'Candidatura Respinta'
-                                  : 'Candidatura Approvata'}
+                              {user.role === 'chef' ? 'Cuoco' : user.role === 'admin' ? 'Admin' : 'Cliente'}
                             </span>
-                          )}
+                            {linkedChef && (
+                              <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-green-100 text-green-800 border border-green-200">
+                                ✓ Catalogo Attivo
+                              </span>
+                            )}
+                            {linkedApp && !linkedChef && (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                linkedApp.status === 'pending'
+                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                  : linkedApp.status === 'rejected'
+                                    ? 'bg-red-100 text-red-800 border-red-200'
+                                    : 'bg-green-100 text-green-800 border-green-200'
+                              }`}>
+                                {linkedApp.status === 'pending'
+                                  ? 'Candidatura In Attesa'
+                                  : linkedApp.status === 'rejected'
+                                    ? 'Candidatura Respinta'
+                                    : 'Candidatura Approvata'}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-600 font-bold">
+                            {user.email}
+                            {user.phone ? ` • Tel: ${user.phone}` : ''}
+                            {user.brandName ? ` • Cucina: ${user.brandName}` : ''}
+                            {user.createdAt ? ` • Registrato: ${user.createdAt}` : ''}
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-600 font-bold">
-                          {user.email}
-                          {user.phone ? ` • Tel: ${user.phone}` : ''}
-                          {user.brandName ? ` • Cucina: ${user.brandName}` : ''}
-                          {user.createdAt ? ` • Registrato: ${user.createdAt}` : ''}
-                        </p>
                       </div>
 
-                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                        {onUpdateUser && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingUserPhotoId(editingUserPhotoId === user.id ? null : user.id)}
+                            className="px-3 py-2 bg-white border border-gray-200 hover:border-orange-500 text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            <span>{editingUserPhotoId === user.id ? 'Chiudi Foto' : 'Foto Profilo'}</span>
+                          </button>
+                        )}
                         {linkedApp && linkedApp.status !== 'approved' && onApproveApplication && (
                           <button
                             onClick={() => onApproveApplication(linkedApp.id)}
@@ -1638,6 +1337,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         )}
                       </div>
                     </div>
+
+                    {editingUserPhotoId === user.id && onUpdateUser && (
+                      <div className="bg-white p-4 rounded-2xl border border-orange-200">
+                        <ImagePickerBox
+                          variant="avatar"
+                          compact
+                          value={resolvedAvatar}
+                          onChange={(nextUrl) => onUpdateUser({ ...user, avatarUrl: nextUrl })}
+                          label={`Foto Profilo — ${user.name} ${user.lastName}`}
+                          helperText="Carica una foto o incolla un URL: si sincronizza con profilo, cuoco e candidatura."
+                        />
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Indirizzi Registrati ({user.addresses.length})</p>

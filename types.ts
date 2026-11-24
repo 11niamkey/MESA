@@ -67,6 +67,7 @@ export interface ChefApplication {
   proposedDishName: string;
   proposedDishDesc: string;
   proposedDishPrice: number;
+  proposedDishImage?: string;
   availableDays?: number[]; // [0 = Dom, 1 = Lun, 2 = Mar, 3 = Mer, 4 = Gio, 5 = Ven, 6 = Sab]
   availabilitySlots?: string[]; // e.g. ["12:00 - 15:00", "19:00 - 22:00"]
   status: 'pending' | 'approved' | 'rejected' | 'needs_info';
@@ -203,6 +204,7 @@ export interface AppUser {
   email: string;
   phone?: string;
   brandName?: string;
+  avatarUrl?: string;
   role: 'client' | 'chef' | 'admin';
   addresses: UserAddress[];
   createdAt: string;

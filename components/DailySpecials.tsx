@@ -33,11 +33,11 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({ chefs, onAddDish, 
         </div>
       </div>
       
-      <div className="flex overflow-x-auto space-x-5 sm:space-x-6 pb-6 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 sm:gap-6 pb-6 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
         {specials.map((dish) => (
           <div 
             key={dish.id} 
-            className="flex-none w-[280px] sm:w-[380px] md:w-[440px] bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden group hover:shadow-2xl transition-all duration-500 cursor-pointer relative flex flex-col justify-between"
+            className="flex-none snap-start w-[calc(100vw-3rem)] max-w-[380px] sm:w-[380px] sm:max-w-none md:w-[440px] bg-white rounded-[2rem] sm:rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden group hover:shadow-2xl transition-all duration-500 cursor-pointer relative flex flex-col justify-between"
             onClick={() => onAddDish(dish)}
           >
             {/* Image Container */}
@@ -50,8 +50,8 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({ chefs, onAddDish, 
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60"></div>
               
-              <div className="absolute top-4 left-4 flex flex-col gap-1.5">
-                <div className="bg-orange-600 text-white text-[9px] font-black px-3 py-1 rounded-xl uppercase tracking-widest shadow-xl flex items-center">
+              <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 flex flex-col gap-1.5">
+                <div className="bg-orange-600 text-white text-[9px] font-black px-3 py-1 rounded-xl uppercase tracking-widest shadow-xl flex items-center w-fit">
                   <Sparkles className="w-3 h-3 mr-1.5" />
                   Speciale
                 </div>
@@ -66,36 +66,38 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({ chefs, onAddDish, 
                   e.stopPropagation();
                   onToggleFavorite(dish.id);
                 }}
-                className="absolute top-4 right-4 p-2.5 bg-white/90 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all transform hover:scale-110 active:scale-95 z-10 border border-gray-100"
+                className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 p-2.5 bg-white/90 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all transform hover:scale-110 active:scale-95 z-10 border border-gray-100"
               >
                 <Heart className={`w-4 h-4 ${favorites.includes(dish.id) ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
               </button>
             </div>
 
             {/* Content Section */}
-            <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between">
+            <div className="p-4 sm:p-6 flex-1 flex flex-col justify-between">
               <div>
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1 pr-2 min-w-0">
-                    <h3 className="font-black text-orange-600 text-base sm:text-lg leading-tight mb-1 group-hover:text-orange-700 transition-colors truncate">{dish.name}</h3>
-                    <p className="text-[10px] font-black text-black uppercase tracking-widest">
+                <div className="flex justify-between items-start gap-3 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-black text-orange-600 text-base sm:text-lg leading-snug mb-1 group-hover:text-orange-700 transition-colors line-clamp-2 break-words">
+                      {dish.name}
+                    </h3>
+                    <p className="text-[10px] font-black text-black uppercase tracking-widest truncate">
                       Chef <span className="text-black">{dish.chefName}</span>
                     </p>
                   </div>
-                  <div className="text-lg sm:text-2xl font-black text-orange-600 bg-orange-50 px-3 py-1 rounded-xl shrink-0">
+                  <div className="text-base sm:text-2xl font-black text-orange-600 bg-orange-50 px-2.5 sm:px-3 py-1 rounded-xl shrink-0">
                     €{dish.price.toFixed(2)}
                   </div>
                 </div>
                 
-                <p className="text-black text-xs leading-relaxed mb-4 line-clamp-2 italic">
+                <p className="text-gray-800 text-xs sm:text-[13px] leading-relaxed mb-4 line-clamp-3 italic">
                   "{dish.description}"
                 </p>
 
                 {/* Key Ingredients Pill */}
                 {dish.ingredients && dish.ingredients.length > 0 && (
-                  <div className="mb-4 flex items-center gap-1.5 text-[10px] text-gray-600 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                  <div className="mb-4 flex items-center gap-1.5 text-[10px] text-gray-600 bg-gray-50 p-2 rounded-xl border border-gray-100 min-w-0">
                     <Leaf className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                    <span className="font-bold truncate">{dish.ingredients.join(', ')}</span>
+                    <span className="font-bold line-clamp-1">{dish.ingredients.join(', ')}</span>
                   </div>
                 )}
               </div>

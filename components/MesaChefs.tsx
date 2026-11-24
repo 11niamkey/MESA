@@ -21,14 +21,14 @@ export const MesaChefs: React.FC<MesaChefsProps> = ({ chefs, onViewProfile }) =>
         <div className="relative z-10 text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center justify-center px-4 py-1.5 mb-4 rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-400 text-xs font-bold uppercase tracking-widest">
             <ShieldCheck className="w-3 h-3 mr-2" />
-            Verificati & Approvati
+            Verificati • Provincia di Pordenone (PN)
           </div>
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight whitespace-nowrap truncate">
             I Nostri Cuochi <span className="text-orange-500">MESA</span>
           </h2>
           <p className="text-sm sm:text-base text-gray-400 leading-relaxed mb-2">
-            Non semplici appassionati, ma professionisti del gusto. Ogni cuoco MESA è selezionato dalla nostra comunità,
-            certificato per gli standard di sicurezza e celebrato per l'autenticità dei suoi piatti.
+            Tutti i nostri cuochi operano nella Provincia di Pordenone (PN), selezionati dalla comunità,
+            certificati per gli standard di sicurezza e celebrati per l'autenticità dei loro piatti.
           </p>
         </div>
       </div>

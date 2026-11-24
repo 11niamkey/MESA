@@ -34,6 +34,7 @@ import { LandingPage } from './components/LandingPage';
 import { PersonalArea } from './components/PersonalArea';
 import { DishCatalogByOrigin } from './components/DishCatalogByOrigin';
 import { CountryFlag } from './components/CountryFlag';
+import { isPordenoneLocation, normalizeLocationToPordenone, resolvePordenoneZip, findPordenoneComune } from './components/italianTerritoryData';
 import { MOCK_CHEFS } from './constants';
 import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderStatus, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
 import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock } from 'lucide-react';
@@ -48,7 +49,7 @@ const DEFAULT_APPLICATIONS: ChefApplication[] = [
     nationality: '🇨🇮',
     countryName: 'Costa d\'Avorio',
     continent: 'Africa',
-    location: 'Milano, Porta Venezia',
+    location: 'Pordenone (PN), Torre',
     bio: 'Cucino con orgoglio ricette tradizionali abidjanesi tramandatemi da mia nonna, specializzata in Garba (Attiéké con pesce fritto) e Alloco.',
     specialties: ['Attiéké', 'Pesce Fritto', 'Platani Fritti'],
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
@@ -90,7 +91,7 @@ const DEFAULT_APPLICATIONS: ChefApplication[] = [
     nationality: '🇮🇹',
     countryName: 'Italia',
     continent: 'Europa',
-    location: 'Milano, Città Studi',
+    location: 'Sacile (PN), Centro',
     bio: 'Pasta tirata al mattarello secondo la secolare tradizione bolognese con ragù cotto a fuoco lento per 6 ore.',
     specialties: ['Tagliatelle al Ragù', 'Tortellini', 'Lasagne'],
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
@@ -110,7 +111,7 @@ const DEFAULT_APPLICATIONS: ChefApplication[] = [
       {
         id: 'doc-4',
         type: 'haccp_certificate',
-        title: 'Certificato HACCP Regione Lombardia',
+        title: 'Certificato HACCP Friuli-Venezia Giulia',
         fileName: 'haccp_valenti_2026.pdf',
         fileSize: '810 KB',
         uploadedAt: '11/08/2026',
@@ -167,6 +168,8 @@ const DEFAULT_USERS: AppUser[] = [
 // ---------------------------------------------------------------------------
 // Firestore helpers (gracefully no-op until Firebase is configured)
 // ---------------------------------------------------------------------------
+const MOCK_CHEF_BY_ID = new Map(MOCK_CHEFS.map(c => [c.id, c]));
+
 const normalizeChef = (chef: Chef): Chef => {
   const cleanName = chef.name.toLowerCase().replace(/[^a-z0-9]/g, '');
   const mappedCountry = nationalityNames[chef.nationality]?.[0];
@@ -174,11 +177,20 @@ const normalizeChef = (chef: Chef): Chef => {
     chef.countryName && !(chef.countryName === 'Italia' && chef.nationality !== '🇮🇹')
       ? chef.countryName
       : mappedCountry || chef.countryName || 'Italia';
+  const mockMatch = MOCK_CHEF_BY_ID.get(chef.id);
+  const resolvedLocation = isPordenoneLocation(chef.location)
+    ? chef.location
+    : (mockMatch?.location || 'Pordenone (PN), Centro');
+
+  const hadOldCityText = /\b(Milano|Napoli|Genova|Prato|Trastevere)\b/i.test(`${chef.bio || ''} ${chef.fullBio || ''}`);
+
   return {
     ...chef,
     email: chef.email || `chef.${cleanName}@mesa.com`,
     password: chef.password || 'demo123',
-    countryName: resolvedCountry
+    countryName: resolvedCountry,
+    location: resolvedLocation,
+    ...(mockMatch && hadOldCityText ? { bio: mockMatch.bio, fullBio: mockMatch.fullBio } : {})
   };
 };
 
@@ -243,6 +255,29 @@ const seedFirestoreDefaults = async () => {
       }
     });
 
+    // Enforce Provincia di Pordenone competence area on existing Firestore chef docs
+    chefsSnap.docs.forEach(docSnap => {
+      const data = docSnap.data() as Chef;
+      const normalized = normalizeChef(data);
+      if (
+        normalized.location !== data.location ||
+        normalized.bio !== data.bio ||
+        normalized.fullBio !== data.fullBio
+      ) {
+        writes.push(
+          setDoc(
+            doc(db, 'chefs', docSnap.id),
+            {
+              location: normalized.location,
+              ...(normalized.bio !== data.bio ? { bio: normalized.bio } : {}),
+              ...(normalized.fullBio !== data.fullBio ? { fullBio: normalized.fullBio } : {})
+            },
+            { merge: true }
+          )
+        );
+      }
+    });
+
     const existingUserIds = new Set(usersSnap.docs.map(d => d.id));
     DEFAULT_USERS.forEach(u => {
       if (!existingUserIds.has(u.id) && (u.role === 'admin' || !deletedUserIds.has(u.id))) {
@@ -250,10 +285,42 @@ const seedFirestoreDefaults = async () => {
       }
     });
 
+    // Migrate existing chef user addresses outside Provincia di Pordenone
+    usersSnap.docs.forEach(docSnap => {
+      const u = docSnap.data() as AppUser;
+      if (u.role === 'chef' && Array.isArray(u.addresses) && u.addresses.length > 0) {
+        const hasOutOfProvince = u.addresses.some(a => !isPordenoneLocation(a.street || a.city, a.zip));
+        if (hasOutOfProvince) {
+          const nextAddresses = u.addresses.map(a =>
+            isPordenoneLocation(a.street || a.city, a.zip)
+              ? a
+              : {
+                  ...a,
+                  street: 'Pordenone (PN), Centro',
+                  city: 'Pordenone (PN)',
+                  zip: '33170'
+                }
+          );
+          writes.push(setDoc(doc(db, 'users', docSnap.id), { addresses: nextAddresses }, { merge: true }));
+        }
+      }
+    });
+
     const existingAppIds = new Set(appsSnap.docs.map(d => d.id));
+    const defaultAppById = new Map(DEFAULT_APPLICATIONS.map(a => [a.id, a]));
     DEFAULT_APPLICATIONS.forEach(a => {
       if (!existingAppIds.has(a.id) && !deletedAppIds.has(a.id)) {
         writes.push(setDoc(doc(db, 'chefApplications', a.id), a));
+      }
+    });
+
+    // Migrate existing chef applications outside Provincia di Pordenone
+    appsSnap.docs.forEach(docSnap => {
+      const appData = docSnap.data() as ChefApplication;
+      if (!isPordenoneLocation(appData.location)) {
+        const defaultMatch = defaultAppById.get(docSnap.id);
+        const resolvedLoc = defaultMatch?.location || 'Pordenone (PN), Centro';
+        writes.push(setDoc(doc(db, 'chefApplications', docSnap.id), { location: resolvedLoc }, { merge: true }));
       }
     });
 
@@ -268,7 +335,11 @@ const seedFirestoreDefaults = async () => {
 function App() {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
   const [verifiedAddress, setVerifiedAddress] = useState<string>(() => {
-    return localStorage.getItem('mesa_verified_address') || 'Pordenone (PN), Centro';
+    const saved = localStorage.getItem('mesa_verified_address');
+    if (saved && isPordenoneLocation(saved)) return saved;
+    const fallback = 'Pordenone (PN), Centro';
+    localStorage.setItem('mesa_verified_address', fallback);
+    return fallback;
   });
   const [isAddressGateOpen, setIsAddressGateOpen] = useState(false);
   const [selectedChef, setSelectedChef] = useState<Chef | null>(null);
@@ -445,44 +516,141 @@ function App() {
     showNotification("Copertura MESA verificata con successo! 🍕");
   };
 
-  const handleUpdateChef = (updatedChef: Chef) => {
-    setChefs(prev => prev.map(c => c.id === updatedChef.id ? updatedChef : c));
-    firestoreWrite('chefs', updatedChef.id, updatedChef, true);
-    
-    // Auto-propagate changes to registeredUsers list
-    setRegisteredUsers(prev => prev.map(u => {
-      const isMatch = u.id === updatedChef.id.replace('chef-', '') || 
-                      u.email.trim().toLowerCase() === (updatedChef.email || '').trim().toLowerCase() ||
-                      u.name.trim().toLowerCase() === updatedChef.name.trim().toLowerCase() ||
-                      `${u.name} ${u.lastName}`.trim().toLowerCase() === updatedChef.name.trim().toLowerCase();
-      if (isMatch && u.role === 'chef') {
-        const nameParts = updatedChef.name.trim().split(' ');
-        const first = nameParts[0] || u.name;
-        const last = nameParts.slice(1).join(' ') || '';
-        
-        const updatedUser: AppUser = {
-          ...u,
-          name: first,
-          lastName: last,
-          email: updatedChef.email || u.email,
-          password: updatedChef.password || u.password
-        };
+  const handleSaveChefDishes = async (chefId: string, dishes: Dish[]): Promise<boolean> => {
+    try {
+      await firestoreWrite('chefs', chefId, { dishes }, true, true);
+      setChefs(prev => prev.map(c => (c.id === chefId ? { ...c, dishes } : c)));
+      if (selectedChef && selectedChef.id === chefId) {
+        setSelectedChef(prev => (prev ? { ...prev, dishes } : prev));
+      }
+      showNotification('Piatto e foto salvati e sincronizzati con il catalogo MESA! 🍽️');
+      return true;
+    } catch (err) {
+      console.error('Errore salvataggio piatti:', err);
+      showNotification('Errore durante il salvataggio del piatto. Verifica le dimensioni della foto.');
+      return false;
+    }
+  };
 
-        if (updatedChef.location) {
-          updatedUser.addresses = [
-            { id: `addr-${updatedChef.id}`, street: updatedChef.location, city: 'Milano', zip: '20121', isVerified: true }
-          ];
+  const handleUpdateChef = async (updatedChef: Chef): Promise<boolean> => {
+    if (!isPordenoneLocation(updatedChef.location)) {
+      showNotification('Area di competenza limitata: l\'indirizzo del cuoco deve trovarsi nella Provincia di Pordenone (PN).');
+      return false;
+    }
+
+    try {
+      const normalizedLocation = normalizeLocationToPordenone(updatedChef.location);
+      const chefToSave: Chef = { ...updatedChef, location: normalizedLocation };
+      await firestoreWrite('chefs', chefToSave.id, chefToSave, true, true);
+      setChefs(prev => prev.map(c => c.id === chefToSave.id ? chefToSave : c));
+      if (selectedChef && selectedChef.id === chefToSave.id) {
+        setSelectedChef(chefToSave);
+      }
+
+      const matchedComune = findPordenoneComune(normalizedLocation);
+      const resolvedCity = matchedComune ? `${matchedComune.name} (PN)` : 'Pordenone (PN)';
+      const resolvedZip = resolvePordenoneZip(normalizedLocation);
+
+      // Auto-propagate changes to registeredUsers list & Firestore
+      const nextUsers = registeredUsers.map(u => {
+        const isMatch = u.id === chefToSave.id.replace('chef-', '') ||
+                        u.email.trim().toLowerCase() === (chefToSave.email || '').trim().toLowerCase() ||
+                        u.name.trim().toLowerCase() === chefToSave.name.trim().toLowerCase() ||
+                        `${u.name} ${u.lastName}`.trim().toLowerCase() === chefToSave.name.trim().toLowerCase();
+        if (isMatch && u.role === 'chef') {
+          const nameParts = chefToSave.name.trim().split(' ');
+          const first = nameParts[0] || u.name;
+          const last = nameParts.slice(1).join(' ') || '';
+
+          const updatedUser: AppUser = {
+            ...u,
+            name: first,
+            lastName: last,
+            email: chefToSave.email || u.email,
+            password: chefToSave.password || u.password,
+            ...(chefToSave.avatar ? { avatarUrl: chefToSave.avatar } : {})
+          };
+
+          if (chefToSave.location) {
+            updatedUser.addresses = [
+              { id: `addr-${chefToSave.id}`, street: chefToSave.location, city: resolvedCity, zip: resolvedZip, isVerified: true }
+            ];
+          }
+
+          firestoreWrite('users', updatedUser.id, updatedUser, true);
+          if (currentUser && currentUser.id === u.id) {
+            setCurrentUser(updatedUser);
+          }
+          return updatedUser;
         }
+        return u;
+      });
+      setRegisteredUsers(nextUsers);
 
-        if (currentUser && currentUser.id === u.id) {
+      // Sync avatar to matching chefApplications if any
+      if (updatedChef.avatar && updatedChef.email) {
+        const chefEmail = updatedChef.email.trim().toLowerCase();
+        setChefApplications(prev =>
+          prev.map(a => {
+            if (a.email.trim().toLowerCase() === chefEmail) {
+              firestoreWrite('chefApplications', a.id, { avatarUrl: updatedChef.avatar }, true);
+              return { ...a, avatarUrl: updatedChef.avatar };
+            }
+            return a;
+          })
+        );
+      }
+
+      showNotification(`Profilo di Chef ${updatedChef.name} aggiornato e sincronizzato! 🧑‍🍳`);
+      return true;
+    } catch (err) {
+      console.error('Errore aggiornamento profilo chef:', err);
+      showNotification('Errore durante il salvataggio del profilo chef.');
+      return false;
+    }
+  };
+
+  const handleUpdateApplication = async (appId: string, patch: Partial<ChefApplication>) => {
+    const targetApp = chefApplications.find(a => a.id === appId);
+    await firestoreWrite('chefApplications', appId, patch, true, true);
+    setChefApplications(prev =>
+      prev.map(a => (a.id === appId ? { ...a, ...patch } : a))
+    );
+
+    if (patch.avatarUrl && targetApp) {
+      const appEmail = (targetApp.email || '').trim().toLowerCase();
+      const matchedUsers = registeredUsers.filter(
+        u => (targetApp.userId && u.id === targetApp.userId) || u.email.trim().toLowerCase() === appEmail
+      );
+      matchedUsers.forEach(u => {
+        const updatedUser: AppUser = { ...u, avatarUrl: patch.avatarUrl };
+        firestoreWrite('users', updatedUser.id, { avatarUrl: patch.avatarUrl }, true);
+        if (currentUser && currentUser.id === updatedUser.id) {
           setCurrentUser(updatedUser);
         }
-        return updatedUser;
+      });
+      if (matchedUsers.length > 0) {
+        setRegisteredUsers(prev =>
+          prev.map(u =>
+            matchedUsers.some(m => m.id === u.id) ? { ...u, avatarUrl: patch.avatarUrl } : u
+          )
+        );
       }
-      return u;
-    }));
 
-    showNotification(`Profilo di Chef ${updatedChef.name} aggiornato e sincronizzato! 🧑‍🍳`);
+      const matchedChef = chefs.find(
+        c =>
+          (targetApp.userId && c.id === `chef-${targetApp.userId}`) ||
+          c.id === `chef-${appId.toLowerCase()}` ||
+          (c.email && c.email.trim().toLowerCase() === appEmail)
+      );
+      if (matchedChef) {
+        firestoreWrite('chefs', matchedChef.id, { avatar: patch.avatarUrl }, true);
+        setChefs(prev =>
+          prev.map(c => (c.id === matchedChef.id ? { ...c, avatar: patch.avatarUrl! } : c))
+        );
+      }
+    }
+    showNotification('Foto candidatura aggiornata e sincronizzata! 📸');
   };
 
   const handleAddChef = (newChef: Chef) => {
@@ -546,9 +714,12 @@ function App() {
         u.email.trim().toLowerCase() === normalizedEmail
     );
 
-    const locParts = (newApp.location || 'Pordenone (PN)').split(',');
-    const parsedStreet = locParts[0]?.trim() || newApp.location || 'Sede da verificare';
-    const parsedCity = locParts.slice(1).join(',').trim() || 'Pordenone';
+    const safeLocation = normalizeLocationToPordenone(newApp.location);
+    const matchedComune = findPordenoneComune(safeLocation);
+    const locParts = safeLocation.split(',');
+    const parsedStreet = locParts[0]?.trim() || safeLocation;
+    const parsedCity = matchedComune ? `${matchedComune.name} (PN)` : 'Pordenone (PN)';
+    const parsedZip = resolvePordenoneZip(safeLocation);
 
     let syncedUserId = existingUser?.id || newApp.userId;
 
@@ -560,6 +731,7 @@ function App() {
         ...existingUser,
         phone: newApp.phone || existingUser.phone,
         brandName: newApp.brandName || existingUser.brandName,
+        ...(newApp.avatarUrl ? { avatarUrl: newApp.avatarUrl } : {}),
         ...(chosenPassword && !existingUser.password ? { password: chosenPassword } : {}),
         addresses: hasAddress
           ? existingUser.addresses
@@ -568,7 +740,7 @@ function App() {
                 id: `addr-${newApp.id}`,
                 street: parsedStreet,
                 city: parsedCity,
-                zip: '',
+                zip: parsedZip,
                 isVerified: false
               },
               ...existingUser.addresses
@@ -588,6 +760,7 @@ function App() {
         email: normalizedEmail,
         phone: newApp.phone,
         brandName: newApp.brandName,
+        ...(newApp.avatarUrl ? { avatarUrl: newApp.avatarUrl } : {}),
         role: 'chef',
         createdAt: new Date().toLocaleDateString('it-IT'),
         addresses: [
@@ -595,7 +768,7 @@ function App() {
             id: `addr-${newApp.id}`,
             street: parsedStreet,
             city: parsedCity,
-            zip: '',
+            zip: parsedZip,
             isVerified: false
           }
         ],
@@ -608,6 +781,7 @@ function App() {
 
     const syncedApp: ChefApplication = {
       ...newApp,
+      location: safeLocation,
       email: normalizedEmail,
       ...(syncedUserId ? { userId: syncedUserId } : {})
     };
@@ -644,6 +818,11 @@ function App() {
       c => c.id === chefId || (c.email && c.email.trim().toLowerCase() === normalizedEmail)
     );
 
+    const safeAppLocation = normalizeLocationToPordenone(app.location);
+    const matchedAppComune = findPordenoneComune(safeAppLocation);
+    const resolvedAppCity = matchedAppComune ? `${matchedAppComune.name} (PN)` : 'Pordenone (PN)';
+    const resolvedAppZip = resolvePordenoneZip(safeAppLocation);
+
     const newChef: Chef = {
       id: existingChef?.id || chefId,
       name: app.brandName || app.fullName,
@@ -652,7 +831,7 @@ function App() {
       continent: app.continent || 'Europa',
       avatar: app.avatarUrl || 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=400&q=80',
       rating: existingChef?.rating || 5.0,
-      location: app.location || 'Pordenone (PN)',
+      location: safeAppLocation,
       phone: app.phone || existingUser?.phone || '',
       email: normalizedEmail,
       password: resolvedPassword,
@@ -669,7 +848,7 @@ function App() {
               name: app.proposedDishName || 'Specialità Tradizionale della Casa',
               description: app.proposedDishDesc || 'Piatto preparato fresco su ordinazione.',
               price: app.proposedDishPrice || 14.5,
-              image: app.kitchenPhotos?.[0] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+              image: app.proposedDishImage || app.kitchenPhotos?.[0] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
               chefId: existingChef?.id || chefId,
               tags: app.specialties || ['Tradizionale']
             }
@@ -686,13 +865,14 @@ function App() {
       const updatedAddresses =
         existingUser.addresses.length > 0
           ? existingUser.addresses.map(addr => ({ ...addr, isVerified: true }))
-          : [{ id: `addr-${app.id}`, street: app.location, city: 'Pordenone', zip: '33170', isVerified: true }];
+          : [{ id: `addr-${app.id}`, street: safeAppLocation, city: resolvedAppCity, zip: resolvedAppZip, isVerified: true }];
 
       const updatedUser: AppUser = {
         ...existingUser,
         role: existingUser.role === 'admin' ? 'admin' : 'chef',
         phone: app.phone || existingUser.phone,
         brandName: app.brandName || existingUser.brandName,
+        ...(app.avatarUrl ? { avatarUrl: app.avatarUrl } : existingUser.avatarUrl ? { avatarUrl: existingUser.avatarUrl } : {}),
         addresses: updatedAddresses
       };
       await firestoreWrite('users', updatedUser.id, updatedUser, true);
@@ -709,10 +889,11 @@ function App() {
         email: normalizedEmail,
         phone: app.phone,
         brandName: app.brandName,
+        ...(app.avatarUrl ? { avatarUrl: app.avatarUrl } : {}),
         role: 'chef',
         createdAt: new Date().toLocaleDateString('it-IT'),
         addresses: [
-          { id: `addr-${app.id}`, street: app.location, city: 'Pordenone', zip: '33170', isVerified: true }
+          { id: `addr-${app.id}`, street: safeAppLocation, city: resolvedAppCity, zip: resolvedAppZip, isVerified: true }
         ],
         password: resolvedPassword
       };
@@ -774,9 +955,10 @@ function App() {
 
       if (!alreadyHasChefProfile && !alreadyHasApplication) {
         const addr = normalizedUser.addresses[0];
-        const locationLabel = addr
+        const rawLocationLabel = addr
           ? `${addr.street}, ${addr.city}${addr.zip ? ` (${addr.zip})` : ''}`
           : 'Pordenone (PN), Centro';
+        const locationLabel = normalizeLocationToPordenone(rawLocationLabel);
         const fullName = `${normalizedUser.name} ${normalizedUser.lastName}`.trim();
         const pendingApp: ChefApplication = {
           id: `APP-REG-${normalizedUser.id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8)}`,
@@ -791,7 +973,7 @@ function App() {
           location: locationLabel,
           bio: 'Nuovo cuoco registrato dalla schermata di accesso MESA, in attesa di verifica e attivazione.',
           specialties: ['Cucina Casalinga'],
-          avatarUrl: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=400&q=80',
+          avatarUrl: normalizedUser.avatarUrl || 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=400&q=80',
           kitchenPhotos: ['https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80'],
           documents: [],
           proposedDishName: 'Specialità della Casa',
@@ -834,7 +1016,8 @@ function App() {
             email: normalizedUser.email,
             phone: normalizedUser.phone || c.phone,
             password: normalizedUser.password || c.password,
-            location: normalizedUser.addresses[0]?.street || c.location
+            location: normalizedUser.addresses[0]?.street || c.location,
+            ...(normalizedUser.avatarUrl ? { avatar: normalizedUser.avatarUrl } : {})
           };
           firestoreWrite('chefs', updatedChef.id, updatedChef, true);
           return updatedChef;
@@ -842,6 +1025,18 @@ function App() {
         return c;
       });
       setChefs(nextChefs);
+    }
+
+    if (normalizedUser.avatarUrl) {
+      setChefApplications(prev =>
+        prev.map(a => {
+          if (a.userId === normalizedUser.id || a.email.trim().toLowerCase() === normalizedUser.email) {
+            firestoreWrite('chefApplications', a.id, { avatarUrl: normalizedUser.avatarUrl }, true);
+            return { ...a, avatarUrl: normalizedUser.avatarUrl };
+          }
+          return a;
+        })
+      );
     }
   };
 
@@ -1686,6 +1881,7 @@ function App() {
             onSelectOrder={setSelectedOrder}
             chefs={chefs}
             onUpdateChef={handleUpdateChef}
+            onSaveChefDishes={handleSaveChefDishes}
             onUpdateOrderStatus={handleUpdateOrderStatus}
             registeredUsers={registeredUsers}
             chefApplications={chefApplications}
@@ -1697,15 +1893,18 @@ function App() {
           <AdminDashboard 
             chefs={chefs} 
             onUpdateChef={handleUpdateChef}
+            onSaveChefDishes={handleSaveChefDishes}
             onDeleteChef={handleDeleteChef}
             orders={orders} 
             registeredUsers={registeredUsers}
             chefApplications={chefApplications}
             onVerifyAddress={handleVerifyAddress}
             onDeleteUser={handleDeleteUser}
+            onUpdateUser={handleUpdateUser}
             onApproveApplication={handleApproveApplication}
             onRejectApplication={handleRejectApplication}
             onDeleteApplication={handleDeleteApplication}
+            onUpdateApplication={handleUpdateApplication}
           />
         )}
 
@@ -1721,7 +1920,13 @@ function App() {
       </main>
 
       <Footer onNavigate={navigateTo} />
-      <BottomNav currentView={currentView} onNavigate={navigateTo} />
+      <BottomNav
+        currentView={currentView}
+        onNavigate={navigateTo}
+        cartCount={cartCount}
+        onCartClick={() => setIsCartOpen(true)}
+        isCartOpen={isCartOpen}
+      />
 
       {/* Glovo-style Sticky Floating Cart Bar - Non-intrusive, dismissible & non-blocking */}
       {cartCount > 0 && !isCartOpen && !isCartBarDismissed && (
