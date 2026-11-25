@@ -4,6 +4,7 @@ import { Heart, Sparkles, MapPin, Star, Clock, ShoppingBag, Leaf, Flame, Info, C
 import { Chef, Dish, Continent } from '../types';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
+import { isChefBookable } from '../utils/chefUtils';
 
 interface DishCatalogByOriginProps {
   chefs: Chef[];
@@ -67,6 +68,7 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
           {allDishesWithChef.map((dish) => {
             const isFav = favorites.includes(dish.id);
             const associatedChef = chefs.find(c => c.id === dish.chefId);
+            const canBook = isChefBookable(associatedChef);
 
             return (
               <motion.div
@@ -76,8 +78,8 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                 exit={{ opacity: 0, scale: 0.9, y: 10 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
                 key={dish.id}
-                className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-100 cursor-pointer relative shadow-sm"
-                onClick={() => onAddDish(dish)}
+                className={`group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-100 relative shadow-sm ${canBook ? 'cursor-pointer' : 'cursor-default'}`}
+                onClick={canBook ? () => onAddDish(dish) : undefined}
               >
                 {/* Image & Badges */}
                 <div className="relative h-44 overflow-hidden shrink-0">
@@ -225,11 +227,29 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                       </div>
                     )}
 
-                    {/* Book Now Button */}
-                    <button className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 border-b-4 border-orange-850 hover:border-orange-950">
-                      <ShoppingBag className="w-4 h-4" />
-                      <span>Scegli e Prenota</span>
-                    </button>
+                    {/* Book Now / Disponibile a breve Button */}
+                    {canBook ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddDish(dish);
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 border-b-4 border-orange-850 hover:border-orange-950"
+                      >
+                        <ShoppingBag className="w-4 h-4" />
+                        <span>Scegli e Prenota</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        aria-disabled="true"
+                        className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-500 border border-gray-200 font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 cursor-not-allowed"
+                      >
+                        <Clock className="w-4 h-4 shrink-0" />
+                        <span>Disponibile a breve</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.div>

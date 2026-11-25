@@ -14,10 +14,13 @@ import {
   Search, 
   Info,
   UtensilsCrossed,
-  Globe
+  Globe,
+  Clock
 } from 'lucide-react';
 import { HeritageJourney } from './HeritageJourney';
 import { CountryFlag } from './CountryFlag';
+import { isChefBookable } from '../utils/chefUtils';
+import { getDishHeritageStory } from '../utils/heritageStories';
 
 interface HeritageMenuProps {
   chefs: Chef[];
@@ -26,95 +29,6 @@ interface HeritageMenuProps {
   favorites: string[];
   onToggleFavorite: (dishId: string) => void;
 }
-
-// Database di aneddoti e storie tradizionali d'eccellenza collegate alle ricette
-const TRADITI_STORIES: Record<string, {
-  history: string;
-  secret: string;
-  vintage: string; // Origine temporale o aneddoto storico aggiuntivo
-}> = {
-  'd1_1': {
-    history: "La ricetta risale al tardo Medioevo nei conventi bolognesi, concepita come piatto solenne di ringraziamento. Cinque strati di sottilissima sfoglia tirata a mattarello sposano un ragù denso che sobbolle pigramente in pentole di terracotta.",
-    secret: "Il ragù sfuma dolcemente con spezie fini quali chiodi di garofano e noce moscata, con un tocco finale di latte intero caldissimo per equilibrare perfettamente la sapidità.",
-    vintage: "Documentata fin dal 1550 come apice della convivialità familiare emiliana."
-  },
-  'd1_2': {
-    history: "Unione ancestrale tra i carbonai del monte Appennino ('carbonari') ed i soldati in cerca di ristoro. La salsa rifugge gelosamente ogni traccia di panna commerciale: è un legame puro, dorato e indissolubile composto di calore e sapienza contadina.",
-    secret: "Soltanto Pecorino Romano autentico ad alto livello di stagionatura e guanciale di Amatrice precedentemente sfumato.",
-    vintage: "Leggenda gastronomica della Roma antica e contemporanea."
-  },
-  'd11_1': {
-    history: "L'abbraccio mitico di Creta. Melanzane fritte stufate con cipolle, aglio e pura carne aromatizzata, il tutto coperto da una morbida nuvola dorata di besciamella montata.",
-    secret: "Le spezie mediterranee, con cannella in stecche e noce moscata pestate al momento nella pentola del ragù d'agnello.",
-    vintage: "Tradizione bizantina tramandata da madri a figlie per secoli."
-  },
-  'd28_1': {
-    history: "La ricetta marinara concepita nel distretto storico Bairro Alto di Lisbona. Un tempo cibo dei lupi di mare portoghesi, ora tesoro imperdibile unito a patatine dorate a fiammifero.",
-    secret: "Il baccalà viene sminuzzato massaggiandolo lungamente dentro un panno di lino umido per sfaldare le fibre finemente.",
-    vintage: "Un classico intramontabile che simboleggia l'epoca delle grandi esplorazioni marittime."
-  },
-  'd32_1': {
-    history: "Un lingotto dorato concepito nel IX secolo durante la dominazione araba a Palermo. Lo zafferano regala al riso il biondo imperiale, coronato da un cuore saporito di ragù contadino.",
-    secret: "Il ripieno denso viene sigillato freddo di frigorifero al centro della semisfera di riso caldo per preservarne l'assoluta integrità.",
-    vintage: "Il cibo da asporto preferito dalle antiche carovane degli emiri arabi."
-  },
-  'd33_1': {
-    history: "La celebre e calorosa torta dei pastori del Nord dell'Inghilterra. Sotto un confortevole mantello dorato di purè gratinato giace un saporito stufato d'agnello arricchito con piselli freschi.",
-    secret: "Cottura a fuoco bassissimo con birra scura Stout locale artigianale per esaltare l'affumicatura naturale.",
-    vintage: "L'essenza del pranzo della domenica nelle campagne britanniche fin dal tardo Settecento."
-  },
-  'd34_1': {
-    history: "Nata come piatto di condivisione comunitario dei contadini valenciani lungo le paludi dell'Albufera. Una preparazione solenne eseguita sui rami d'arancio bruciati che infondono un aroma unico.",
-    secret: "La maestrìa sta nel creare il 'Socarrat', la prelibata e tostata crosticina di riso caramellata che si forma sul fondo della pentola di ferro.",
-    vintage: "L'indissolubile rito della domenica spagnola d'altri tempi."
-  }
-};
-
-// Generatore di storie di riserva automatico per qualsiasi altro piatto del database
-const getDynamicStoryForDish = (dish: Dish, chefNationality: string) => {
-  const lowercaseName = dish.name.toLowerCase();
-  
-  if (TRADITI_STORIES[dish.id]) {
-    return TRADITI_STORIES[dish.id];
-  }
-
-  // Generatori intelligenti basati sul nome del piatto
-  if (lowercaseName.includes('pesto') || lowercaseName.includes('trofie')) {
-    return {
-      history: "Nato tra le colline liguri baciate dalla brezza del mare. Le foglie tenere di basilico venivano pestate delicatamente all'alba in mortai di marmo di Carrara con pestello in legno di fico.",
-      secret: "Nessun attrito termico: il basilico va pestato roteando lentamente per non ossidare l'olio essenziale delle foglie.",
-      vintage: "Ricetta rinfrescante custodita dalla Repubblica Marinara di Genova."
-    };
-  }
-  if (lowercaseName.includes('sushi') || lowercaseName.includes('ramen')) {
-    return {
-      history: "Un'arte millenaria fondata sull'equilibrio perfetto tra natura, tempo e rigore. Nato nei mercati galleggianti per conservare il pescato fresco del Pacifico tra chicchi di riso fermentato.",
-      secret: "Il riso viene bagnato caldo con aceto equilibrato ed areato a mano con un ventaglio tradizionale Uchiwa.",
-      vintage: "Eredità spirituale dell'antico periodo Edo giapponese."
-    };
-  }
-  if (lowercaseName.includes('taco') || lowercaseName.includes('enchilada')) {
-    return {
-      history: "Le radici messicane racchiuse nella nixtamalizzazione del mais, rito sacro azteco volto a rendere la tortilla elastica e nutriente. Un piatto nato per dare energia ai lavoratori dei campi.",
-      secret: "Il mais biologico viene cotto con pietra calcarea per esaltarne la digeribilità ed il profumo autentico di terra.",
-      vintage: "L'abbraccio caliente di civiltà preispaniche millenarie."
-    };
-  }
-  if (lowercaseName.includes('curry') || lowercaseName.includes('tikka') || lowercaseName.includes('samosa')) {
-    return {
-      history: "Un mosaico profumato di spezie tostate che narra le epiche carovane commerciali lungo la via della seta. Ogni spezia viene macinata a pietra per sprigionare oli aromatici immortali.",
-      secret: "Tostatura a secco dei semi interi prima di ridurli in polvere per svegliarne l'anima essenziale.",
-      vintage: "I lussuosi banchetti della corte reale Moghul nell'antica India."
-    };
-  }
-
-  // Fallback generico ma poetico e ben contestualizzato
-  return {
-    history: `Questo piatto straordinario rappresenta le radici e l'eredità storica più intima della cucina legata a questa tradizione (${chefNationality}). Una ricetta nata dalla vicinanza con la terra, trasmessa a voce di generazione in generazione per non perderne i sapori.`,
-    secret: "Rispetto rigoroso dei tempi di riposo degli ingredienti secchi ed utilizzo di calore moderato e costante durante la preparazione.",
-    vintage: "Custodita gelosamente nel ricettario di famiglia da oltre tre generazioni."
-  };
-};
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 
@@ -130,9 +44,10 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
 
   // Raccogliamo tutti i piatti in una lista piana, arricchendoli dei dati del cuoco e del loro aneddoto storico unico
   const allHeritageDishes = useMemo(() => {
-    return chefs.flatMap(chef => 
-      chef.dishes.map(dish => {
-        const storyData = getDynamicStoryForDish(dish, chef.nationality);
+    return chefs.flatMap(chef => {
+      const canBook = isChefBookable(chef);
+      return chef.dishes.map(dish => {
+        const storyData = getDishHeritageStory(dish, chef);
         return {
           ...dish,
           chefName: chef.name,
@@ -140,10 +55,11 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
           chefAvatar: chef.avatar,
           chefRating: chef.rating,
           chefData: chef,
-          storyData
+          storyData,
+          canBook
         };
-      })
-    );
+      });
+    });
   }, [chefs]);
 
   // Filtriamo i piatti tradizionali in base all'input dell'utente
@@ -154,7 +70,10 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
       dish.name.toLowerCase().includes(query) ||
       dish.description.toLowerCase().includes(query) ||
       dish.chefName.toLowerCase().includes(query) ||
+      (dish.chefData.countryName || '').toLowerCase().includes(query) ||
       dish.storyData.history.toLowerCase().includes(query) ||
+      dish.storyData.secret.toLowerCase().includes(query) ||
+      dish.storyData.vintage.toLowerCase().includes(query) ||
       dish.tags.some(t => t.toLowerCase().includes(query))
     );
   }, [allHeritageDishes, searchQuery]);
@@ -264,7 +183,7 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
                     <span className="text-[9px] font-black uppercase tracking-wider text-orange-600 font-mono">Le Origini / Aneddoto:</span>
                   </div>
                   
-                  <div className="bg-orange-50/50 rounded-2.5xl p-5 border border-orange-100">
+                  <div className="bg-orange-50/50 rounded-2xl p-5 border border-orange-100">
                     <p className="text-xs sm:text-sm text-black leading-relaxed font-serif italic">
                       "{dish.storyData.history}"
                     </p>
@@ -283,9 +202,11 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
                 </div>
 
                 {/* Era/Epoca e Riferimenti */}
-                <div className="flex items-center gap-2 bg-neutral-50 px-4 py-2.5 rounded-xl border border-neutral-100 text-[10px] text-black font-medium">
-                  <Hourglass className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                  <span className="truncate"><strong>Origine:</strong> {dish.storyData.vintage}</span>
+                <div className="flex items-start gap-2.5 bg-neutral-50 px-4 py-3 rounded-xl border border-neutral-100 text-[11px] text-black font-medium">
+                  <Hourglass className="w-3.5 h-3.5 text-orange-500 shrink-0 mt-0.5" />
+                  <span className="leading-snug break-words">
+                    <strong className="font-black text-gray-900">Origine:</strong> {dish.storyData.vintage}
+                  </span>
                 </div>
 
                 {/* Riquadro sul Custode e Tasti d'Azione */}
@@ -312,12 +233,24 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
                       <Compass className="w-3.5 h-3.5 shrink-0" /> Vivi Rituale AI
                     </button>
 
-                    <button 
-                      onClick={() => onAddDish(dish)}
-                      className="w-full py-3 bg-black hover:bg-orange-600 text-white hover:text-black rounded-xl font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
-                    >
-                      <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" /> Ordina Tradizione
-                    </button>
+                    {dish.canBook ? (
+                      <button 
+                        onClick={() => onAddDish(dish)}
+                        className="w-full py-3 bg-black hover:bg-orange-600 text-white hover:text-black rounded-xl font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
+                      >
+                        <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" /> Ordina Tradizione
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        aria-disabled="true"
+                        className="w-full py-3 bg-gray-100 text-gray-500 border border-gray-200 rounded-xl font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 cursor-not-allowed"
+                      >
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span>Disponibile a breve</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 

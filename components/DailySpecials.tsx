@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Sparkles, Heart, Clock, Utensils, Leaf } from 'lucide-react';
 import { Dish, Chef } from '../types';
 import { AllergensRow } from './Allergens';
+import { isChefBookable } from '../utils/chefUtils';
 
 interface DailySpecialsProps {
   chefs: Chef[];
@@ -22,7 +23,8 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({ chefs, onAddDish, 
     return chefs
       .flatMap(chef => {
         const chefDishes = chef.dishes.slice(0, 1).concat(chef.dishes.slice(4, 5));
-        return chefDishes.map(dish => ({ ...dish, chefName: chef.name }));
+        const canBook = isChefBookable(chef);
+        return chefDishes.map(dish => ({ ...dish, chefName: chef.name, canBook }));
       })
       .sort(() => 0.5 - Math.random())
       .slice(0, 6);
@@ -48,8 +50,8 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({ chefs, onAddDish, 
         {specials.map((dish) => (
           <div
             key={dish.id}
-            className="bg-white rounded-[2rem] shadow-lg border border-gray-100 overflow-hidden group hover:shadow-2xl transition-all duration-300 cursor-pointer relative flex flex-col justify-between"
-            onClick={() => onAddDish(dish)}
+            className={`bg-white rounded-[2rem] shadow-lg border border-gray-100 overflow-hidden group hover:shadow-2xl transition-all duration-300 relative flex flex-col justify-between ${dish.canBook ? 'cursor-pointer' : 'cursor-default'}`}
+            onClick={dish.canBook ? () => onAddDish(dish) : undefined}
           >
             {/* Image Container */}
             <div className="relative h-44 overflow-hidden shrink-0">
@@ -115,10 +117,28 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({ chefs, onAddDish, 
                 )}
               </div>
 
-              <button className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-xs flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-95 border-b-4 border-orange-850 hover:border-orange-950">
-                <Utensils className="w-4 h-4" />
-                <span>Prenota Ora</span>
-              </button>
+              {dish.canBook ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddDish(dish);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-xs flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-95 border-b-4 border-orange-850 hover:border-orange-950"
+                >
+                  <Utensils className="w-4 h-4" />
+                  <span>Prenota Ora</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-500 border border-gray-200 font-black uppercase tracking-widest text-xs flex items-center justify-center space-x-2 cursor-not-allowed"
+                >
+                  <Clock className="w-4 h-4 shrink-0" />
+                  <span>Disponibile a breve</span>
+                </button>
+              )}
             </div>
           </div>
         ))}

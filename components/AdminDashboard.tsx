@@ -6,16 +6,19 @@ import {
   ArrowDownRight, Sparkles, Loader2, RefreshCw, Rocket, Globe, Activity,
   CheckCircle2, AlertTriangle, FileText, PieChart, ExternalLink, Share2, Globe2,
   Trash2, ShieldAlert, Check, Ban, KeyRound, Clock, Eye, X, MessageSquare, UserCheck, AlertOctagon,
-  CalendarDays, UtensilsCrossed, Plus, Pencil
+  CalendarDays, UtensilsCrossed, Plus, Pencil, Landmark
 } from 'lucide-react';
 import { Chef, Dish, Order, OrderStatus, ORDER_STATUS_LABELS, AppUser, ChefApplication, ChefDocument, Continent } from '../types';
 import { ShareModal } from './ShareModal';
 import { COUNTRY_FLAG_PRESETS, getCountryNameByFlag } from './FilterBar';
 import { CountryFlag } from './CountryFlag';
 import { AdminDishesPanel } from './AdminDishesPanel';
+import { AdminAccountingPanel } from './AdminAccountingPanel';
 import { ImagePickerBox } from './ImagePickerBox';
 import { AllergensPicker, AllergensRow } from './Allergens';
 import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation } from './italianTerritoryData';
+import { ConfirmDeleteOrdersModal } from './ConfirmDeleteOrdersModal';
+import { isConcludedOrder, OrderDeleteResult } from '../utils/orderUtils';
 
 interface AdminDashboardProps {
   chefs: Chef[];
@@ -28,6 +31,8 @@ interface AdminDashboardProps {
   onUpdateChef?: (updatedChef: Chef) => Promise<boolean> | void;
   onSaveChefDishes?: (chefId: string, dishes: Dish[]) => Promise<boolean>;
   onDeleteChef?: (chefId: string, deleteLinkedUser?: boolean) => Promise<void> | void;
+  onDeleteOrder?: (orderId: string) => Promise<OrderDeleteResult>;
+  onDeleteConcludedOrders?: (orderIds: string[]) => Promise<OrderDeleteResult>;
   onApproveApplication?: (appId: string) => void;
   onRejectApplication?: (appId: string, notes?: string) => void;
   onDeleteApplication?: (appId: string) => void;
@@ -45,12 +50,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onUpdateChef,
   onSaveChefDishes,
   onDeleteChef,
+  onDeleteOrder,
+  onDeleteConcludedOrders,
   onApproveApplication,
   onRejectApplication,
   onDeleteApplication,
   onUpdateApplication
 }) => {
-  const [adminTab, setAdminTab] = useState<'orders' | 'dishes' | 'applications' | 'users' | 'chefs' | 'cockpit'>('orders');
+  const [adminTab, setAdminTab] = useState<'orders' | 'accounting' | 'dishes' | 'applications' | 'users' | 'chefs' | 'cockpit'>('orders');
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'client' | 'chef' | 'admin'>('all');
   const [orderSearch, setOrderSearch] = useState('');
@@ -86,6 +93,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [chefToDelete, setChefToDelete] = useState<Chef | null>(null);
   const [deleteLinkedUser, setDeleteLinkedUser] = useState(false);
   const [isDeletingChef, setIsDeletingChef] = useState(false);
+  const [orderDeleteConfirm, setOrderDeleteConfirm] = useState<{ mode: 'single' | 'bulk'; order?: Order } | null>(null);
+  const [isDeletingOrders, setIsDeletingOrders] = useState(false);
+  const [orderDeleteError, setOrderDeleteError] = useState<string | null>(null);
 
   const findLinkedChefUser = (chef: Chef) =>
     registeredUsers.find(
@@ -115,6 +125,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const pendingOrdersCount = orders.filter(o => o.status === 'PENDING_CONFIRMATION').length;
   const confirmedOrdersCount = orders.filter(o => o.status === 'CONFIRMED' || o.status === 'PLACED' || o.status === 'PREPARING' || o.status === 'READY' || o.status === 'DELIVERING' || o.status === 'COMPLETED').length;
   const rejectedOrdersCount = orders.filter(o => o.status === 'REJECTED').length;
+  const concludedOrders = orders.filter(isConcludedOrder);
+
+  const handleConfirmDeleteOrders = async () => {
+    if (!orderDeleteConfirm) return;
+    setIsDeletingOrders(true);
+    setOrderDeleteError(null);
+    try {
+      if (orderDeleteConfirm.mode === 'single' && orderDeleteConfirm.order && onDeleteOrder) {
+        const res = await onDeleteOrder(orderDeleteConfirm.order.id);
+        if (!res.ok) {
+          setOrderDeleteError(res.error || 'Impossibile eliminare questo ordine.');
+          return;
+        }
+      } else if (orderDeleteConfirm.mode === 'bulk' && onDeleteConcludedOrders) {
+        const idsToDelete = concludedOrders.map(o => o.id);
+        const res = await onDeleteConcludedOrders(idsToDelete);
+        if (!res.ok) {
+          setOrderDeleteError(res.error || 'Impossibile completare la pulizia degli ordini conclusi.');
+          return;
+        }
+      }
+      setOrderDeleteConfirm(null);
+    } finally {
+      setIsDeletingOrders(false);
+    }
+  };
   const allDishes = chefs.flatMap(chef => chef.dishes.map(dish => ({ dish, chef })));
 
   const handleSaveDishesFallback = async (chefId: string, dishes: Dish[]): Promise<boolean> => {
@@ -283,6 +319,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
+          onClick={() => setAdminTab('accounting')}
+          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+            adminTab === 'accounting' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Landmark className="w-4 h-4" /> Contabilità & Commissioni
+        </button>
+
+        <button
           onClick={() => setAdminTab('dishes')}
           className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             adminTab === 'dishes' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -345,10 +390,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Tutte le prenotazioni dei clienti sincronizzate in tempo reale con cuoco, piatto, importo, data/orario e stato attuale.
               </p>
             </div>
-            <span className="bg-orange-100 text-orange-800 text-xs font-black px-4 py-2 rounded-2xl border border-orange-200 uppercase tracking-wider w-fit">
-              Live Sync Attivo
-            </span>
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              {onDeleteConcludedOrders && concludedOrders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderDeleteError(null);
+                    setOrderDeleteConfirm({ mode: 'bulk' });
+                  }}
+                  className="px-4 py-2.5 rounded-2xl bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 text-[11px] font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-sm active:scale-95"
+                >
+                  <Trash2 className="w-4 h-4 shrink-0" />
+                  <span>Pulisci ordini conclusi ({concludedOrders.length})</span>
+                </button>
+              )}
+              <span className="bg-orange-100 text-orange-800 text-xs font-black px-4 py-2 rounded-2xl border border-orange-200 uppercase tracking-wider w-fit">
+                Live Sync Attivo
+              </span>
+            </div>
           </div>
+
+          {orderDeleteError && !orderDeleteConfirm && (
+            <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs font-bold flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{orderDeleteError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrderDeleteError(null)}
+                className="p-1 rounded-lg hover:bg-red-100 text-red-600"
+                aria-label="Chiudi avviso"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200">
@@ -421,6 +498,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <th className="py-4 px-5">Importo</th>
                     <th className="py-4 px-5">Data / Orario</th>
                     <th className="py-4 px-5">Stato Attuale</th>
+                    {onDeleteOrder && <th className="py-4 px-5 text-right">Azioni</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-xs">
@@ -428,6 +506,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     const firstItem = order.items[0];
                     const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status;
                     const isConfirmed = order.status === 'CONFIRMED' || order.status === 'PLACED';
+                    const concluded = isConcludedOrder(order);
                     return (
                       <tr key={order.id} className="hover:bg-orange-50/20 transition-colors">
                         <td className="py-4 px-5 align-top">
@@ -472,6 +551,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             {statusLabel}
                           </span>
                         </td>
+                        {onDeleteOrder && (
+                          <td className="py-4 px-5 align-top text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOrderDeleteError(null);
+                                setOrderDeleteConfirm({ mode: 'single', order });
+                              }}
+                              title={concluded ? 'Elimina ordine concluso' : 'Elimina ordine (anche di prova)'}
+                              aria-label={`Elimina ordine ${order.id.split('-')[0]}`}
+                              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all ${
+                                concluded
+                                  ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-600 hover:text-white hover:border-red-600'
+                                  : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
+                              }`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                              <span>Elimina</span>
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -480,6 +580,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* TAB 0A: CONTABILITÀ & COMMISSIONI */}
+      {adminTab === 'accounting' && (
+        <AdminAccountingPanel chefs={chefs} fallbackOrders={orders} />
       )}
 
       {/* TAB 0B: GESTIONE PIATTI & DESCRIZIONI */}
@@ -1578,6 +1683,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         );
       })()}
+
+      <ConfirmDeleteOrdersModal
+        isOpen={Boolean(orderDeleteConfirm)}
+        mode={orderDeleteConfirm?.mode || 'single'}
+        order={orderDeleteConfirm?.order}
+        ordersCount={concludedOrders.length}
+        isDeleting={isDeletingOrders}
+        errorMessage={orderDeleteError}
+        onCancel={() => {
+          if (!isDeletingOrders) {
+            setOrderDeleteConfirm(null);
+            setOrderDeleteError(null);
+          }
+        }}
+        onConfirm={handleConfirmDeleteOrders}
+      />
 
       <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
     </div>

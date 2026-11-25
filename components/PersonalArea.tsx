@@ -9,6 +9,8 @@ import { CountryFlag } from './CountryFlag';
 import { ImagePickerBox } from './ImagePickerBox';
 import { AdminDishesPanel } from './AdminDishesPanel';
 import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, normalizeLocationToPordenone } from './italianTerritoryData';
+import { ConfirmDeleteOrdersModal } from './ConfirmDeleteOrdersModal';
+import { isConcludedOrder, OrderDeleteResult } from '../utils/orderUtils';
 
 interface PersonalAreaProps {
   currentUser: AppUser;
@@ -21,6 +23,8 @@ interface PersonalAreaProps {
   onUpdateChef?: (updatedChef: Chef) => Promise<boolean> | void;
   onSaveChefDishes?: (chefId: string, dishes: Dish[]) => Promise<boolean>;
   onUpdateOrderStatus?: (orderId: string, status: OrderStatus) => Promise<void> | void;
+  onDeleteOrder?: (orderId: string) => Promise<OrderDeleteResult>;
+  onDeleteConcludedOrders?: (orderIds: string[]) => Promise<OrderDeleteResult>;
   soundAlertsEnabled?: boolean;
   onToggleSoundAlerts?: () => void;
   registeredUsers?: AppUser[];
@@ -41,6 +45,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   onUpdateChef,
   onSaveChefDishes,
   onUpdateOrderStatus,
+  onDeleteOrder,
+  onDeleteConcludedOrders,
   soundAlertsEnabled = true,
   onToggleSoundAlerts,
   registeredUsers = [],
@@ -52,6 +58,9 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   );
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [orderDeleteConfirm, setOrderDeleteConfirm] = useState<{ mode: 'single' | 'bulk'; order?: Order } | null>(null);
+  const [isDeletingOrders, setIsDeletingOrders] = useState(false);
+  const [orderDeleteError, setOrderDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentUser.role === 'chef') {
@@ -178,6 +187,34 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
 
   const pendingChefOrdersCount = chefOrders.filter(o => o.status === 'PENDING_CONFIRMATION').length;
   const userOrders = currentUser.role === 'chef' ? chefOrders : clientOrders;
+  const concludedUserOrders = userOrders.filter(isConcludedOrder);
+
+  const handleConfirmDeleteOrders = async () => {
+    if (!orderDeleteConfirm) return;
+    setIsDeletingOrders(true);
+    setOrderDeleteError(null);
+    try {
+      if (orderDeleteConfirm.mode === 'single' && orderDeleteConfirm.order && onDeleteOrder) {
+        const res = await onDeleteOrder(orderDeleteConfirm.order.id);
+        if (!res.ok) {
+          setOrderDeleteError(res.error || 'Impossibile eliminare questo ordine.');
+          return;
+        }
+        setFeedbackMsg({ type: 'success', text: `Ordine #${orderDeleteConfirm.order.id.split('-')[0]} eliminato definitivamente.` });
+      } else if (orderDeleteConfirm.mode === 'bulk' && onDeleteConcludedOrders) {
+        const idsToDelete = concludedUserOrders.map(o => o.id);
+        const res = await onDeleteConcludedOrders(idsToDelete);
+        if (!res.ok) {
+          setOrderDeleteError(res.error || 'Impossibile eliminare gli ordini conclusi.');
+          return;
+        }
+        setFeedbackMsg({ type: 'success', text: `${idsToDelete.length} ordini conclusi eliminati dallo storico.` });
+      }
+      setOrderDeleteConfirm(null);
+    } finally {
+      setIsDeletingOrders(false);
+    }
+  };
 
   const handleChefStatusChange = async (orderId: string, nextStatus: OrderStatus) => {
     if (!onUpdateOrderStatus) return;
@@ -762,8 +799,25 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         {/* TAB 3: STORIA ORDINI (FOR CLIENTS) */}
         {activeTab === 'orders' && currentUser.role === 'client' && (
           <div className="space-y-6 animate-fade-in">
-            <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Storia dei tuoi Ordini</h3>
-            <p className="text-black text-sm mb-6 leading-relaxed">Ecco gli ordini che hai prenotato dai nostri cuochi locali MESA.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-orange-600">Storia dei tuoi Ordini</h3>
+                <p className="text-black text-sm mt-1 leading-relaxed">Ecco gli ordini che hai prenotato dai nostri cuochi locali MESA.</p>
+              </div>
+              {onDeleteConcludedOrders && concludedUserOrders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderDeleteError(null);
+                    setOrderDeleteConfirm({ mode: 'bulk' });
+                  }}
+                  className="px-4 py-2.5 rounded-2xl bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 self-start sm:self-auto"
+                >
+                  <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Pulisci ordini conclusi ({concludedUserOrders.length})</span>
+                </button>
+              )}
+            </div>
             
             {userOrders.length === 0 ? (
               <div className="py-12 bg-gray-50 rounded-3xl text-center border-2 border-dashed border-gray-200">
@@ -773,43 +827,61 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
               </div>
             ) : (
               <div className="space-y-4">
-                {userOrders.map((order) => (
-                  <div 
-                    key={order.id} 
-                    onClick={() => {
-                      onSelectOrder(order);
-                      onNavigate(ViewState.ORDERS);
-                    }}
-                    className="p-6 bg-white border border-gray-100 hover:border-orange-500/20 rounded-[2rem] shadow-sm hover:shadow-md transition-all cursor-pointer flex justify-between items-center group"
-                  >
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Codice: #{order.id}</span>
-                        <span className="text-xs font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">{order.deliveryMode === 'delivery' ? 'Consegna' : 'Ritiro'}</span>
+                {userOrders.map((order) => {
+                  const concluded = isConcludedOrder(order);
+                  return (
+                    <div 
+                      key={order.id} 
+                      onClick={() => {
+                        onSelectOrder(order);
+                        onNavigate(ViewState.ORDERS);
+                      }}
+                      className="p-6 bg-white border border-gray-100 hover:border-orange-500/20 rounded-[2rem] shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col sm:flex-row justify-between sm:items-center gap-4 group"
+                    >
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Codice: #{order.id}</span>
+                          <span className="text-xs font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">{order.deliveryMode === 'delivery' ? 'Consegna' : 'Ritiro'}</span>
+                        </div>
+                        <h4 className="font-bold text-xl text-gray-900 mt-1 group-hover:text-orange-600 transition-colors uppercase italic">{order.chefName}</h4>
+                        <p className="text-xs text-gray-500 mt-0.5">{order.items.length} piatti ordinati • € {order.total.toFixed(2)}</p>
                       </div>
-                      <h4 className="font-bold text-xl text-gray-900 mt-1 group-hover:text-orange-600 transition-colors uppercase italic">{order.chefName}</h4>
-                      <p className="text-xs text-gray-500 mt-0.5">{order.items.length} piatti ordinati • € {order.total.toFixed(2)}</p>
-                    </div>
 
-                    <div className="flex items-center gap-4">
-                      <div className="text-right hidden sm:block">
-                        <p className="text-[10px] text-gray-400 font-bold">Stato Attuale</p>
-                        <p className="text-xs font-black text-gray-900 tracking-wider uppercase">{ORDER_STATUS_LABELS[order.status] || order.status}</p>
+                      <div className="flex items-center gap-3 sm:gap-4 self-end sm:self-auto">
+                        <div className="text-right hidden sm:block">
+                          <p className="text-[10px] text-gray-400 font-bold">Stato Attuale</p>
+                          <p className="text-xs font-black text-gray-900 tracking-wider uppercase">{ORDER_STATUS_LABELS[order.status] || order.status}</p>
+                        </div>
+                        <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                          order.status === 'COMPLETED' || order.status === 'CONFIRMED' || order.status === 'PLACED'
+                            ? 'bg-green-50 text-green-700 border-green-200' 
+                            : order.status === 'REJECTED'
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : order.status === 'PENDING_CONFIRMATION'
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-orange-50 text-orange-700 border-orange-200 animate-pulse'
+                        }`}>
+                          {ORDER_STATUS_LABELS[order.status] || order.status}
+                        </span>
+                        {concluded && onDeleteOrder && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOrderDeleteError(null);
+                              setOrderDeleteConfirm({ mode: 'single', order });
+                            }}
+                            title="Elimina ordine concluso"
+                            aria-label={`Elimina ordine ${order.id.split('-')[0]}`}
+                            className="p-2.5 rounded-xl bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 transition-all shrink-0"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
-                      <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                        order.status === 'COMPLETED' || order.status === 'CONFIRMED' || order.status === 'PLACED'
-                          ? 'bg-green-50 text-green-700 border-green-200' 
-                          : order.status === 'REJECTED'
-                            ? 'bg-red-50 text-red-700 border-red-200'
-                            : order.status === 'PENDING_CONFIRMATION'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-orange-50 text-orange-700 border-orange-200 animate-pulse'
-                      }`}>
-                        {ORDER_STATUS_LABELS[order.status] || order.status}
-                      </span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1164,6 +1236,19 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                 <span className="px-3.5 py-2 rounded-2xl bg-gray-100 border border-gray-200 text-gray-800 text-[10px] font-black uppercase tracking-widest">
                   Totali: {chefOrders.length}
                 </span>
+                {onDeleteConcludedOrders && concludedUserOrders.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderDeleteError(null);
+                      setOrderDeleteConfirm({ mode: 'bulk' });
+                    }}
+                    className="px-3.5 py-2 rounded-2xl bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Pulisci ordini conclusi ({concludedUserOrders.length})</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1313,16 +1398,33 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                             </button>
                           )}
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSelectOrder(order);
-                              onNavigate(ViewState.ORDERS);
-                            }}
-                            className="px-3.5 py-1.5 bg-gray-100 hover:bg-black hover:text-white text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                          >
-                            Apri Timeline & Chat
-                          </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectOrder(order);
+                                onNavigate(ViewState.ORDERS);
+                              }}
+                              className="px-3.5 py-1.5 bg-gray-100 hover:bg-black hover:text-white text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                            >
+                              Apri Timeline & Chat
+                            </button>
+                            {isConcludedOrder(order) && onDeleteOrder && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOrderDeleteError(null);
+                                  setOrderDeleteConfirm({ mode: 'single', order });
+                                }}
+                                title="Elimina ordine concluso"
+                                aria-label={`Elimina ordine ${order.id.split('-')[0]}`}
+                                className="px-3 py-1.5 bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1 transition-all"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                <span>Elimina</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1392,6 +1494,22 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           </div>
         )}
       </div>
+
+      <ConfirmDeleteOrdersModal
+        isOpen={Boolean(orderDeleteConfirm)}
+        mode={orderDeleteConfirm?.mode || 'single'}
+        order={orderDeleteConfirm?.order}
+        ordersCount={concludedUserOrders.length}
+        isDeleting={isDeletingOrders}
+        errorMessage={orderDeleteError}
+        onCancel={() => {
+          if (!isDeletingOrders) {
+            setOrderDeleteConfirm(null);
+            setOrderDeleteError(null);
+          }
+        }}
+        onConfirm={handleConfirmDeleteOrders}
+      />
     </div>
   );
 };

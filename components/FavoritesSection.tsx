@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
-import { Heart, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Heart, ShoppingBag, ArrowRight, Clock } from 'lucide-react';
 import { Chef, Dish } from '../types';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
+import { isChefBookable } from '../utils/chefUtils';
 
 interface FavoritesSectionProps {
   favorites: string[];
@@ -21,9 +22,10 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
 }) => {
   
   const favoriteDishes = useMemo(() => {
-    const allDishes = chefs.flatMap(chef => 
-      chef.dishes.map(dish => ({ ...dish, chefName: chef.name, chefNationality: chef.nationality }))
-    );
+    const allDishes = chefs.flatMap(chef => {
+      const canBook = isChefBookable(chef);
+      return chef.dishes.map(dish => ({ ...dish, chefName: chef.name, chefNationality: chef.nationality, canBook }));
+    });
     return allDishes.filter(dish => favorites.includes(dish.id));
   }, [favorites, chefs]);
 
@@ -54,8 +56,8 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
         {favoriteDishes.map((dish) => (
           <div key={dish.id} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col">
             <div 
-              className="relative h-44 overflow-hidden cursor-pointer shrink-0"
-              onClick={() => onAddDish(dish)}
+              className={`relative h-44 overflow-hidden shrink-0 ${dish.canBook ? 'cursor-pointer' : 'cursor-default'}`}
+              onClick={dish.canBook ? () => onAddDish(dish) : undefined}
             >
               <img 
                 src={dish.image || DEFAULT_FOOD_IMAGE} 
@@ -82,8 +84,8 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
               <div>
                 <div className="flex justify-between items-start gap-2 mb-1.5">
                   <h3 
-                    className="text-[15px] font-black text-orange-600 leading-snug cursor-pointer hover:text-orange-700 transition-colors line-clamp-2"
-                    onClick={() => onAddDish(dish)}
+                    className={`text-[15px] font-black text-orange-600 leading-snug line-clamp-2 ${dish.canBook ? 'cursor-pointer hover:text-orange-700 transition-colors' : ''}`}
+                    onClick={dish.canBook ? () => onAddDish(dish) : undefined}
                   >
                     {dish.name}
                   </h3>
@@ -97,13 +99,25 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
                 <AllergensRow allergens={dish.allergens} />
               </div>
 
-              <button 
-                onClick={() => onAddDish(dish)}
-                className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-xs rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-95 border-b-4 border-orange-850 hover:border-orange-950"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                <span>Prenota ora</span>
-              </button>
+              {dish.canBook ? (
+                <button 
+                  onClick={() => onAddDish(dish)}
+                  className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-xs rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-95 border-b-4 border-orange-850 hover:border-orange-950"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>Prenota ora</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  className="w-full py-2.5 bg-gray-100 text-gray-500 border border-gray-200 font-black uppercase tracking-widest text-xs rounded-xl flex items-center justify-center space-x-2 cursor-not-allowed"
+                >
+                  <Clock className="w-4 h-4 shrink-0" />
+                  <span>Disponibile a breve</span>
+                </button>
+              )}
             </div>
           </div>
         ))}

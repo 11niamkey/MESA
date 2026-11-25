@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
 import { Chef, Dish } from '../types';
-import { Star, MapPin, Utensils, Share2, ShoppingBag, ShieldCheck, ArrowLeft, Heart, Compass } from 'lucide-react';
+import { Star, MapPin, Utensils, Share2, ShoppingBag, ShieldCheck, ArrowLeft, Heart, Compass, Clock } from 'lucide-react';
 import { HeritageJourney } from './HeritageJourney';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
+import { isChefBookable } from '../utils/chefUtils';
 
 interface PublicStorefrontProps {
   chef: Chef;
@@ -16,6 +17,7 @@ const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a
 
 export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddDish, onExit }) => {
   const [heritageDish, setHeritageDish] = useState<Dish | null>(null);
+  const canBook = isChefBookable(chef);
 
   const handleShare = () => {
     const url = window.location.href;
@@ -150,12 +152,24 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                          ))}
                       </div>
                     </div>
-                    <button 
-                      onClick={() => onAddDish(dish)}
-                      className="w-full py-3.5 sm:py-5 bg-orange-600 hover:bg-orange-700 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 shadow-orange-950/15 border-b-4 border-orange-850 hover:border-orange-950"
-                    >
-                      <ShoppingBag className="w-5 h-5" /> Prenota questo piatto
-                    </button>
+                    {canBook ? (
+                      <button 
+                        onClick={() => onAddDish(dish)}
+                        className="w-full py-3.5 sm:py-5 bg-orange-600 hover:bg-orange-700 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 shadow-orange-950/15 border-b-4 border-orange-850 hover:border-orange-950"
+                      >
+                        <ShoppingBag className="w-5 h-5" /> Prenota questo piatto
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        aria-disabled="true"
+                        className="w-full py-3.5 sm:py-5 bg-gray-100 text-gray-500 border border-gray-200 rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 cursor-not-allowed"
+                      >
+                        <Clock className="w-5 h-5 shrink-0" />
+                        <span>Disponibile a breve</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

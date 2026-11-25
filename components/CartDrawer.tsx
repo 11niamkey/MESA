@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect } from 'react';
 import { X, Minus, Plus, ShoppingBag, CalendarClock, Truck, Store, Info, Sparkles, ArrowLeft, UtensilsCrossed } from 'lucide-react';
 import { CartItem, Dish, Chef } from '../types';
+import { isChefBookable } from '../utils/chefUtils';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -46,18 +47,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   const suggestedDishes = useMemo(() => {
     const activeChefIds = Array.from(new Set(cart.map(item => item.chefId)));
+    const bookableChefs = availableChefs.filter(isChefBookable);
     
     let candidates: Dish[] = [];
     
     if (activeChefIds.length > 0) {
       activeChefIds.forEach(id => {
-        const chef = availableChefs.find(c => c.id === id);
+        const chef = bookableChefs.find(c => c.id === id);
         if (chef) {
            candidates.push(...chef.dishes);
         }
       });
     } else {
-       candidates = availableChefs.flatMap(c => c.dishes);
+       candidates = bookableChefs.flatMap(c => c.dishes);
     }
 
     const cartDishIds = new Set(cart.map(i => i.id));

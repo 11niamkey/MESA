@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { db, auth, isFirebaseConfigured, OperationType, handleFirestoreError } from './firebase';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, getDoc, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, getDoc, arrayUnion, writeBatch } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { Header } from './components/Header';
 import { AddressGateModal } from './components/AddressGateModal';
@@ -35,11 +35,14 @@ import { PersonalArea } from './components/PersonalArea';
 import { DishCatalogByOrigin } from './components/DishCatalogByOrigin';
 import { CountryFlag } from './components/CountryFlag';
 import { AllergensRow } from './components/Allergens';
+import { ConfirmDeleteOrdersModal } from './components/ConfirmDeleteOrdersModal';
 import { isPordenoneLocation, normalizeLocationToPordenone, resolvePordenoneZip, findPordenoneComune } from './components/italianTerritoryData';
 import { playNewOrderChime } from './utils/soundAlert';
+import { isConcludedOrder, formatOrderDeleteError, OrderDeleteResult } from './utils/orderUtils';
+import { isChefBookable } from './utils/chefUtils';
 import { MOCK_CHEFS } from './constants';
 import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
-import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock, Volume2, VolumeX } from 'lucide-react';
+import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock, Volume2, VolumeX, Trash2 } from 'lucide-react';
 
 const formatChefDisplayName = (name?: string) => {
   const trimmed = (name || 'MESA').trim();
@@ -440,6 +443,9 @@ function App() {
   });
   const [unreadOrderAlertIds, setUnreadOrderAlertIds] = useState<string[]>([]);
   const [recentlyPlacedOrderId, setRecentlyPlacedOrderId] = useState<string | null>(null);
+  const [ordersViewDeleteConfirm, setOrdersViewDeleteConfirm] = useState<{ mode: 'single' | 'bulk'; order?: Order } | null>(null);
+  const [isDeletingOrdersView, setIsDeletingOrdersView] = useState(false);
+  const [ordersViewDeleteError, setOrdersViewDeleteError] = useState<string | null>(null);
   const [chefSoundEnabled, setChefSoundEnabled] = useState<boolean>(() => {
     const saved = localStorage.getItem('mesa_chef_sound_alerts');
     return saved === null ? true : saved === 'true';
@@ -1517,6 +1523,14 @@ function App() {
   };
 
   const handleInitiateBooking = (dish: Dish) => {
+    const dishChef = chefs.find(c => c.id === dish.chefId);
+    if (!isChefBookable(dishChef)) {
+      showNotification('Questo cuoco sarà disponibile a breve per le prenotazioni su MESA.', {
+        title: 'Disponibile a breve',
+        variant: 'info',
+      });
+      return;
+    }
     if (!currentUser) {
       setPendingBookingDish(dish);
       promptClientAuth("Accedi o registrati come Cliente per ordinare questo piatto.");
@@ -1555,6 +1569,96 @@ function App() {
       title: 'Stato Aggiornato',
       variant: status === 'REJECTED' ? 'warning' : 'success',
     });
+  };
+
+  const handleDeleteOrder = async (orderId: string): Promise<OrderDeleteResult> => {
+    if (!orderId) return { ok: false, error: 'ID ordine non valido.' };
+    try {
+      if (isFirebaseConfigured && db) {
+        await deleteDoc(doc(db, 'orders', orderId));
+      }
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      setUnreadOrderAlertIds(prev => prev.filter(id => id !== orderId));
+      setGuestOrderIds(prev => {
+        const next = prev.filter(id => id !== orderId);
+        try {
+          localStorage.setItem('mesa_guest_order_ids', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      setSelectedOrder(prev => (prev?.id === orderId ? null : prev));
+      setRecentlyPlacedOrderId(prev => (prev === orderId ? null : prev));
+      delete prevOrderStatusesRef.current[orderId];
+      knownOrderIdsRef.current.delete(orderId);
+
+      showNotification(`Ordine #${orderId.split('-')[0]} eliminato definitivamente.`, {
+        title: 'Ordine Eliminato',
+        variant: 'success',
+      });
+      return { ok: true, deletedCount: 1 };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `orders/${orderId}`, false);
+      const friendlyError = formatOrderDeleteError(err);
+      showNotification(friendlyError, {
+        title: 'Errore Eliminazione',
+        variant: 'error',
+      });
+      return { ok: false, deletedCount: 0, error: friendlyError };
+    }
+  };
+
+  const handleDeleteConcludedOrders = async (orderIds: string[]): Promise<OrderDeleteResult> => {
+    const uniqueIds = Array.from(new Set(orderIds.filter(Boolean)));
+    if (uniqueIds.length === 0) {
+      return { ok: true, deletedCount: 0 };
+    }
+
+    try {
+      if (isFirebaseConfigured && db) {
+        for (let i = 0; i < uniqueIds.length; i += 450) {
+          const chunk = uniqueIds.slice(i, i + 450);
+          const batch = writeBatch(db);
+          chunk.forEach(id => {
+            batch.delete(doc(db, 'orders', id));
+          });
+          await batch.commit();
+        }
+      }
+
+      const deletedSet = new Set(uniqueIds);
+      setOrders(prev => prev.filter(o => !deletedSet.has(o.id)));
+      setUnreadOrderAlertIds(prev => prev.filter(id => !deletedSet.has(id)));
+      setGuestOrderIds(prev => {
+        const next = prev.filter(id => !deletedSet.has(id));
+        try {
+          localStorage.setItem('mesa_guest_order_ids', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      setSelectedOrder(prev => (prev && deletedSet.has(prev.id) ? null : prev));
+      setRecentlyPlacedOrderId(prev => (prev && deletedSet.has(prev) ? null : prev));
+      uniqueIds.forEach(id => {
+        delete prevOrderStatusesRef.current[id];
+        knownOrderIdsRef.current.delete(id);
+      });
+
+      showNotification(
+        `${uniqueIds.length} ${uniqueIds.length === 1 ? 'ordine concluso eliminato' : 'ordini conclusi eliminati'} definitivamente.`,
+        {
+          title: 'Storico Pulito',
+          variant: 'success',
+        }
+      );
+      return { ok: true, deletedCount: uniqueIds.length };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, 'orders (batch)', false);
+      const friendlyError = formatOrderDeleteError(err);
+      showNotification(friendlyError, {
+        title: 'Errore Pulizia Ordini',
+        variant: 'error',
+      });
+      return { ok: false, deletedCount: 0, error: friendlyError };
+    }
   };
 
   const createAndSaveOrder = async (
@@ -1922,6 +2026,35 @@ function App() {
     return orders.filter(o => o.userId === currentUser.id || guestOrderIds.includes(o.id));
   }, [orders, currentUser, guestOrderIds, chefs]);
 
+  const concludedVisibleOrders = useMemo(
+    () => visibleClientOrders.filter(isConcludedOrder),
+    [visibleClientOrders]
+  );
+
+  const handleConfirmOrdersViewDelete = async () => {
+    if (!ordersViewDeleteConfirm) return;
+    setIsDeletingOrdersView(true);
+    setOrdersViewDeleteError(null);
+    try {
+      if (ordersViewDeleteConfirm.mode === 'single' && ordersViewDeleteConfirm.order) {
+        const res = await handleDeleteOrder(ordersViewDeleteConfirm.order.id);
+        if (!res.ok) {
+          setOrdersViewDeleteError(res.error || 'Impossibile eliminare questo ordine.');
+          return;
+        }
+      } else if (ordersViewDeleteConfirm.mode === 'bulk') {
+        const res = await handleDeleteConcludedOrders(concludedVisibleOrders.map(o => o.id));
+        if (!res.ok) {
+          setOrdersViewDeleteError(res.error || 'Impossibile completare la pulizia degli ordini conclusi.');
+          return;
+        }
+      }
+      setOrdersViewDeleteConfirm(null);
+    } finally {
+      setIsDeletingOrdersView(false);
+    }
+  };
+
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
   const activeOrdersCount = useMemo(() => {
     if (!currentUser) return 0;
@@ -2146,11 +2279,12 @@ function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
                       {matchingDishes.map(({ dish, chef }) => {
                         const isFav = favorites.includes(dish.id);
+                        const canBook = isChefBookable(chef);
                         return (
                           <div
                             key={`${chef.id}-${dish.id}`}
-                            onClick={() => handleInitiateBooking(dish)}
-                            className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-200 cursor-pointer shadow-sm"
+                            onClick={canBook ? () => handleInitiateBooking(dish) : undefined}
+                            className={`group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-200 shadow-sm ${canBook ? 'cursor-pointer' : 'cursor-default'}`}
                           >
                             <div className="relative h-44 overflow-hidden shrink-0">
                               <img
@@ -2230,10 +2364,28 @@ function App() {
                                   </div>
                                 </div>
 
-                                <button className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-black text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95">
-                                  <ShoppingBag className="w-4 h-4" />
-                                  <span>Scegli e Prenota</span>
-                                </button>
+                                {canBook ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleInitiateBooking(dish);
+                                    }}
+                                    className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-black text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+                                  >
+                                    <ShoppingBag className="w-4 h-4" />
+                                    <span>Scegli e Prenota</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    aria-disabled="true"
+                                    className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-500 border border-gray-200 font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 cursor-not-allowed"
+                                  >
+                                    <Clock className="w-4 h-4 shrink-0" />
+                                    <span>Disponibile a breve</span>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -2314,32 +2466,48 @@ function App() {
                 <h2 className="text-3xl font-black text-orange-600 tracking-tight">
                   {currentUser.role === 'chef' ? 'Ordini Ricevuti' : 'I Miei Ordini'}
                 </h2>
-                {currentUser.role === 'chef' && (
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {concludedVisibleOrders.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setChefSoundEnabled(prev => !prev)}
-                      className={`px-3.5 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
-                        chefSoundEnabled
-                          ? 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100'
-                          : 'bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200'
-                      }`}
+                      onClick={() => {
+                        setOrdersViewDeleteError(null);
+                        setOrdersViewDeleteConfirm({ mode: 'bulk' });
+                      }}
+                      className="px-3.5 py-2 rounded-2xl bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all"
                     >
-                      {chefSoundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-                      <span>{chefSoundEnabled ? 'Avviso Sonoro ON' : 'Avviso Sonoro OFF'}</span>
+                      <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Pulisci ordini conclusi ({concludedVisibleOrders.length})</span>
                     </button>
-                    {chefPendingBadgeCount > 0 && (
-                      <span className="px-3.5 py-2 rounded-2xl bg-red-600 text-white text-[10px] font-black uppercase tracking-widest animate-pulse">
-                        {chefPendingBadgeCount} in attesa
-                      </span>
-                    )}
-                  </div>
-                )}
+                  )}
+                  {currentUser.role === 'chef' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setChefSoundEnabled(prev => !prev)}
+                        className={`px-3.5 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
+                          chefSoundEnabled
+                            ? 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100'
+                            : 'bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200'
+                        }`}
+                      >
+                        {chefSoundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                        <span>{chefSoundEnabled ? 'Avviso Sonoro ON' : 'Avviso Sonoro OFF'}</span>
+                      </button>
+                      {chefPendingBadgeCount > 0 && (
+                        <span className="px-3.5 py-2 rounded-2xl bg-red-600 text-white text-[10px] font-black uppercase tracking-widest animate-pulse">
+                          {chefPendingBadgeCount} in attesa
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
               {visibleClientOrders.length === 0 ? <p className="text-gray-400 font-bold py-20 text-center bg-gray-50 rounded-[3rem]">Nessun ordine attivo.</p> : visibleClientOrders.map(order => {
                 const firstItem = order.items[0];
                 const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status;
                 const isConfirmed = order.status === 'CONFIRMED' || order.status === 'PLACED';
+                const canDeleteOrder = isConcludedOrder(order) || currentUser.role === 'admin';
                 return (
                   <div
                     key={order.id}
@@ -2361,7 +2529,7 @@ function App() {
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center gap-3 self-end sm:self-auto">
                       <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
                         order.status === 'COMPLETED' || isConfirmed
                           ? 'bg-green-100 text-green-700 border-green-200'
@@ -2373,6 +2541,21 @@ function App() {
                       }`}>
                         {statusLabel}
                       </span>
+                      {canDeleteOrder && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOrdersViewDeleteError(null);
+                            setOrdersViewDeleteConfirm({ mode: 'single', order });
+                          }}
+                          title={isConcludedOrder(order) ? 'Elimina ordine concluso' : 'Elimina ordine (anche di prova)'}
+                          aria-label={`Elimina ordine ${order.id.split('-')[0]}`}
+                          className="p-2.5 rounded-xl bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 transition-all shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -2409,6 +2592,8 @@ function App() {
             onUpdateChef={handleUpdateChef}
             onSaveChefDishes={handleSaveChefDishes}
             onUpdateOrderStatus={handleUpdateOrderStatus}
+            onDeleteOrder={handleDeleteOrder}
+            onDeleteConcludedOrders={handleDeleteConcludedOrders}
             soundAlertsEnabled={chefSoundEnabled}
             onToggleSoundAlerts={() => setChefSoundEnabled(prev => !prev)}
             registeredUsers={registeredUsers}
@@ -2423,6 +2608,8 @@ function App() {
             onUpdateChef={handleUpdateChef}
             onSaveChefDishes={handleSaveChefDishes}
             onDeleteChef={handleDeleteChef}
+            onDeleteOrder={handleDeleteOrder}
+            onDeleteConcludedOrders={handleDeleteConcludedOrders}
             orders={orders} 
             registeredUsers={registeredUsers}
             chefApplications={chefApplications}
@@ -2544,6 +2731,22 @@ function App() {
         availableChefs={chefs}
       />
       
+      <ConfirmDeleteOrdersModal
+        isOpen={Boolean(ordersViewDeleteConfirm)}
+        mode={ordersViewDeleteConfirm?.mode || 'single'}
+        order={ordersViewDeleteConfirm?.order}
+        ordersCount={concludedVisibleOrders.length}
+        isDeleting={isDeletingOrdersView}
+        errorMessage={ordersViewDeleteError}
+        onCancel={() => {
+          if (!isDeletingOrdersView) {
+            setOrdersViewDeleteConfirm(null);
+            setOrdersViewDeleteError(null);
+          }
+        }}
+        onConfirm={handleConfirmOrdersViewDelete}
+      />
+
       {showTour && (
         <LaunchTour onComplete={() => { 
           setShowTour(false); 

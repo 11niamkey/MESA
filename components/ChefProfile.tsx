@@ -12,6 +12,8 @@ import { StarRating } from './StarRating';
 import { HeritageJourney } from './HeritageJourney';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
+import { isChefBookable } from '../utils/chefUtils';
+import { getDishHeritageStory } from '../utils/heritageStories';
 
 interface ChefProfileProps {
   chef: Chef;
@@ -28,6 +30,7 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
   const [activeTab, setActiveTab] = useState<'menu' | 'heritage' | 'reviews'>('menu');
   const [expandedDishId, setExpandedDishId] = useState<string | null>(null);
   const [heritageDish, setHeritageDish] = useState<Dish | null>(null);
+  const canBook = isChefBookable(chef);
 
   const handleShare = () => {
     alert(`Link copiato negli appunti: https://mesa.app/chef/${chef.id}\nCondividi questo chef con i tuoi amici!`);
@@ -184,12 +187,24 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                     )}
                   </div>
                   <div className="space-y-2">
-                    <button 
-                      onClick={() => onAddDish(dish)}
-                      className="w-full py-2.5 sm:py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] transition-all font-bold border-b-2 border-orange-800"
-                    >
-                      Prenota
-                    </button>
+                    {canBook ? (
+                      <button 
+                        onClick={() => onAddDish(dish)}
+                        className="w-full py-2.5 sm:py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] transition-all font-bold border-b-2 border-orange-800"
+                      >
+                        Prenota
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        aria-disabled="true"
+                        className="w-full py-2.5 sm:py-3 bg-gray-100 text-gray-500 border border-gray-200 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-1.5 cursor-not-allowed"
+                      >
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span>Disponibile a breve</span>
+                      </button>
+                    )}
                     <button 
                       onClick={() => setHeritageDish(dish)}
                       className="w-full py-2 flex items-center justify-center gap-2 text-orange-600 text-[10px] font-black uppercase tracking-widest hover:underline"
@@ -214,7 +229,9 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                 </p>
              </div>
 
-             {chef.dishes.map((dish, idx) => (
+             {chef.dishes.map((dish, idx) => {
+               const storyData = getDishHeritageStory(dish, chef);
+               return (
                <div key={dish.id} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center border-b border-gray-100 pb-12 last:border-0">
                   <div className={`lg:col-span-5 ${idx % 2 !== 0 ? 'lg:order-2' : ''}`}>
                     <div className="relative">
@@ -234,47 +251,55 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                   
                   <div className="lg:col-span-7 space-y-6">
                     <div className="flex items-center gap-3">
-                       <span className="px-3 py-1 bg-orange-100 text-orange-700 text-[9px] font-black uppercase tracking-widest rounded-lg">Ricetta Antica</span>
+                       <span className="px-3 py-1 bg-orange-100 text-orange-700 text-[9px] font-black uppercase tracking-widest rounded-lg">Ricetta del Cuore</span>
                        <div className="h-px flex-1 bg-orange-100"></div>
                     </div>
                     <h4 className="text-4xl font-black italic text-orange-600 tracking-tighter">{dish.name}</h4>
                     
                     <div className="bg-white border-l-4 border-orange-600 pl-6 py-2">
                        <p className="text-xl font-serif text-black leading-relaxed italic">
-                         {/* Qui verrebbe caricato o generato lo storytelling specifico del piatto */}
-                         Questa ricetta è stata tramandata nella famiglia di {chef.name} per generazioni. 
-                         Utilizza tecniche di cottura lente che permettono agli ingredienti di sprigionare l'essenza della loro terra d'origine.
+                         {storyData.history}
                        </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6 pt-4">
-                       <div className="space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                       <div className="space-y-2 bg-orange-50/60 p-4 rounded-2xl border border-orange-100">
                           <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-2">
-                             <Wind className="w-3 h-3 text-orange-500" /> Atmosfera
+                             <Sparkles className="w-3.5 h-3.5 text-orange-500 shrink-0" /> Il Segreto del Cuoco
                           </p>
-                          <p className="text-sm font-medium text-black italic">Luci soffuse e un calice di vino rosso locale.</p>
+                          <p className="text-xs font-medium text-black leading-relaxed">{storyData.secret}</p>
                        </div>
-                       <div className="space-y-2">
+                       <div className="space-y-2 bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
                           <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-2">
-                             <Music className="w-3 h-3 text-orange-500" /> Musica
+                             <Compass className="w-3.5 h-3.5 text-orange-500 shrink-0" /> Origine
                           </p>
-                          <p className="text-sm font-medium text-black italic flex items-center gap-1.5 flex-wrap">
-                            <span>Melodie popolari ({chef.countryName || chef.continent})</span>
-                            <CountryFlag flag={chef.nationality} title={chef.countryName} size="xs" />
-                          </p>
+                          <p className="text-xs font-medium text-black leading-relaxed break-words">{storyData.vintage}</p>
                        </div>
                     </div>
 
-                    <button 
-                      onClick={() => onAddDish(dish)}
-                      className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] text-orange-600 hover:text-black transition-colors pt-4 group"
-                    >
-                      <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" /> 
-                      Voglio assaggiare questa storia →
-                    </button>
+                    {canBook ? (
+                      <button 
+                        onClick={() => onAddDish(dish)}
+                        className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] text-orange-600 hover:text-black transition-colors pt-2 group"
+                      >
+                        <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" /> 
+                        Voglio assaggiare questa storia →
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        aria-disabled="true"
+                        className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.15em] text-gray-500 bg-gray-100 border border-gray-200 px-4 py-2.5 rounded-xl mt-2 cursor-not-allowed"
+                      >
+                        <Clock className="w-4 h-4 shrink-0" />
+                        <span>Disponibile a breve</span>
+                      </button>
+                    )}
                   </div>
                </div>
-             ))}
+               );
+             })}
           </div>
         )}
 

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Star, MapPin, ChevronRight, Heart } from 'lucide-react';
+import { Star, MapPin, ChevronRight, Heart, Clock } from 'lucide-react';
 import { Chef, Dish } from '../types';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
+import { isChefBookable } from '../utils/chefUtils';
 
 interface ChefCardProps {
   chef: Chef;
@@ -17,6 +18,8 @@ const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80';
 
 export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfile, favorites, onToggleFavorite }) => {
+  const canBook = isChefBookable(chef);
+
   return (
     <div className="bg-white rounded-[2.5rem] shadow-sm border border-orange-100 overflow-hidden transition-all hover:shadow-xl flex flex-col h-full">
       {/* Chef Header - Minimal on mobile, expanded on desktop */}
@@ -78,8 +81,8 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
           {chef.dishes.slice(0, 2).map((dish) => (
             <div key={dish.id} className="group flex flex-col h-full bg-white rounded-3xl border border-gray-100 overflow-hidden hover:border-orange-300 transition-all shadow-sm hover:shadow-lg relative">
               <div 
-                className="relative h-36 sm:h-60 md:h-72 overflow-hidden cursor-pointer shrink-0"
-                onClick={() => onAddDish(dish)}
+                className={`relative h-36 sm:h-60 md:h-72 overflow-hidden shrink-0 ${canBook ? 'cursor-pointer' : 'cursor-default'}`}
+                onClick={canBook ? () => onAddDish(dish) : undefined}
               >
                 <img 
                   src={dish.image || DEFAULT_FOOD_IMAGE} 
@@ -103,20 +106,32 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
               <div className="p-3.5 sm:p-6 flex flex-col flex-grow justify-between gap-2.5">
                 <div className="space-y-1.5">
                   <h5 
-                    className="text-base sm:text-lg font-black text-orange-600 cursor-pointer hover:text-orange-700 transition-colors leading-snug line-clamp-2"
-                    onClick={() => onAddDish(dish)}
+                    className={`text-base sm:text-lg font-black text-orange-600 leading-snug line-clamp-2 ${canBook ? 'cursor-pointer hover:text-orange-700 transition-colors' : ''}`}
+                    onClick={canBook ? () => onAddDish(dish) : undefined}
                   >
                     {dish.name}
                   </h5>
                   <p className="text-xs sm:text-sm text-black line-clamp-2 leading-snug sm:leading-relaxed">{dish.description}</p>
                   <AllergensRow allergens={dish.allergens} />
                 </div>
-                <button 
-                  onClick={() => onAddDish(dish)}
-                  className="w-full py-2.5 sm:py-4 bg-orange-600 hover:bg-black text-white text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl sm:rounded-2xl shadow-lg shadow-orange-200 transition-all transform active:scale-95"
-                >
-                  Aggiungi al carrello
-                </button>
+                {canBook ? (
+                  <button 
+                    onClick={() => onAddDish(dish)}
+                    className="w-full py-2.5 sm:py-4 bg-orange-600 hover:bg-black text-white text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl sm:rounded-2xl shadow-lg shadow-orange-200 transition-all transform active:scale-95"
+                  >
+                    Aggiungi al carrello
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    className="w-full py-2.5 sm:py-4 bg-gray-100 text-gray-500 border border-gray-200 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed"
+                  >
+                    <Clock className="w-4 h-4 shrink-0" />
+                    <span>Disponibile a breve</span>
+                  </button>
+                )}
               </div>
             </div>
           ))}
