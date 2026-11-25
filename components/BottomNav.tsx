@@ -6,6 +6,8 @@ interface BottomNavProps {
   currentView: ViewState;
   onNavigate: (view: ViewState) => void;
   cartCount: number;
+  orderCount?: number;
+  hasUnreadOrders?: boolean;
   onCartClick: () => void;
   isCartOpen?: boolean;
 }
@@ -14,6 +16,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   currentView,
   onNavigate,
   cartCount,
+  orderCount = 0,
+  hasUnreadOrders = false,
   onCartClick,
   isCartOpen = false,
 }) => {
@@ -31,6 +35,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = !isCartOpen && currentView === item.view;
+          const isOrdersItem = item.view === ViewState.ORDERS;
+          const showOrdersBadge = isOrdersItem && orderCount > 0;
 
           return (
             <button
@@ -43,13 +49,23 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             >
               <div className={`relative transition-transform duration-300 ${isActive ? '-translate-y-0.5' : ''}`}>
                 <Icon className={`w-[18px] h-[18px] sm:w-5 sm:h-5 ${isActive ? 'fill-orange-500/10' : ''}`} />
-                {isActive && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
+                {showOrdersBadge ? (
+                  <span
+                    className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 inline-flex items-center justify-center text-[9px] font-black leading-none text-white rounded-full border border-black shadow-md ${
+                      hasUnreadOrders ? 'bg-red-600 animate-pulse' : 'bg-orange-600'
+                    }`}
+                  >
+                    {orderCount}
+                  </span>
+                ) : (
+                  isActive && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
+                  )
                 )}
               </div>
               <span
                 className={`text-[8.5px] min-[375px]:text-[9.5px] font-black uppercase tracking-tight leading-none mt-1.5 whitespace-nowrap transition-opacity ${
-                  isActive ? 'opacity-100' : 'opacity-75'
+                  isActive || showOrdersBadge ? 'opacity-100' : 'opacity-75'
                 }`}
               >
                 {item.label}

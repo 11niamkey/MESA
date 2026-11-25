@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   User, MapPin, ShieldCheck, ShieldAlert, Trash2, 
   Plus, LogOut, ChefHat, Calendar, ClipboardList, 
-  Clock, CheckCircle, Smartphone, Mail, Globe, Check, XCircle, Sparkles, AlertCircle 
+  Clock, CheckCircle, Smartphone, Mail, Globe, Check, XCircle, Sparkles, AlertCircle, Volume2, VolumeX 
 } from 'lucide-react';
 import { AppUser, UserAddress, Order, OrderStatus, ViewState, Chef, Dish, ChefApplication, ORDER_STATUS_LABELS } from '../types';
 import { CountryFlag } from './CountryFlag';
@@ -21,6 +21,8 @@ interface PersonalAreaProps {
   onUpdateChef?: (updatedChef: Chef) => Promise<boolean> | void;
   onSaveChefDishes?: (chefId: string, dishes: Dish[]) => Promise<boolean>;
   onUpdateOrderStatus?: (orderId: string, status: OrderStatus) => Promise<void> | void;
+  soundAlertsEnabled?: boolean;
+  onToggleSoundAlerts?: () => void;
   registeredUsers?: AppUser[];
   chefApplications?: ChefApplication[];
   onOpenOnboarding?: () => void;
@@ -39,6 +41,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   onUpdateChef,
   onSaveChefDishes,
   onUpdateOrderStatus,
+  soundAlertsEnabled = true,
+  onToggleSoundAlerts,
   registeredUsers = [],
   chefApplications = [],
   onOpenOnboarding
@@ -1138,7 +1142,22 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                   Conferma o rifiuta le prenotazioni ricevute in tempo reale. Lo stato si aggiorna subito anche per il cliente e nell'Area Admin.
                 </p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {onToggleSoundAlerts && (
+                  <button
+                    type="button"
+                    onClick={onToggleSoundAlerts}
+                    className={`px-3.5 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
+                      soundAlertsEnabled
+                        ? 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100'
+                        : 'bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200'
+                    }`}
+                    title="Attiva o disattiva il segnale acustico per i nuovi ordini"
+                  >
+                    {soundAlertsEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                    <span>{soundAlertsEnabled ? 'Suono Attivo' : 'Suono Disattivo'}</span>
+                  </button>
+                )}
                 <span className="px-3.5 py-2 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-black uppercase tracking-widest">
                   In attesa: {pendingChefOrdersCount}
                 </span>
@@ -1293,6 +1312,17 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                               Segna Consegnato
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectOrder(order);
+                              onNavigate(ViewState.ORDERS);
+                            }}
+                            className="px-3.5 py-1.5 bg-gray-100 hover:bg-black hover:text-white text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                          >
+                            Apri Timeline & Chat
+                          </button>
                         </div>
                       </div>
                     </div>

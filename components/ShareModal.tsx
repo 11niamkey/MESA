@@ -91,7 +91,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, initial
       telegram: `https://t.me/share/url?url=${encodeURIComponent(customUrl)}&text=${text}`,
       email: `mailto:?subject=Invito Progetto MESA&body=${text}`
     };
-    window.open(links[platform], '_blank');
+    const anchor = document.createElement('a');
+    anchor.href = links[platform];
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.click();
   };
 
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(customUrl)}&bgcolor=ffffff&color=000000&margin=1`;

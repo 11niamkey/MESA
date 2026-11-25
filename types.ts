@@ -130,6 +130,14 @@ export interface Message {
   timestamp: Date;
 }
 
+export interface OrderTimelineEntry {
+  id: string;
+  status: OrderStatus;
+  title: string;
+  description?: string;
+  timestamp: Date;
+}
+
 export interface Order {
   id: string;
   userId?: string;
@@ -145,6 +153,7 @@ export interface Order {
   estimatedTime: string;
   isReviewed?: boolean;
   messages?: Message[];
+  timeline?: OrderTimelineEntry[];
   notificationChannel?: 'app' | 'whatsapp';
 }
 

@@ -3,6 +3,11 @@ import React, { useState } from 'react';
 import { X, CreditCard, Banknote, CheckCircle, Smartphone } from 'lucide-react';
 import { CartItem, Chef } from '../types';
 
+const formatChefDisplayName = (name?: string) => {
+  const trimmed = (name || 'MESA').trim();
+  return /^chef\b/i.test(trimmed) ? trimmed : `Chef ${trimmed}`;
+};
+
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -83,7 +88,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       return `- ${item.quantity}x ${item.name} (€${item.price.toFixed(2)})${specStr}`;
     }).join('\n');
 
-    const text = `Ciao Chef ${chefName}! 🍳 
+    const text = `Ciao ${formatChefDisplayName(chefName)}! 🍳 
 Ho appena inviato un ordine per te su *MESA*!
 
 *Dettagli dell'Ordine*:

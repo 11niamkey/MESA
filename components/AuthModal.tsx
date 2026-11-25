@@ -16,6 +16,7 @@ interface AuthModalProps {
   onClose: () => void;
   registeredUsers: AppUser[];
   chefs?: Chef[];
+  initialRole?: 'client' | 'chef' | 'admin';
   onLoginSuccess: (user: AppUser, isNewRegistration?: boolean) => void;
   onRegisterUser: (user: AppUser) => Promise<void> | void;
   onOpenOnboarding?: () => void;
@@ -26,11 +27,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose, 
   registeredUsers,
   chefs = [],
+  initialRole,
   onLoginSuccess,
   onRegisterUser,
   onOpenOnboarding
 }) => {
-  const [role, setRole] = useState<'client' | 'chef' | 'admin'>('client');
+  const [role, setRole] = useState<'client' | 'chef' | 'admin'>(initialRole || 'client');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   
   // Basic Fields
@@ -53,10 +55,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      if (initialRole) {
+        setRole(initialRole);
+        setMode('login');
+        if (initialRole === 'admin') {
+          setEmail('admin@mesa.com');
+        } else {
+          setEmail(prev => (prev === 'admin@mesa.com' ? '' : prev));
+        }
+      }
       setErrorMsg('');
       setIsSubmitting(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialRole]);
 
   if (!isOpen) return null;
 
@@ -328,7 +339,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] overflow-y-auto">
+    <div className="fixed inset-0 z-[110] overflow-y-auto">
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         
@@ -349,7 +360,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="flex border-b border-gray-100 bg-gray-50 pr-14 sm:pr-16 relative">
             <button
               type="button"
-              onClick={() => { setRole('client'); setErrorMsg(''); }}
+              onClick={() => {
+                if (role === 'admin') { setEmail(''); setPassword(''); }
+                setRole('client');
+                setErrorMsg('');
+              }}
               className={`flex-1 py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
                 role === 'client' ? 'bg-white text-orange-600 border-b-4 border-orange-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
                }`}
@@ -359,7 +374,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setRole('chef'); setErrorMsg(''); }}
+              onClick={() => {
+                if (role === 'admin') { setEmail(''); setPassword(''); }
+                setRole('chef');
+                setErrorMsg('');
+              }}
               className={`flex-1 py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
                 role === 'chef' ? 'bg-white text-orange-600 border-b-4 border-orange-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
               }`}
@@ -385,26 +404,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
           </div>
 
-          <div className="p-8 sm:p-10 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 rounded-xl overflow-hidden bg-black shadow-lg outline outline-1 outline-white/10 shrink-0">
-                <img src="/images/mesa_logo_type.png" alt="MESA" className="w-full h-full object-cover" />
-              </div>
-              <h2 className="text-3xl font-black text-gray-900 italic tracking-tight m-0">
-                {role === 'admin' ? 'Pannello di Controllo' : mode === 'login' ? 'Bentornato!' : role === 'client' ? 'Unisciti' : 'Registrati come Cuoco'}
-              </h2>
-            </div>
-            <p className="text-gray-500 text-sm font-medium mb-6 leading-relaxed">
+          <div className="p-6 sm:p-8 max-h-[82vh] overflow-y-auto">
+            <h2 className="text-3xl font-black text-gray-900 italic tracking-tight mb-2">
+              {role === 'admin' ? 'Pannello di Controllo' : mode === 'login' ? 'Bentornato!' : role === 'client' ? 'Unisciti' : 'Registrati come Cuoco'}
+            </h2>
+            <p className="text-gray-500 text-sm font-medium mb-5 leading-relaxed">
               {role === 'admin' 
                 ? 'Accedi alla visione a 360° per approvare e convalidare utenti, candidature cuochi e indirizzi.'
                 : mode === 'login' 
-                  ? 'Accedi per gestire il tuo profilo, i tuoi indirizzi e i tuoi ordini.' 
+                  ? (role === 'chef'
+                      ? 'Accedi per gestire i tuoi piatti e le tue prenotazioni'
+                      : 'Accedi per gestire il tuo profilo, i tuoi indirizzi e i tuoi ordini.')
                   : role === 'client' 
                     ? 'Registrati per ordinare piatti fatti in casa dalle cucine verificate. Il tuo profilo sarà subito visibile nell\'Area Admin.' 
                     : 'Crea il tuo account Cuoco: verrai sincronizzato con l\'Area Admin per la verifica e l\'attivazione nel catalogo MESA.'}
             </p>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3.5">
               {mode === 'register' && role !== 'admin' && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
@@ -467,37 +483,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   />
                 </>
               )}
-              
-              {role === 'chef' && mode === 'login' && chefs.length > 0 && (
-                <div className="bg-orange-50/70 border border-orange-200 rounded-2xl p-3.5 space-y-1.5">
-                  <label className="block text-[10px] font-black text-orange-700 uppercase tracking-widest">
-                    Seleziona Cuoco del Catalogo (Test Area Cuoco)
-                  </label>
-                  <select
-                    value={chefs.some(c => (c.email || '').toLowerCase() === email.trim().toLowerCase()) ? email.trim().toLowerCase() : ''}
-                    onChange={(e) => {
-                      const chosen = chefs.find(c => (c.email || '').toLowerCase() === e.target.value);
-                      if (chosen) {
-                        setEmail(chosen.email || '');
-                        setPassword(chosen.password || 'demo123');
-                        setErrorMsg('');
-                      }
-                    }}
-                    className="w-full p-2.5 bg-white border border-orange-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
-                  >
-                    <option value="">-- Scegli uno chef per accedere alla sua Area Cuoco --</option>
-                    {chefs.map(c => (
-                      <option key={c.id} value={(c.email || '').toLowerCase()}>
-                        {c.name} ({c.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
               <input 
                 type="email" 
-                placeholder="Indirizzo Email" 
+                autoComplete="email"
+                placeholder={role === 'chef' && mode === 'login' ? 'Email privata del Cuoco' : 'Indirizzo Email'} 
                 value={email} 
                 onChange={e => setEmail(e.target.value)} 
                 className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
@@ -507,6 +496,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="relative">
                 <input 
                   type={showPassword ? "text" : "password"} 
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   placeholder="Password" 
                   value={password} 
                   onChange={e => setPassword(e.target.value)} 
@@ -611,7 +601,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button 
                 type="submit" 
                 disabled={isSubmitting}
-                className={`w-full py-4.5 font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95 text-xs ${role === 'admin' ? 'bg-orange-600 text-black' : 'bg-black text-white hover:bg-orange-600'} disabled:opacity-60 disabled:cursor-not-allowed`}
+                className={`w-full py-4 font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95 text-xs ${role === 'admin' ? 'bg-orange-600 text-black' : 'bg-black text-white hover:bg-orange-600'} disabled:opacity-60 disabled:cursor-not-allowed`}
               >
                 {isSubmitting ? 'Salvataggio in corso...' : role === 'admin' ? 'Entra nella Dashboard' : mode === 'login' ? 'Accedi' : role === 'chef' ? 'Registrati & Invia ad Admin' : 'Registrati'}
               </button>
@@ -632,8 +622,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             )}
 
             {role !== 'admin' && (
-              <div className="mt-6">
-                <div className="flex items-center gap-3 mb-4">
+              <div className="mt-5">
+                <div className="flex items-center gap-3 mb-3.5">
                   <div className="h-px flex-1 bg-gray-200" />
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">oppure</span>
                   <div className="h-px flex-1 bg-gray-200" />
@@ -642,7 +632,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={isSubmitting}
-                  className="w-full py-4 font-black uppercase tracking-widest rounded-2xl border-2 border-gray-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 transition-all active:scale-95 text-xs flex items-center justify-center gap-2 bg-white disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full py-3.5 font-black uppercase tracking-widest rounded-2xl border-2 border-gray-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 transition-all active:scale-95 text-xs flex items-center justify-center gap-2 bg-white disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
                     <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
@@ -656,15 +646,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             )}
 
             {role !== 'admin' && (
-              <div className="mt-8 text-center text-sm font-medium text-gray-500">
-                {mode === 'login' ? 'Non hai un account? ' : 'Hai già un account? '}
-                <button 
-                  type="button"
-                  onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setErrorMsg(''); }}
-                  className="font-black text-orange-600 hover:underline"
-                >
-                  {mode === 'login' ? 'Registrati' : 'Accedi'}
-                </button>
+              <div className="mt-5 text-center text-sm font-medium text-gray-500">
+                {mode === 'login' ? (
+                  role === 'chef' ? (
+                    <button
+                      type="button"
+                      onClick={() => { setMode('register'); setErrorMsg(''); }}
+                      className="w-full py-3.5 px-4 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-800 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+                    >
+                      <ChefHat className="w-4 h-4 text-orange-600 shrink-0" />
+                      <span>Registrati / Candidati come nuovo Cuoco</span>
+                    </button>
+                  ) : (
+                    <>
+                      Non hai un account?{' '}
+                      <button 
+                        type="button"
+                        onClick={() => { setMode('register'); setErrorMsg(''); }}
+                        className="font-black text-orange-600 hover:underline"
+                      >
+                        Registrati
+                      </button>
+                    </>
+                  )
+                ) : (
+                  <>
+                    Hai già un account?{' '}
+                    <button 
+                      type="button"
+                      onClick={() => { setMode('login'); setErrorMsg(''); }}
+                      className="font-black text-orange-600 hover:underline"
+                    >
+                      Accedi
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

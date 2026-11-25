@@ -61,7 +61,7 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
       {/* Grid of Dishes with Smooth Category Swap AnimatePresence */}
       <motion.div 
         layout
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-8 md:gap-10"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6"
       >
         <AnimatePresence mode="popLayout">
           {allDishesWithChef.map((dish) => {
@@ -76,11 +76,11 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                 exit={{ opacity: 0, scale: 0.9, y: 10 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
                 key={dish.id}
-                className="group bg-white rounded-[2rem] sm:rounded-[2.5rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-500 hover:border-orange-100 cursor-pointer relative shadow-sm"
+                className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-100 cursor-pointer relative shadow-sm"
                 onClick={() => onAddDish(dish)}
               >
                 {/* Image & Badges */}
-                <div className="relative h-36 sm:h-56 md:h-64 overflow-hidden shrink-0">
+                <div className="relative h-44 overflow-hidden shrink-0">
                   <img
                     src={dish.image || DEFAULT_FOOD_IMAGE}
                     alt={dish.name}
@@ -91,12 +91,12 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
                   
                   {/* Floating Left: Price */}
-                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4 bg-black/85 backdrop-blur-md text-white text-[11px] font-black px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl uppercase tracking-widest shadow-xl flex items-center">
+                  <div className="absolute top-3 left-3 bg-black/85 backdrop-blur-md text-white text-[11px] font-black px-3 py-1 rounded-xl uppercase tracking-widest shadow-xl flex items-center">
                     € {dish.price.toFixed(2)}
                   </div>
 
                   {/* Floating Middle Bottom: Origin Flag Badge */}
-                  <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 bg-white/95 backdrop-blur-sm text-black text-[10px] font-black px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl uppercase tracking-wider shadow-md flex items-center gap-1.5 border border-white/20">
+                  <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-sm text-black text-[10px] font-black px-2.5 py-1 rounded-xl uppercase tracking-wider shadow-md flex items-center gap-1.5 border border-white/20">
                     <CountryFlag flag={dish.chefNationality} title={associatedChef?.countryName || dish.chefContinent} size="sm" />
                     <span className="text-black tracking-tight">{associatedChef?.countryName || dish.chefContinent}</span>
                   </div>
@@ -107,18 +107,18 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                       e.stopPropagation();
                       onToggleFavorite(dish.id);
                     }}
-                    className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 sm:p-3 bg-white/95 backdrop-blur rounded-xl sm:rounded-2xl shadow-xl hover:bg-white transition-all transform hover:scale-110 active:scale-95 z-10 border border-gray-100"
+                    className="absolute top-3 right-3 p-2 bg-white/95 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all transform hover:scale-110 active:scale-95 z-10 border border-gray-100"
                   >
-                    <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+                    <Heart className={`w-4 h-4 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
                   </button>
                 </div>
 
                 {/* Card Content & Descriptions */}
-                <div className="p-3.5 sm:p-6 flex-1 flex flex-col justify-between gap-2.5 sm:gap-3">
+                <div className="p-4 flex-1 flex flex-col justify-between gap-2.5">
                   <div className="space-y-2">
                     {/* Header line: Title & Quick Details Toggle */}
                     <div className="flex justify-between items-start gap-2">
-                      <h3 className="font-black italic text-orange-600 text-[15px] sm:text-lg leading-snug group-hover:text-orange-700 transition-colors line-clamp-2 min-w-0">
+                      <h3 className="font-black italic text-orange-600 text-[15px] leading-snug group-hover:text-orange-700 transition-colors line-clamp-2 min-w-0">
                         {dish.name}
                       </h3>
                       <button
@@ -135,7 +135,7 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                     </div>
 
                     {/* Short Description */}
-                    <p className="text-black text-xs sm:text-sm leading-snug sm:leading-relaxed line-clamp-2 italic font-medium">
+                    <p className="text-black text-xs leading-snug line-clamp-2 italic font-medium">
                       "{dish.description}"
                     </p>
 
@@ -173,14 +173,14 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
 
                     {/* Tag list & Glovo-style delivery info */}
                     <div className="flex flex-wrap gap-1.5">
-                      <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-orange-50 text-orange-800 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                      <span className="px-2 py-0.5 bg-orange-50 text-orange-800 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
                         <Clock className="w-3 h-3 text-orange-600" /> 25-35 min
                       </span>
-                      <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-green-50 text-green-800 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                      <span className="px-2 py-0.5 bg-green-50 text-green-800 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
                         🛵 €2.50
                       </span>
                       {dish.tags.slice(0, 2).map(tag => (
-                        <span key={tag} className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-gray-50 border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-500">
+                        <span key={tag} className="px-2 py-0.5 bg-gray-50 border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-500">
                           {tag}
                         </span>
                       ))}
@@ -188,7 +188,7 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                   </div>
 
                   {/* Chef Info block and Booking button */}
-                  <div className="space-y-2 sm:space-y-3.5">
+                  <div className="space-y-2.5">
                     {associatedChef && (
                       <div 
                         onClick={(e) => {
@@ -197,16 +197,16 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                             onViewProfile(associatedChef);
                           }
                         }}
-                        className="flex items-center justify-between p-2 sm:p-3 bg-gray-50/80 hover:bg-orange-50/60 rounded-2xl border border-gray-100 transition-colors group/chef cursor-pointer"
+                        className="flex items-center justify-between p-2.5 bg-gray-50/80 hover:bg-orange-50/60 rounded-2xl border border-gray-100 transition-colors group/chef cursor-pointer"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <img 
                             src={dish.chefAvatar} 
                             alt={dish.chefName}
-                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl object-cover border border-white shadow-sm shrink-0"
+                            className="w-7 h-7 rounded-xl object-cover border border-white shadow-sm shrink-0"
                           />
                           <div className="min-w-0">
-                            <p className="text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Chef Locale</p>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Chef Locale</p>
                             <span className="text-xs font-bold text-gray-800 group-hover/chef:text-orange-600 transition-colors truncate block">{dish.chefName}</span>
                           </div>
                         </div>
@@ -226,7 +226,7 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                     )}
 
                     {/* Book Now Button */}
-                    <button className="w-full py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-[11px] sm:text-xs flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 border-b-4 border-orange-850 hover:border-orange-950">
+                    <button className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 border-b-4 border-orange-850 hover:border-orange-950">
                       <ShoppingBag className="w-4 h-4" />
                       <span>Scegli e Prenota</span>
                     </button>

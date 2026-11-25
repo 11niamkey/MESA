@@ -20,6 +20,11 @@ interface Workshop {
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80';
 
+const formatChefDisplayName = (name?: string) => {
+  const trimmed = (name || 'MESA').trim();
+  return /^chef\b/i.test(trimmed) ? trimmed : `Chef ${trimmed}`;
+};
+
 const MOCK_WORKSHOPS: Workshop[] = [
   {
     id: 'w1',
@@ -136,7 +141,7 @@ export const ExperiencesSection: React.FC = () => {
                    className="w-10 h-10 rounded-full border-2 border-white shadow-xl" 
                    alt={workshop.chefName} 
                  />
-                 <span className="text-white font-black text-xs shadow-black drop-shadow-md">Chef {workshop.chefName}</span>
+                 <span className="text-white font-black text-xs shadow-black drop-shadow-md">{formatChefDisplayName(workshop.chefName)}</span>
               </div>
             </div>
 

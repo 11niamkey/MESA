@@ -21,22 +21,42 @@ import {
   Share2, 
   AlertCircle 
 } from 'lucide-react';
-import { Order, OrderStatus, Chef } from '../types';
+import { Order, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Chef, AppUser } from '../types';
+
+const formatChefDisplayName = (name?: string) => {
+  const trimmed = (name || 'MESA').trim();
+  return /^chef\b/i.test(trimmed) ? trimmed : `Chef ${trimmed}`;
+};
 
 interface OrderTrackingProps {
   order: Order;
   onBack: () => void;
   chefs?: Chef[];
+  userRole?: AppUser['role'];
+  justPlaced?: boolean;
   onUpdateOrderStatus?: (orderId: string, status: OrderStatus) => void;
 }
+
+const STATUS_CHAT_UPDATES: Partial<Record<OrderStatus, string>> = {
+  CONFIRMED: '✅ Ho confermato il tuo ordine! Lo stiamo inserendo subito in preparazione.',
+  PLACED: '✅ Ordine confermato e preso in carico!',
+  PREPARING: '🍳 Sto preparando il tuo piatto con ingredienti freschi!',
+  READY: '🍱 Il tuo ordine è pronto per il ritiro o la consegna!',
+  DELIVERING: '🛵 Il rider è partito con il tuo ordine!',
+  COMPLETED: '🎉 Ordine completato! Buon appetito da Chef e da MESA!',
+  REJECTED: '❌ Mi dispiace, non posso accettare questa prenotazione per la data richiesta.',
+};
 
 export const OrderTracking: React.FC<OrderTrackingProps> = ({ 
   order, 
   onBack, 
   chefs,
+  userRole,
+  justPlaced = false,
   onUpdateOrderStatus 
 }) => {
-  const [activeTab, setActiveTab] = useState<'chat' | 'chef-sim'>('chef-sim');
+  const isChefView = userRole === 'chef';
+  const [activeTab, setActiveTab] = useState<'chat' | 'chef-sim'>(isChefView ? 'chef-sim' : 'chat');
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState(order.messages || [
     {
@@ -75,13 +95,44 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
   const rawStepIndex = activeSteps.findIndex(s => s.status === normalizedStepStatus);
   const currentStepIndex = rawStepIndex >= 0 ? rawStepIndex : 0;
   const isRejected = order.status === 'REJECTED';
+  const lastTrackedStatusRef = React.useRef<OrderStatus>(order.status);
 
-  // Sync messages
+  // Sync messages from Firestore
   useEffect(() => {
-    if (order.messages) {
+    if (order.messages && order.messages.length > 0) {
       setMessages(order.messages);
     }
   }, [order.messages]);
+
+  // Append live timeline status update message in ORDINI chat when Firestore updates order status
+  useEffect(() => {
+    if (lastTrackedStatusRef.current !== order.status) {
+      lastTrackedStatusRef.current = order.status;
+      const updateText = STATUS_CHAT_UPDATES[order.status];
+      if (updateText) {
+        setMessages(prev => {
+          if (prev.some(m => m.text === updateText)) return prev;
+          return [
+            ...prev,
+            {
+              id: `status-${order.id}-${order.status}`,
+              sender: 'chef',
+              text: updateText,
+              timestamp: new Date(),
+            },
+          ];
+        });
+      }
+      const timeNow = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status;
+      setStatusLogs(prev => [`[${timeNow}] Stato aggiornato: ${statusLabel}`, ...prev]);
+    }
+  }, [order.id, order.status]);
+
+  // Enforce separation: clients must never enter chef-sim tab
+  useEffect(() => {
+    setActiveTab(isChefView ? 'chef-sim' : 'chat');
+  }, [isChefView]);
 
   const handleSendMessage = () => {
     if (!chatInput.trim()) return;
@@ -125,6 +176,35 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
     }
   };
 
+  const timelineEntries: OrderTimelineEntry[] = React.useMemo(() => {
+    if (order.timeline && order.timeline.length > 0) {
+      return order.timeline.map((entry) => ({
+        ...entry,
+        timestamp: entry.timestamp instanceof Date ? entry.timestamp : new Date(entry.timestamp),
+      }));
+    }
+    const baseTime = order.timestamp instanceof Date ? order.timestamp : new Date(order.timestamp);
+    const entries: OrderTimelineEntry[] = [
+      {
+        id: `tl-created-${order.id}`,
+        status: 'PENDING_CONFIRMATION',
+        title: 'Ordine inviato',
+        description: 'Ordine inviato! In attesa di conferma dallo chef.',
+        timestamp: baseTime,
+      },
+    ];
+    if (order.status !== 'PENDING_CONFIRMATION') {
+      entries.push({
+        id: `tl-current-${order.id}-${order.status}`,
+        status: order.status,
+        title: ORDER_STATUS_LABELS[order.status] || order.status,
+        description: STATUS_CHAT_UPDATES[order.status] || 'Aggiornamento stato in tempo reale.',
+        timestamp: new Date(),
+      });
+    }
+    return entries;
+  }, [order.id, order.status, order.timeline, order.timestamp]);
+
   return (
     <div className="animate-fade-in space-y-6 max-w-5xl mx-auto px-2 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -141,6 +221,22 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
         </div>
       </div>
 
+      {!isChefView && (justPlaced || order.status === 'PENDING_CONFIRMATION') && (
+        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-3xl p-4 sm:p-5 flex items-start sm:items-center gap-3.5 shadow-sm">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
+            <CheckCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs sm:text-sm font-black text-emerald-950">
+              Ordine inviato! In attesa di conferma dallo chef
+            </p>
+            <p className="text-[11px] sm:text-xs font-medium text-emerald-800 mt-0.5">
+              Riceverai un avviso in tempo reale nella barra in alto e in questa timeline appena {formatChefDisplayName(order.chefName)} aggiornerà lo stato.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className={`rounded-[2.5rem] p-6 sm:p-8 text-white relative overflow-hidden shadow-2xl ${
         isRejected
           ? 'bg-gradient-to-r from-red-600 to-rose-700'
@@ -153,7 +249,9 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-              <p className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white/80">Stato Ordine (Vista Cliente)</p>
+              <p className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white/80">
+                {isChefView ? 'Stato Ordine (Vista Cuoco)' : 'Stato Ordine (Vista Cliente)'}
+              </p>
             </div>
             <h3 className="text-3xl sm:text-4xl font-black tracking-tight">
               {isRejected ? 'Rifiutato' : activeSteps[currentStepIndex]?.label}
@@ -250,7 +348,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
             <div className="p-6 sm:p-8 space-y-4">
               <div className="flex justify-between items-center pb-4 border-b border-gray-100">
                 <div>
-                  <h4 className="font-black italic text-gray-900 text-lg">Piatto ordinato da Chef {order.chefName}</h4>
+                  <h4 className="font-black italic text-gray-900 text-lg">Piatto ordinato da {formatChefDisplayName(order.chefName)}</h4>
                   <p className="text-gray-500 text-xs mt-0.5">Grazie per aver sostenuto la vera cucina fatta in casa locale.</p>
                 </div>
                 <div className="bg-orange-50 text-orange-700 font-mono font-black text-xs px-3 py-1.5 rounded-xl border border-orange-100">
@@ -269,6 +367,52 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+
+          {/* Real-time Order Timeline inside ORDINI */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-orange-600" />
+                <h4 className="font-black text-gray-900 text-sm uppercase tracking-wider">Timeline Ordine & Aggiornamenti</h4>
+              </div>
+              <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 uppercase tracking-widest">
+                Live
+              </span>
+            </div>
+            <div className="space-y-4">
+              {timelineEntries.map((entry, idx) => {
+                const isLast = idx === timelineEntries.length - 1;
+                const isEntryRejected = entry.status === 'REJECTED';
+                return (
+                  <div key={entry.id} className="flex items-start gap-3">
+                    <div className="flex flex-col items-center">
+                      <span
+                        className={`w-3 h-3 rounded-full mt-1 ${
+                          isEntryRejected
+                            ? 'bg-red-500'
+                            : isLast
+                              ? 'bg-orange-600 ring-4 ring-orange-100'
+                              : 'bg-emerald-500'
+                        }`}
+                      />
+                      {!isLast && <span className="w-0.5 h-7 bg-gray-200 mt-1" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-black text-gray-900">{entry.title}</p>
+                        <span className="text-[10px] font-mono text-gray-400 shrink-0">
+                          {entry.timestamp.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      {entry.description && (
+                        <p className="text-[11px] text-gray-600 font-medium mt-0.5">{entry.description}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -345,36 +489,37 @@ Attendo conferma, grazie!`;
           </div>
         </div>
 
-        {/* Right Column: Chat & Chef Simulator Simulator */}
+        {/* Right Column: Chat for Client; Terminale Cuoco + Chat for Chef */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Tab Selector */}
-          <div className="bg-gray-100 p-1.5 rounded-2xl flex gap-2">
-            <button
-              onClick={() => setActiveTab('chef-sim')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                activeTab === 'chef-sim' 
-                  ? 'bg-black text-white shadow-md' 
-                  : 'text-gray-500 hover:text-black hover:bg-gray-200/50'
-              }`}
-            >
-              <Smartphone className="w-4 h-4" />
-              <span>📱 Terminale Cuoco</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('chat')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                activeTab === 'chat' 
-                  ? 'bg-black text-white shadow-md' 
-                  : 'text-gray-500 hover:text-black hover:bg-gray-200/50'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Chat Utente</span>
-            </button>
-          </div>
+          {isChefView && (
+            <div className="bg-gray-100 p-1.5 rounded-2xl flex gap-2">
+              <button
+                onClick={() => setActiveTab('chef-sim')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                  activeTab === 'chef-sim' 
+                    ? 'bg-black text-white shadow-md' 
+                    : 'text-gray-500 hover:text-black hover:bg-gray-200/50'
+                }`}
+              >
+                <Smartphone className="w-4 h-4" />
+                <span>📱 Terminale Cuoco</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                  activeTab === 'chat' 
+                    ? 'bg-black text-white shadow-md' 
+                    : 'text-gray-500 hover:text-black hover:bg-gray-200/50'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Chat Utente</span>
+              </button>
+            </div>
+          )}
 
-          {activeTab === 'chef-sim' ? (
-            /* Chef Simulator Interface Mockup */
+          {isChefView && activeTab === 'chef-sim' ? (
+            /* Chef Console (only visible when logged in as 'chef') */
             <div className="bg-black text-white rounded-[2.5rem] p-6 shadow-2xl relative border-4 border-gray-800 flex flex-col min-h-[500px] overflow-hidden">
               {/* Phone Status Bar Accent */}
               <div className="flex justify-between items-center text-[9px] font-mono text-gray-500 border-b border-white/10 pb-3 mb-4">
@@ -394,7 +539,7 @@ Attendo conferma, grazie!`;
               {/* Title & Status */}
               <div className="flex items-start justify-between gap-2 mb-4">
                 <div>
-                  <h4 className="font-black italic text-md leading-tight text-white mb-0.5">Console Chef {order.chefName}</h4>
+                  <h4 className="font-black italic text-md leading-tight text-white mb-0.5">Console {formatChefDisplayName(order.chefName)}</h4>
                   <p className="text-[10px] text-gray-400">Simulatore della ricezione ed evasione dell'ordine</p>
                 </div>
                 <div className={`px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider border ${
@@ -561,7 +706,7 @@ Attendo conferma, grazie!`;
                      </div>
                      <div>
                         <h4 className="font-black italic text-gray-900 leading-none">MESA Connect</h4>
-                        <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mt-1">Chef {order.chefName} online</p>
+                        <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mt-1">{formatChefDisplayName(order.chefName)} online</p>
                      </div>
                   </div>
                </div>

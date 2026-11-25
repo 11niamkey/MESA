@@ -50,11 +50,11 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
         <h2 className="text-lg sm:text-2xl font-black text-orange-600 tracking-tight whitespace-nowrap truncate">Salvati per dopo</h2>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
         {favoriteDishes.map((dish) => (
-          <div key={dish.id} className="bg-white rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col">
+          <div key={dish.id} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col">
             <div 
-              className="relative h-36 sm:h-64 overflow-hidden cursor-pointer shrink-0"
+              className="relative h-44 overflow-hidden cursor-pointer shrink-0"
               onClick={() => onAddDish(dish)}
             >
               <img 
@@ -68,29 +68,29 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
                   e.stopPropagation();
                   onToggleFavorite(dish.id);
                 }}
-                className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 sm:p-2.5 bg-white/90 backdrop-blur rounded-2xl shadow-lg z-10 hover:bg-white transition-all"
+                className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur rounded-2xl shadow-lg z-10 hover:bg-white transition-all"
               >
-                <Heart className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 fill-current" />
+                <Heart className="w-4 h-4 text-red-500 fill-current" />
               </button>
-              <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 bg-white/90 backdrop-blur-md px-3 sm:px-4 py-1 sm:py-1.5 rounded-2xl text-xs font-black text-gray-900 shadow-xl flex items-center gap-2 border border-white">
+              <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-black text-gray-900 shadow-xl flex items-center gap-1.5 border border-white">
                  <CountryFlag flag={dish.chefNationality} size="sm" />
                  <span>{dish.chefName}</span>
               </div>
             </div>
             
-            <div className="p-4 sm:p-7 flex flex-col flex-1 justify-between gap-3">
+            <div className="p-4 flex flex-col flex-1 justify-between gap-2.5">
               <div>
-                <div className="flex justify-between items-start mb-2">
+                <div className="flex justify-between items-start gap-2 mb-1.5">
                   <h3 
-                    className="text-lg sm:text-xl font-black text-orange-600 leading-tight cursor-pointer hover:text-orange-700 transition-colors truncate"
+                    className="text-[15px] font-black text-orange-600 leading-snug cursor-pointer hover:text-orange-700 transition-colors line-clamp-2"
                     onClick={() => onAddDish(dish)}
                   >
                     {dish.name}
                   </h3>
-                  <span className="text-lg sm:text-xl font-black text-orange-600 ml-3 shrink-0">€{dish.price.toFixed(2)}</span>
+                  <span className="text-base font-black text-orange-600 shrink-0">€{dish.price.toFixed(2)}</span>
                 </div>
                 
-                <p className="text-xs sm:text-sm text-black line-clamp-2 mb-2.5 leading-snug sm:leading-relaxed">
+                <p className="text-xs text-black line-clamp-2 mb-2 leading-snug">
                   {dish.description}
                 </p>
 
@@ -99,9 +99,9 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
 
               <button 
                 onClick={() => onAddDish(dish)}
-                className="w-full py-3 sm:py-4 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-xs rounded-2xl flex items-center justify-center space-x-2.5 transition-all shadow-lg active:scale-95 border-b-4 border-orange-850 hover:border-orange-950"
+                className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-xs rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-95 border-b-4 border-orange-850 hover:border-orange-950"
               >
-                <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />
+                <ShoppingBag className="w-4 h-4" />
                 <span>Prenota ora</span>
               </button>
             </div>

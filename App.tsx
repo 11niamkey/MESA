@@ -18,7 +18,7 @@ import { CultureSection } from './components/CultureSection';
 import { ExperiencesSection } from './components/ExperiencesSection';
 import { FavoritesSection } from './components/FavoritesSection';
 import { Footer } from './components/Footer';
-import { NotificationToast } from './components/NotificationToast';
+import { NotificationToast, ToastVariant } from './components/NotificationToast';
 import { BottomNav } from './components/BottomNav';
 import { InfoPage } from './components/InfoPage';
 import { OrderTracking } from './components/OrderTracking';
@@ -36,9 +36,15 @@ import { DishCatalogByOrigin } from './components/DishCatalogByOrigin';
 import { CountryFlag } from './components/CountryFlag';
 import { AllergensRow } from './components/Allergens';
 import { isPordenoneLocation, normalizeLocationToPordenone, resolvePordenoneZip, findPordenoneComune } from './components/italianTerritoryData';
+import { playNewOrderChime } from './utils/soundAlert';
 import { MOCK_CHEFS } from './constants';
-import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderStatus, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
-import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock } from 'lucide-react';
+import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
+import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock, Volume2, VolumeX } from 'lucide-react';
+
+const formatChefDisplayName = (name?: string) => {
+  const trimmed = (name || 'MESA').trim();
+  return /^chef\b/i.test(trimmed) ? trimmed : `Chef ${trimmed}`;
+};
 
 const DEFAULT_APPLICATIONS: ChefApplication[] = [
   {
@@ -346,6 +352,55 @@ const seedFirestoreDefaults = async () => {
   }
 };
 
+const normalizeOrderStatus = (rawStatus: unknown): OrderStatus => {
+  const s = String(rawStatus || '').trim();
+  if (s.toLowerCase() === 'pending') return 'PENDING_CONFIRMATION';
+  if (
+    s === 'PENDING_CONFIRMATION' ||
+    s === 'CONFIRMED' ||
+    s === 'REJECTED' ||
+    s === 'PLACED' ||
+    s === 'PREPARING' ||
+    s === 'READY' ||
+    s === 'DELIVERING' ||
+    s === 'COMPLETED'
+  ) {
+    return s;
+  }
+  return 'PENDING_CONFIRMATION';
+};
+
+const isPendingOrderStatus = (rawStatus: unknown): boolean => {
+  const s = String(rawStatus || '').trim().toLowerCase();
+  return s === 'pending' || s === 'pending_confirmation';
+};
+
+const isOrderForChefUser = (order: Order, user: AppUser | null, chefsList: Chef[]): boolean => {
+  if (!user || user.role !== 'chef') return false;
+  const matchedChef = chefsList.find(c =>
+    (c.email && user.email && c.email.toLowerCase().trim() === user.email.toLowerCase().trim()) ||
+    c.id === `chef-${user.id}` ||
+    c.id === user.id ||
+    `usr-${c.id}` === user.id ||
+    `usr-${c.id.replace('chef-', '')}` === user.id
+  );
+  if (matchedChef) {
+    if (order.chefId === matchedChef.id) return true;
+    if (order.chefName?.trim().toLowerCase() === matchedChef.name.trim().toLowerCase()) return true;
+  }
+  const fullName = `${user.name} ${user.lastName}`.trim().toLowerCase();
+  const brand = (user.brandName || '').trim().toLowerCase();
+  const orderChefName = (order.chefName || '').trim().toLowerCase();
+  return (
+    order.chefId === user.id ||
+    order.chefId === `chef-${user.id}` ||
+    `usr-${order.chefId}` === user.id ||
+    `usr-${String(order.chefId || '').replace('chef-', '')}` === user.id ||
+    (Boolean(fullName) && orderChefName === fullName) ||
+    (Boolean(brand) && orderChefName === brand)
+  );
+};
+
 function App() {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
   const [verifiedAddress, setVerifiedAddress] = useState<string>(() => {
@@ -383,7 +438,33 @@ function App() {
       return [];
     }
   });
+  const [unreadOrderAlertIds, setUnreadOrderAlertIds] = useState<string[]>([]);
+  const [recentlyPlacedOrderId, setRecentlyPlacedOrderId] = useState<string | null>(null);
+  const [chefSoundEnabled, setChefSoundEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('mesa_chef_sound_alerts');
+    return saved === null ? true : saved === 'true';
+  });
+
   const prevOrderStatusesRef = useRef<Record<string, OrderStatus>>({});
+  const knownOrderIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedInitialOrdersRef = useRef(false);
+  const currentUserRef = useRef<AppUser | null>(currentUser);
+  const chefsRef = useRef<Chef[]>(chefs);
+  const chefSoundEnabledRef = useRef<boolean>(chefSoundEnabled);
+  const announcedChefSessionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  useEffect(() => {
+    chefsRef.current = chefs;
+  }, [chefs]);
+
+  useEffect(() => {
+    chefSoundEnabledRef.current = chefSoundEnabled;
+    localStorage.setItem('mesa_chef_sound_alerts', String(chefSoundEnabled));
+  }, [chefSoundEnabled]);
 
   useEffect(() => {
     if (!isFirebaseConfigured) return;
@@ -423,32 +504,126 @@ function App() {
         (snapshot) => {
           const ordersData: Order[] = snapshot.docs.map(d => {
             const data = d.data();
+            const parsedTimeline = Array.isArray(data.timeline)
+              ? data.timeline.map((entry: any) => ({
+                  ...entry,
+                  status: normalizeOrderStatus(entry.status),
+                  timestamp: entry.timestamp?.toDate ? entry.timestamp.toDate() : new Date(entry.timestamp),
+                }))
+              : undefined;
             return {
               ...data,
-              timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp)
+              status: normalizeOrderStatus(data.status),
+              timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
+              ...(parsedTimeline ? { timeline: parsedTimeline } : {}),
             } as Order;
           });
           ordersData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
+          const activeUser = currentUserRef.current;
+          const activeChefs = chefsRef.current;
           const prevMap = prevOrderStatusesRef.current;
-          if (Object.keys(prevMap).length > 0) {
-            ordersData.forEach(order => {
-              const prevStatus = prevMap[order.id];
-              if (prevStatus && prevStatus !== order.status) {
-                const label = ORDER_STATUS_LABELS[order.status] || order.status;
-                if (order.status === 'CONFIRMED') {
-                  showNotification(`✅ Ordine #${order.id.split('-')[0]} aggiornato: ${label} da ${order.chefName}!`);
-                } else if (order.status === 'REJECTED') {
-                  showNotification(`❌ Ordine #${order.id.split('-')[0]} aggiornato: ${label} da ${order.chefName}.`);
-                } else {
-                  showNotification(`📦 Ordine #${order.id.split('-')[0]}: ${label}`);
+          const knownIds = knownOrderIdsRef.current;
+
+          if (hasLoadedInitialOrdersRef.current && activeUser) {
+            // 1. Chef Real-Time Alert: new pending orders targeting logged-in chef
+            if (activeUser.role === 'chef') {
+              const incomingChefOrders = ordersData.filter(
+                order =>
+                  !knownIds.has(order.id) &&
+                  isPendingOrderStatus(order.status) &&
+                  isOrderForChefUser(order, activeUser, activeChefs)
+              );
+              if (incomingChefOrders.length > 0) {
+                const newest = incomingChefOrders[0];
+                const dishTitle = newest.items[0]?.name || 'Nuovo piatto';
+                setUnreadOrderAlertIds(prev =>
+                  Array.from(new Set([...prev, ...incomingChefOrders.map(o => o.id)]))
+                );
+                if (chefSoundEnabledRef.current) {
+                  playNewOrderChime();
                 }
+                showNotification(
+                  incomingChefOrders.length === 1
+                    ? `#${newest.id.split('-')[0]} • ${dishTitle} (€${newest.total.toFixed(2)})`
+                    : `${incomingChefOrders.length} nuovi ordini in attesa di conferma!`,
+                  {
+                    title: 'Nuovo ordine ricevuto!',
+                    variant: 'chef',
+                    actionLabel: 'Vedi Ordini',
+                    onAction: () => {
+                      setSelectedOrder(newest);
+                      setCurrentView(ViewState.ORDERS);
+                    },
+                  }
+                );
               }
+            }
+
+            // 2. Client Real-Time Alert: order status updates for logged-in client
+            const updatedClientOrders = ordersData.filter(order => {
+              const prevStatus = prevMap[order.id];
+              return Boolean(prevStatus && prevStatus !== order.status && order.userId === activeUser.id);
             });
+
+            if (updatedClientOrders.length > 0) {
+              setUnreadOrderAlertIds(prev =>
+                Array.from(new Set([...prev, ...updatedClientOrders.map(o => o.id)]))
+              );
+              const latestUpdated = updatedClientOrders[0];
+              const label = ORDER_STATUS_LABELS[latestUpdated.status] || latestUpdated.status;
+              const code = `#${latestUpdated.id.split('-')[0]}`;
+              let variant: ToastVariant = 'info';
+              let title = 'Aggiornamento Ordine';
+              let msg = `Ordine ${code}: ${label}`;
+
+              if (latestUpdated.status === 'CONFIRMED' || latestUpdated.status === 'PLACED') {
+                variant = 'success';
+                title = 'Ordine Confermato';
+                msg = `Ordine ${code} confermato da ${formatChefDisplayName(latestUpdated.chefName)}!`;
+              } else if (latestUpdated.status === 'REJECTED') {
+                variant = 'error';
+                title = 'Ordine Rifiutato';
+                msg = `Ordine ${code} rifiutato da ${formatChefDisplayName(latestUpdated.chefName)}.`;
+              } else if (latestUpdated.status === 'PREPARING') {
+                variant = 'info';
+                title = 'In Cucina';
+                msg = `${formatChefDisplayName(latestUpdated.chefName)} sta preparando l'ordine ${code}!`;
+              } else if (latestUpdated.status === 'READY') {
+                variant = 'success';
+                title = 'Ordine Pronto!';
+                msg = `Ordine ${code} pronto per ${latestUpdated.deliveryMode === 'delivery' ? 'la consegna' : 'il ritiro'}!`;
+              } else if (latestUpdated.status === 'DELIVERING') {
+                variant = 'info';
+                title = 'In Consegna';
+                msg = `Il rider sta arrivando con il tuo ordine ${code}!`;
+              } else if (latestUpdated.status === 'COMPLETED') {
+                variant = 'success';
+                title = 'Ordine Completato';
+                msg = `Ordine ${code} completato! Buon appetito.`;
+              }
+
+              showNotification(msg, {
+                title,
+                variant,
+                actionLabel: 'Vedi Ordine',
+                onAction: () => {
+                  setSelectedOrder(latestUpdated);
+                  setCurrentView(ViewState.ORDERS);
+                },
+              });
+            }
           }
+
+          hasLoadedInitialOrdersRef.current = true;
           const nextMap: Record<string, OrderStatus> = {};
-          ordersData.forEach(o => { nextMap[o.id] = o.status; });
+          const nextIds = new Set<string>();
+          ordersData.forEach(o => {
+            nextMap[o.id] = o.status;
+            nextIds.add(o.id);
+          });
           prevOrderStatusesRef.current = nextMap;
+          knownOrderIdsRef.current = nextIds;
 
           setOrders(ordersData);
         },
@@ -615,7 +790,7 @@ function App() {
         );
       }
 
-      showNotification(`Profilo di Chef ${updatedChef.name} aggiornato e sincronizzato! 🧑‍🍳`);
+      showNotification(`Profilo di ${formatChefDisplayName(updatedChef.name)} aggiornato e sincronizzato! 🧑‍🍳`);
       return true;
     } catch (err) {
       console.error('Errore aggiornamento profilo chef:', err);
@@ -675,7 +850,7 @@ function App() {
       return [newChef, ...prev];
     });
     firestoreWrite('chefs', newChef.id, newChef);
-    showNotification(`Chef ${newChef.name} registrato con successo nel database partner MESA! 🎉`);
+    showNotification(`${formatChefDisplayName(newChef.name)} registrato con successo nel database partner MESA! 🎉`);
   };
 
   const handleDeleteChef = async (chefId: string, deleteLinkedUser = false) => {
@@ -1102,6 +1277,12 @@ function App() {
     setRegisteredUsers(prev => prev.filter(u => u.id !== userId));
     if (currentUser && currentUser.id === userId) {
       setCurrentUser(null);
+      setSelectedOrder(null);
+      setBookingDish(null);
+      setPendingBookingDish(null);
+      setPendingBookingPayload(null);
+      setPendingPostAuthView(null);
+      setPendingCheckoutTotal(null);
       setCurrentView(ViewState.LANDING);
     }
     showNotification("Account rimosso definitivamente.");
@@ -1112,6 +1293,17 @@ function App() {
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
 
   const [bookingDish, setBookingDish] = useState<Dish | null>(null);
+  const [pendingBookingDish, setPendingBookingDish] = useState<Dish | null>(null);
+  const [pendingBookingPayload, setPendingBookingPayload] = useState<{
+    dish: Dish;
+    date: string;
+    time: string;
+    deliveryMode: 'delivery' | 'pickup';
+    preferences: any;
+  } | null>(null);
+  const [pendingPostAuthView, setPendingPostAuthView] = useState<ViewState | null>(null);
+  const [pendingCheckoutTotal, setPendingCheckoutTotal] = useState<number | null>(null);
+  const [authInitialRole, setAuthInitialRole] = useState<'client' | 'chef' | 'admin'>('client');
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -1120,6 +1312,9 @@ function App() {
   const [checkoutTotal, setCheckoutTotal] = useState(0);
 
   const [toastMessage, setToastMessage] = useState('');
+  const [toastTitle, setToastTitle] = useState<string | undefined>(undefined);
+  const [toastVariant, setToastVariant] = useState<ToastVariant>('success');
+  const [toastAction, setToastAction] = useState<{ label: string; onAction: () => void } | null>(null);
   const [isToastVisible, setIsToastVisible] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>({
@@ -1199,17 +1394,43 @@ function App() {
     return () => clearInterval(timer);
   }, [orders, currentUser]);
 
+  const promptClientAuth = (message: string) => {
+    setAuthInitialRole('client');
+    setIsCartOpen(false);
+    showNotification(message);
+    setIsAuthOpen(true);
+  };
+
+  const handleAuthModalClose = () => {
+    setIsAuthOpen(false);
+    setPendingBookingDish(null);
+    setPendingBookingPayload(null);
+    setPendingPostAuthView(null);
+    setPendingCheckoutTotal(null);
+  };
+
   const navigateTo = (view: ViewState) => {
     if (view === ViewState.PROFILE && !currentUser) {
-      showNotification("Sblocca la tua area! Accedi o registrati come Cliente o Cuoco.");
-      setIsAuthOpen(true);
+      setPendingPostAuthView(ViewState.PROFILE);
+      promptClientAuth("Sblocca la tua area! Accedi o registrati come Cliente o Cuoco.");
+      return;
+    }
+
+    if (view === ViewState.ORDERS && !currentUser) {
+      setPendingPostAuthView(ViewState.ORDERS);
+      promptClientAuth("Accedi o registrati come Cliente per visualizzare o gestire gli ordini.");
       return;
     }
 
     if (view === ViewState.ADMIN_DASHBOARD && currentUser?.role !== 'admin') {
+      setAuthInitialRole('admin');
       showNotification("Accesso riservato. Inserisci la password amministratore per accedere.");
       setIsAuthOpen(true);
       return;
+    }
+
+    if (view === ViewState.ORDERS) {
+      setUnreadOrderAlertIds([]);
     }
 
     setCurrentView(view);
@@ -1229,15 +1450,61 @@ function App() {
     if (currentUser?.role === 'admin') {
       setCurrentView(ViewState.ADMIN_DASHBOARD);
     } else {
+      setAuthInitialRole('admin');
       showNotification("Area riservata. Inserisci la password per accedere all'area amministratore.");
       setIsAuthOpen(true);
     }
   };
 
-  const showNotification = (message: string) => {
+  const showNotification = (
+    message: string,
+    options?: {
+      title?: string;
+      variant?: ToastVariant;
+      actionLabel?: string;
+      onAction?: () => void;
+    }
+  ) => {
     setToastMessage(message);
+    setToastTitle(options?.title);
+    setToastVariant(options?.variant || 'success');
+    setToastAction(
+      options?.actionLabel && options?.onAction
+        ? { label: options.actionLabel, onAction: options.onAction }
+        : null
+    );
     setIsToastVisible(true);
   };
+
+  // Notify logged-in chef immediately if pending orders are already waiting in Firestore
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'chef') {
+      announcedChefSessionRef.current = null;
+      return;
+    }
+    const pendingForChef = orders.filter(
+      o => isPendingOrderStatus(o.status) && isOrderForChefUser(o, currentUser, chefs)
+    );
+    if (pendingForChef.length > 0 && announcedChefSessionRef.current !== currentUser.id) {
+      announcedChefSessionRef.current = currentUser.id;
+      const latestPending = pendingForChef[0];
+      setUnreadOrderAlertIds(prev => Array.from(new Set([...prev, ...pendingForChef.map(o => o.id)])));
+      showNotification(
+        pendingForChef.length === 1
+          ? `Ordine #${latestPending.id.split('-')[0]} in attesa di conferma.`
+          : `Hai ${pendingForChef.length} nuovi ordini in attesa di conferma!`,
+        {
+          title: 'Nuovo ordine ricevuto!',
+          variant: 'chef',
+          actionLabel: 'Apri Ordini',
+          onAction: () => {
+            setSelectedOrder(latestPending);
+            setCurrentView(ViewState.ORDERS);
+          },
+        }
+      );
+    }
+  }, [currentUser?.id, currentUser?.role, orders, chefs]);
 
   const handleToggleFavorite = (dishId: string) => {
     const isFav = favorites.includes(dishId);
@@ -1249,67 +1516,118 @@ function App() {
     showNotification(isFav ? "Rimosso dai preferiti" : "Aggiunto ai preferiti ❤️");
   };
 
-  const handleInitiateBooking = (dish: Dish) => setBookingDish(dish);
-
-  const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus) => {
-    setOrders(prev => prev.map(o => (o.id === orderId ? { ...o, status } : o)));
-    prevOrderStatusesRef.current[orderId] = status;
-    await firestoreWrite('orders', orderId, { status }, true);
-    const label = ORDER_STATUS_LABELS[status] || status;
-    showNotification(`Stato ordine #${orderId.split('-')[0]} aggiornato a: ${label}`);
+  const handleInitiateBooking = (dish: Dish) => {
+    if (!currentUser) {
+      setPendingBookingDish(dish);
+      promptClientAuth("Accedi o registrati come Cliente per ordinare questo piatto.");
+      return;
+    }
+    setBookingDish(dish);
   };
 
-  const handleConfirmBooking = async (date: string, time: string, deliveryMode: 'delivery' | 'pickup', preferences: any) => {
-    if (!bookingDish) return;
+  const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus) => {
+    const targetOrder = orders.find(o => o.id === orderId);
+    const statusLabel = ORDER_STATUS_LABELS[status] || status;
+    const timelineNoteMap: Partial<Record<OrderStatus, string>> = {
+      CONFIRMED: 'Prenotazione confermata dallo chef.',
+      REJECTED: 'Prenotazione rifiutata dallo chef.',
+      PREPARING: 'Lo chef ha iniziato la preparazione.',
+      READY: 'Ordine pronto per ritiro o consegna.',
+      DELIVERING: 'Ordine affidato al rider per la consegna.',
+      COMPLETED: 'Ordine consegnato e completato.',
+    };
+    const nextEntry: OrderTimelineEntry = {
+      id: `tl-${Date.now()}-${status}`,
+      status,
+      title: statusLabel,
+      description: timelineNoteMap[status] || `Stato aggiornato a ${statusLabel}.`,
+      timestamp: new Date(),
+    };
+    const nextTimeline = [...(targetOrder?.timeline || []), nextEntry];
+
+    setOrders(prev =>
+      prev.map(o => (o.id === orderId ? { ...o, status, timeline: nextTimeline } : o))
+    );
+    setUnreadOrderAlertIds(prev => prev.filter(id => id !== orderId));
+    prevOrderStatusesRef.current[orderId] = status;
+    await firestoreWrite('orders', orderId, { status, timeline: nextTimeline }, true);
+    showNotification(`Ordine #${orderId.split('-')[0]} aggiornato: ${statusLabel}`, {
+      title: 'Stato Aggiornato',
+      variant: status === 'REJECTED' ? 'warning' : 'success',
+    });
+  };
+
+  const createAndSaveOrder = async (
+    authenticatedUser: AppUser,
+    dishToBook: Dish,
+    date: string,
+    time: string,
+    deliveryMode: 'delivery' | 'pickup',
+    preferences: any
+  ) => {
     const deliveryFee = deliveryMode === 'delivery' ? 2.50 : 0;
     const bookedItem: CartItem = {
-      ...bookingDish,
+      ...dishToBook,
       quantity: 1,
       scheduledDate: date,
       scheduledTime: time,
       deliveryMode,
       preferences
     };
-    const chefName = chefs.find(c => c.id === bookingDish.chefId)?.name || 'Chef MESA';
-    const customerName = currentUser
-      ? `${currentUser.name} ${currentUser.lastName}`.trim()
-      : 'Cliente Ospite';
+    const chefName = chefs.find(c => c.id === dishToBook.chefId)?.name || 'Chef MESA';
+    const customerName = `${authenticatedUser.name} ${authenticatedUser.lastName}`.trim() || authenticatedUser.email;
+    const now = new Date();
+    const orderId = `MESA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
     const newOrder: Order = {
-      id: `MESA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      ...(currentUser?.id ? { userId: currentUser.id } : {}),
+      id: orderId,
+      userId: authenticatedUser.id,
       customerName,
-      ...(currentUser?.email ? { customerEmail: currentUser.email } : {}),
+      ...(authenticatedUser.email ? { customerEmail: authenticatedUser.email } : {}),
       items: [bookedItem],
-      total: bookingDish.price + deliveryFee,
+      total: dishToBook.price + deliveryFee,
       status: 'PENDING_CONFIRMATION',
-      timestamp: new Date(),
-      chefId: bookingDish.chefId,
+      timestamp: now,
+      chefId: dishToBook.chefId,
       chefName,
       deliveryMode,
       estimatedTime: `${date} ore ${time}`,
-      notificationChannel: 'app'
+      notificationChannel: 'app',
+      timeline: [
+        {
+          id: `tl-init-${orderId}`,
+          status: 'PENDING_CONFIRMATION',
+          title: 'Ordine inviato',
+          description: 'Ordine inviato! In attesa di conferma dallo chef.',
+          timestamp: now,
+        },
+      ],
     };
 
-    if (!currentUser) {
-      setGuestOrderIds(prev => {
-        const next = [newOrder.id, ...prev.filter(id => id !== newOrder.id)];
-        try {
-          localStorage.setItem('mesa_guest_order_ids', JSON.stringify(next));
-        } catch {}
-        return next;
-      });
-    }
-
     prevOrderStatusesRef.current[newOrder.id] = newOrder.status;
+    knownOrderIdsRef.current.add(newOrder.id);
     setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrder.id)]);
     await firestoreWrite('orders', newOrder.id, newOrder);
 
     setBookingDish(null);
-    setSelectedOrder(null);
+    setRecentlyPlacedOrderId(newOrder.id);
+    setSelectedOrder(newOrder);
     setSelectedChef(null);
     setCurrentView(ViewState.ORDERS);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showNotification("Prenotazione inviata! Stato: In attesa di conferma.");
+    showNotification('Ordine inviato! In attesa di conferma dallo chef', {
+      title: 'Ordine Confermato',
+      variant: 'success',
+    });
+  };
+
+  const handleConfirmBooking = async (date: string, time: string, deliveryMode: 'delivery' | 'pickup', preferences: any) => {
+    if (!bookingDish) return;
+    if (!currentUser) {
+      setPendingBookingPayload({ dish: bookingDish, date, time, deliveryMode, preferences });
+      promptClientAuth("Accedi o registrati come Cliente per completare la prenotazione.");
+      return;
+    }
+    await createAndSaveOrder(currentUser, bookingDish, date, time, deliveryMode, preferences);
   };
 
   const handleUpdateQuantity = (id: string, delta: number) => {
@@ -1318,9 +1636,8 @@ function App() {
 
   const handleCheckout = (total: number) => {
     if (!currentUser) {
-      showNotification("Sblocca la tua area! Accedi per ordinare.");
-      setIsCartOpen(false);
-      setIsAuthOpen(true);
+      setPendingCheckoutTotal(total);
+      promptClientAuth("Accedi o registrati come Cliente per completare l'ordine.");
       return;
     }
 
@@ -1341,33 +1658,119 @@ function App() {
   };
 
   const handlePaymentSuccess = async (notificationChannel?: 'app' | 'whatsapp') => {
+    if (!currentUser) {
+      promptClientAuth("Accedi o registrati come Cliente per completare l'ordine.");
+      return;
+    }
     const firstChefId = cart[0]?.chefId || 'c1';
     const chefName = chefs.find(c => c.id === firstChefId)?.name || 'Chef MESA';
-    const customerName = currentUser
-      ? `${currentUser.name} ${currentUser.lastName}`.trim()
-      : 'Cliente Ospite';
+    const customerName = `${currentUser.name} ${currentUser.lastName}`.trim() || currentUser.email;
+    const now = new Date();
+    const orderId = `MESA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
     const newOrder: Order = {
-      id: `MESA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      userId: currentUser?.id,
+      id: orderId,
+      userId: currentUser.id,
       customerName,
-      ...(currentUser?.email ? { customerEmail: currentUser.email } : {}),
+      ...(currentUser.email ? { customerEmail: currentUser.email } : {}),
       items: [...cart],
       total: checkoutTotal,
       status: 'PENDING_CONFIRMATION',
-      timestamp: new Date(),
+      timestamp: now,
       chefId: firstChefId,
       chefName: chefName,
       deliveryMode: cart[0]?.deliveryMode || 'pickup',
       estimatedTime: 'In arrivo...',
-      notificationChannel: notificationChannel || 'app'
+      notificationChannel: notificationChannel || 'app',
+      timeline: [
+        {
+          id: `tl-init-${orderId}`,
+          status: 'PENDING_CONFIRMATION',
+          title: 'Ordine inviato',
+          description: 'Ordine inviato! In attesa di conferma dallo chef.',
+          timestamp: now,
+        },
+      ],
     };
     prevOrderStatusesRef.current[newOrder.id] = newOrder.status;
+    knownOrderIdsRef.current.add(newOrder.id);
     setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrder.id)]);
     await firestoreWrite('orders', newOrder.id, newOrder);
     setCart([]);
+    setIsPaymentOpen(false);
+    setIsCartOpen(false);
+    setRecentlyPlacedOrderId(newOrder.id);
     setSelectedOrder(newOrder);
     setCurrentView(ViewState.ORDERS);
-    showNotification(`Prenotazione inviata! Stato: In attesa di conferma.`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showNotification('Ordine inviato! In attesa di conferma dallo chef', {
+      title: 'Ordine Confermato',
+      variant: 'success',
+    });
+  };
+
+  const handleAuthSuccess = async (user: AppUser, isNewRegistration?: boolean) => {
+    setCurrentUser(user);
+
+    if (isNewRegistration) {
+      showNotification(
+        user.role === 'chef'
+          ? `Benvenuto ${formatChefDisplayName(user.name)}! Registrazione inviata all'Area Admin per la verifica.`
+          : `Benvenuto ${user.name}! Account registrato e sincronizzato.`
+      );
+    }
+
+    if (pendingBookingPayload) {
+      const payload = pendingBookingPayload;
+      setPendingBookingPayload(null);
+      await createAndSaveOrder(
+        user,
+        payload.dish,
+        payload.date,
+        payload.time,
+        payload.deliveryMode,
+        payload.preferences
+      );
+      return;
+    }
+
+    if (pendingBookingDish) {
+      const dishToBook = pendingBookingDish;
+      setPendingBookingDish(null);
+      setBookingDish(dishToBook);
+      return;
+    }
+
+    if (pendingCheckoutTotal !== null) {
+      const amt = pendingCheckoutTotal;
+      setPendingCheckoutTotal(null);
+      const deliveryMode = cart[0]?.deliveryMode || 'pickup';
+      if (deliveryMode === 'delivery' && !user.addresses.some(addr => addr.isVerified)) {
+        showNotification("Sicurezza MESA: Richiesto un indirizzo verificato dall'Admin per la consegna!");
+        setCurrentView(ViewState.PROFILE);
+        setIsCartOpen(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      setCheckoutTotal(amt);
+      setIsPaymentOpen(true);
+      return;
+    }
+
+    if (pendingPostAuthView) {
+      const targetView = pendingPostAuthView;
+      setPendingPostAuthView(null);
+      setSelectedOrder(null);
+      setCurrentView(targetView);
+      setIsCartOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (user.role === 'admin') {
+      navigateTo(ViewState.ADMIN_DASHBOARD);
+    } else {
+      navigateTo(ViewState.PROFILE);
+    }
   };
 
   const handleReviewSubmit = (rating: number, comment: string) => {
@@ -1508,29 +1911,40 @@ function App() {
 
   const visibleClientOrders = useMemo(() => {
     if (!currentUser) {
-      return orders.filter(o => !o.userId || guestOrderIds.includes(o.id));
+      return [];
     }
     if (currentUser.role === 'admin') {
       return orders;
     }
     if (currentUser.role === 'chef') {
-      const matchedChef = chefs.find(c =>
-        (c.email && currentUser.email && c.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
-        c.id === `chef-${currentUser.id}` ||
-        c.id === currentUser.id ||
-        `usr-${c.id}` === currentUser.id ||
-        `usr-${c.id.replace('chef-', '')}` === currentUser.id
-      );
-      return orders.filter(o =>
-        o.userId === currentUser.id ||
-        (matchedChef && (o.chefId === matchedChef.id || o.chefName?.trim().toLowerCase() === matchedChef.name.trim().toLowerCase()))
-      );
+      return orders.filter(o => o.userId === currentUser.id || isOrderForChefUser(o, currentUser, chefs));
     }
     return orders.filter(o => o.userId === currentUser.id || guestOrderIds.includes(o.id));
   }, [orders, currentUser, guestOrderIds, chefs]);
 
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const activeOrdersCount = visibleClientOrders.filter(o => o.status !== 'COMPLETED' && o.status !== 'REJECTED').length;
+  const activeOrdersCount = useMemo(() => {
+    if (!currentUser) return 0;
+    if (currentUser.role === 'chef') {
+      const pendingOrUnreadIds = new Set<string>([
+        ...visibleClientOrders.filter(o => isPendingOrderStatus(o.status)).map(o => o.id),
+        ...unreadOrderAlertIds,
+      ]);
+      return pendingOrUnreadIds.size;
+    }
+    const activeIds = new Set<string>([
+      ...visibleClientOrders.filter(o => o.status !== 'COMPLETED' && o.status !== 'REJECTED').map(o => o.id),
+      ...unreadOrderAlertIds,
+    ]);
+    return activeIds.size;
+  }, [currentUser, visibleClientOrders, unreadOrderAlertIds]);
+
+  const chefPendingBadgeCount = useMemo(() => {
+    if (!currentUser || currentUser.role !== 'chef') return 0;
+    return visibleClientOrders.filter(o => isPendingOrderStatus(o.status)).length;
+  }, [currentUser, visibleClientOrders]);
+
+  const hasUnreadOrderAlerts = unreadOrderAlertIds.length > 0;
 
   // View dedicata per Landing Page (Sito Web)
   if (currentView === ViewState.LANDING) {
@@ -1548,7 +1962,15 @@ function App() {
           onShareClick={() => setIsShareOpen(true)}
         />
         <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
-        <NotificationToast message={toastMessage} isVisible={isToastVisible} onClose={() => setIsToastVisible(false)} />
+        <NotificationToast
+          message={toastMessage}
+          title={toastTitle}
+          variant={toastVariant}
+          actionLabel={toastAction?.label}
+          onAction={toastAction?.onAction}
+          isVisible={isToastVisible}
+          onClose={() => setIsToastVisible(false)}
+        />
         <AddressGateModal 
           isOpen={isAddressGateOpen} 
           onClose={() => setIsAddressGateOpen(false)} 
@@ -1578,7 +2000,31 @@ function App() {
         )}
         <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} onUpdateQuantity={handleUpdateQuantity} onCheckout={handleCheckout} onAddDish={handleInitiateBooking} availableChefs={chefs} />
         <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} total={checkoutTotal} onSuccess={handlePaymentSuccess} cart={cart} availableChefs={chefs} />
-        <NotificationToast message={toastMessage} isVisible={isToastVisible} onClose={() => setIsToastVisible(false)} />
+        <AuthModal 
+          isOpen={isAuthOpen} 
+          onClose={handleAuthModalClose} 
+          registeredUsers={registeredUsers}
+          chefs={chefs}
+          initialRole={authInitialRole}
+          onLoginSuccess={handleAuthSuccess}
+          onRegisterUser={handleRegisterUser}
+          onOpenOnboarding={() => setIsOnboardingOpen(true)}
+        />
+        <ChefOnboarding 
+          isOpen={isOnboardingOpen} 
+          onClose={() => setIsOnboardingOpen(false)} 
+          onSubmitApplication={handleChefSubmitApplication}
+          currentUser={currentUser} 
+        />
+        <NotificationToast
+          message={toastMessage}
+          title={toastTitle}
+          variant={toastVariant}
+          actionLabel={toastAction?.label}
+          onAction={toastAction?.onAction}
+          isVisible={isToastVisible}
+          onClose={() => setIsToastVisible(false)}
+        />
         {cartCount > 0 && !isCartOpen && (
           <button 
             onClick={() => setIsCartOpen(true)}
@@ -1599,10 +2045,12 @@ function App() {
       <Header 
         cartCount={cartCount} 
         orderCount={activeOrdersCount} 
+        hasUnreadOrders={hasUnreadOrderAlerts}
+        chefAlertCount={chefPendingBadgeCount}
         onCartClick={() => setIsCartOpen(true)} 
         currentView={currentView} 
         onNavigate={navigateTo} 
-        onAuthClick={() => setIsAuthOpen(true)}
+        onAuthClick={() => { setAuthInitialRole('client'); setIsAuthOpen(true); }}
         onShareClick={() => setIsShareOpen(true)}
         onOnboardingClick={() => setIsOnboardingOpen(true)}
         currentUser={currentUser}
@@ -1695,16 +2143,16 @@ function App() {
                 {matchingDishes.length > 0 ? (
                   <>
                     {/* Risultati Diretti per Piatto */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
                       {matchingDishes.map(({ dish, chef }) => {
                         const isFav = favorites.includes(dish.id);
                         return (
                           <div
                             key={`${chef.id}-${dish.id}`}
                             onClick={() => handleInitiateBooking(dish)}
-                            className="group bg-white rounded-[2rem] sm:rounded-[2.5rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-200 cursor-pointer shadow-sm"
+                            className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-200 cursor-pointer shadow-sm"
                           >
-                            <div className="relative h-36 sm:h-56 overflow-hidden shrink-0">
+                            <div className="relative h-44 overflow-hidden shrink-0">
                               <img
                                 src={dish.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'}
                                 alt={dish.name}
@@ -1714,11 +2162,11 @@ function App() {
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
 
-                              <div className="absolute top-3 left-3 sm:top-4 sm:left-4 bg-black/85 backdrop-blur-md text-white text-[11px] font-black px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl uppercase tracking-widest shadow-xl">
+                              <div className="absolute top-3 left-3 bg-black/85 backdrop-blur-md text-white text-[11px] font-black px-3 py-1 rounded-xl uppercase tracking-widest shadow-xl">
                                 € {dish.price.toFixed(2)}
                               </div>
 
-                              <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 bg-white/95 backdrop-blur-sm text-black text-[10px] font-black px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl uppercase tracking-wider shadow-md flex items-center gap-1.5">
+                              <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-sm text-black text-[10px] font-black px-2.5 py-1 rounded-xl uppercase tracking-wider shadow-md flex items-center gap-1.5">
                                 <CountryFlag flag={chef.nationality} title={chef.countryName} size="sm" />
                                 <span className="text-gray-800 tracking-tight">{chef.countryName}</span>
                               </div>
@@ -1728,45 +2176,45 @@ function App() {
                                   e.stopPropagation();
                                   handleToggleFavorite(dish.id);
                                 }}
-                                className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 sm:p-2.5 bg-white/95 backdrop-blur rounded-xl sm:rounded-2xl shadow-xl hover:bg-white transition-all z-10"
+                                className="absolute top-3 right-3 p-2 bg-white/95 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all z-10"
                               >
-                                <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+                                <Heart className={`w-4 h-4 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
                               </button>
                             </div>
 
-                            <div className="p-3.5 sm:p-6 flex-1 flex flex-col justify-between gap-2.5 sm:gap-3">
+                            <div className="p-4 flex-1 flex flex-col justify-between gap-2.5">
                               <div>
-                                <h3 className="font-black italic text-orange-600 text-[15px] sm:text-lg leading-snug group-hover:text-orange-700 transition-colors mb-1 line-clamp-2">
+                                <h3 className="font-black italic text-orange-600 text-[15px] leading-snug group-hover:text-orange-700 transition-colors mb-1 line-clamp-2">
                                   {dish.name}
                                 </h3>
-                                <p className="text-black text-xs leading-snug sm:leading-relaxed mb-2 line-clamp-2 italic font-medium">
+                                <p className="text-black text-xs leading-snug mb-2 line-clamp-2 italic font-medium">
                                   "{dish.description}"
                                 </p>
                                 <AllergensRow allergens={dish.allergens} className="mb-2" />
                                 <div className="flex flex-wrap gap-1.5">
-                                  <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-orange-50 text-orange-800 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                                  <span className="px-2 py-0.5 bg-orange-50 text-orange-800 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
                                     <Clock className="w-3 h-3 text-orange-600" /> 25-35 min
                                   </span>
                                   {dish.tags.slice(0, 2).map(tag => (
-                                    <span key={tag} className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-gray-50 border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-500">
+                                    <span key={tag} className="px-2 py-0.5 bg-gray-50 border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-500">
                                       {tag}
                                     </span>
                                   ))}
                                 </div>
                               </div>
 
-                              <div className="space-y-2 sm:space-y-3">
+                              <div className="space-y-2.5">
                                 <div
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleViewProfile(chef);
                                   }}
-                                  className="flex items-center justify-between p-2 sm:p-2.5 bg-gray-50 hover:bg-orange-50/60 rounded-2xl border border-gray-100 transition-colors"
+                                  className="flex items-center justify-between p-2.5 bg-gray-50 hover:bg-orange-50/60 rounded-2xl border border-gray-100 transition-colors"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <img src={chef.avatar} alt={chef.name} className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl object-cover shrink-0" />
+                                    <img src={chef.avatar} alt={chef.name} className="w-7 h-7 rounded-xl object-cover shrink-0" />
                                     <div className="min-w-0">
-                                      <p className="text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none">Chef</p>
+                                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">Chef Locale</p>
                                       <span className="text-xs font-bold text-gray-800 truncate block">{chef.name}</span>
                                     </div>
                                   </div>
@@ -1782,7 +2230,7 @@ function App() {
                                   </div>
                                 </div>
 
-                                <button className="w-full py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-orange-600 hover:bg-black text-white font-black uppercase tracking-widest text-[11px] sm:text-[10px] flex items-center justify-center gap-2 transition-all shadow-md active:scale-95">
+                                <button className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-black text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95">
                                   <ShoppingBag className="w-4 h-4" />
                                   <span>Scegli e Prenota</span>
                                 </button>
@@ -1831,52 +2279,106 @@ function App() {
         {currentView === ViewState.EXPERIENCES && <ExperiencesSection />}
         {currentView === ViewState.FAVORITES && <FavoritesSection favorites={favorites} chefs={baseChefs} onAddDish={handleInitiateBooking} onToggleFavorite={handleToggleFavorite} />}
         {currentView === ViewState.ORDERS && (
-          selectedOrder 
-            ? <OrderTracking 
-                order={orders.find(o => o.id === selectedOrder.id) || selectedOrder} 
-                onBack={() => setSelectedOrder(null)} 
-                chefs={chefs} 
-                onUpdateOrderStatus={handleUpdateOrderStatus}
-              />
-            : (
-              <div className="animate-fade-in space-y-6">
-                <h2 className="text-3xl font-black text-orange-600 mb-8 tracking-tight">I Miei Ordini</h2>
-                {visibleClientOrders.length === 0 ? <p className="text-gray-400 font-bold py-20 text-center bg-gray-50 rounded-[3rem]">Nessun ordine attivo.</p> : visibleClientOrders.map(order => {
-                  const firstItem = order.items[0];
-                  const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status;
-                  const isConfirmed = order.status === 'CONFIRMED' || order.status === 'PLACED';
-                  return (
-                    <div key={order.id} onClick={() => setSelectedOrder(order)} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all cursor-pointer flex flex-col sm:flex-row justify-between sm:items-center gap-4 group">
-                      <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{order.id.split('-')[0]}</p>
-                        <h4 className="font-bold text-xl text-orange-600">{firstItem?.name || order.chefName}</h4>
-                        <p className="text-xs text-black font-medium mt-0.5">
-                          Chef {order.chefName} • {order.items.length} {order.items.length === 1 ? 'piatto' : 'piatti'} • €{order.total.toFixed(2)}
-                        </p>
-                        {firstItem?.scheduledDate && (
-                          <p className="text-[11px] text-black/75 font-semibold mt-1">
-                            {order.deliveryMode === 'delivery' ? 'Consegna a domicilio' : 'Ritiro'} • {firstItem.scheduledDate} ore {firstItem.scheduledTime}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                          order.status === 'COMPLETED' || isConfirmed
-                            ? 'bg-green-100 text-green-700 border-green-200'
-                            : order.status === 'REJECTED'
-                              ? 'bg-red-100 text-red-700 border-red-200'
-                              : order.status === 'PENDING_CONFIRMATION'
-                                ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                : 'bg-orange-100 text-orange-700 border-orange-200 animate-pulse'
-                        }`}>
-                          {statusLabel}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+          !currentUser ? (
+            <div className="animate-fade-in py-16 px-6 bg-gray-50 rounded-[2.5rem] border border-gray-200 text-center max-w-xl mx-auto space-y-4">
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">Accesso richiesto per gli Ordini</h2>
+              <p className="text-sm text-gray-600 font-medium leading-relaxed">
+                Accedi o registrati come Cliente per visualizzare le tue prenotazioni e seguirne lo stato in tempo reale.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingPostAuthView(ViewState.ORDERS);
+                  promptClientAuth("Accedi o registrati come Cliente per visualizzare i tuoi ordini.");
+                }}
+                className="px-7 py-3.5 bg-orange-600 hover:bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg transition-all active:scale-95"
+              >
+                Accedi o Registrati
+              </button>
+            </div>
+          ) : selectedOrder ? (
+            <OrderTracking 
+              order={orders.find(o => o.id === selectedOrder.id) || selectedOrder} 
+              onBack={() => {
+                setSelectedOrder(null);
+                setRecentlyPlacedOrderId(null);
+              }} 
+              chefs={chefs} 
+              userRole={currentUser.role}
+              justPlaced={selectedOrder.id === recentlyPlacedOrderId}
+              onUpdateOrderStatus={currentUser.role === 'chef' || currentUser.role === 'admin' ? handleUpdateOrderStatus : undefined}
+            />
+          ) : (
+            <div className="animate-fade-in space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                <h2 className="text-3xl font-black text-orange-600 tracking-tight">
+                  {currentUser.role === 'chef' ? 'Ordini Ricevuti' : 'I Miei Ordini'}
+                </h2>
+                {currentUser.role === 'chef' && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setChefSoundEnabled(prev => !prev)}
+                      className={`px-3.5 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
+                        chefSoundEnabled
+                          ? 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100'
+                          : 'bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      {chefSoundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                      <span>{chefSoundEnabled ? 'Avviso Sonoro ON' : 'Avviso Sonoro OFF'}</span>
+                    </button>
+                    {chefPendingBadgeCount > 0 && (
+                      <span className="px-3.5 py-2 rounded-2xl bg-red-600 text-white text-[10px] font-black uppercase tracking-widest animate-pulse">
+                        {chefPendingBadgeCount} in attesa
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-            )
+              {visibleClientOrders.length === 0 ? <p className="text-gray-400 font-bold py-20 text-center bg-gray-50 rounded-[3rem]">Nessun ordine attivo.</p> : visibleClientOrders.map(order => {
+                const firstItem = order.items[0];
+                const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status;
+                const isConfirmed = order.status === 'CONFIRMED' || order.status === 'PLACED';
+                return (
+                  <div
+                    key={order.id}
+                    onClick={() => {
+                      setUnreadOrderAlertIds(prev => prev.filter(id => id !== order.id));
+                      setSelectedOrder(order);
+                    }}
+                    className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all cursor-pointer flex flex-col sm:flex-row justify-between sm:items-center gap-4 group"
+                  >
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{order.id.split('-')[0]}</p>
+                      <h4 className="font-bold text-xl text-orange-600">{firstItem?.name || order.chefName}</h4>
+                      <p className="text-xs text-black font-medium mt-0.5">
+                        {currentUser.role === 'chef' ? `Cliente ${order.customerName}` : formatChefDisplayName(order.chefName)} • {order.items.length} {order.items.length === 1 ? 'piatto' : 'piatti'} • €{order.total.toFixed(2)}
+                      </p>
+                      {firstItem?.scheduledDate && (
+                        <p className="text-[11px] text-black/75 font-semibold mt-1">
+                          {order.deliveryMode === 'delivery' ? 'Consegna a domicilio' : 'Ritiro'} • {firstItem.scheduledDate} ore {firstItem.scheduledTime}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                        order.status === 'COMPLETED' || isConfirmed
+                          ? 'bg-green-100 text-green-700 border-green-200'
+                          : order.status === 'REJECTED'
+                            ? 'bg-red-100 text-red-700 border-red-200'
+                            : order.status === 'PENDING_CONFIRMATION'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-orange-100 text-orange-700 border-orange-200 animate-pulse'
+                      }`}>
+                        {statusLabel}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
         )}
         {currentView === ViewState.CHEF_PROFILE && selectedChef && (
           <ChefProfile chef={selectedChef} onBack={() => navigateTo(ViewState.HOME)} onAddDish={handleInitiateBooking} favorites={favorites} onToggleFavorite={handleToggleFavorite} onNavigateToCulture={() => navigateTo(ViewState.CULTURE)} />
@@ -1888,6 +2390,14 @@ function App() {
             onLogout={() => {
               if (auth) signOut(auth).catch(() => {});
               setCurrentUser(null);
+              setSelectedOrder(null);
+              setBookingDish(null);
+              setUnreadOrderAlertIds([]);
+              setRecentlyPlacedOrderId(null);
+              setPendingBookingDish(null);
+              setPendingBookingPayload(null);
+              setPendingPostAuthView(null);
+              setPendingCheckoutTotal(null);
               navigateTo(ViewState.LANDING);
               showNotification("Sconnesso dall'Area Personale MESA. A presto! 👋");
             }}
@@ -1899,6 +2409,8 @@ function App() {
             onUpdateChef={handleUpdateChef}
             onSaveChefDishes={handleSaveChefDishes}
             onUpdateOrderStatus={handleUpdateOrderStatus}
+            soundAlertsEnabled={chefSoundEnabled}
+            onToggleSoundAlerts={() => setChefSoundEnabled(prev => !prev)}
             registeredUsers={registeredUsers}
             chefApplications={chefApplications}
             onOpenOnboarding={() => setIsOnboardingOpen(true)}
@@ -1940,6 +2452,8 @@ function App() {
         currentView={currentView}
         onNavigate={navigateTo}
         cartCount={cartCount}
+        orderCount={activeOrdersCount}
+        hasUnreadOrders={hasUnreadOrderAlerts}
         onCartClick={() => setIsCartOpen(true)}
         isCartOpen={isCartOpen}
       />
@@ -1996,24 +2510,11 @@ function App() {
       
       <AuthModal 
         isOpen={isAuthOpen} 
-        onClose={() => setIsAuthOpen(false)} 
+        onClose={handleAuthModalClose} 
         registeredUsers={registeredUsers}
         chefs={chefs}
-        onLoginSuccess={(user, isNewRegistration) => {
-          setCurrentUser(user);
-          if (user.role === 'admin') {
-            navigateTo(ViewState.ADMIN_DASHBOARD);
-          } else {
-            navigateTo(ViewState.PROFILE);
-            if (isNewRegistration) {
-              showNotification(
-                user.role === 'chef'
-                  ? `Benvenuto Chef ${user.name}! Registrazione inviata all'Area Admin per la verifica.`
-                  : `Benvenuto ${user.name}! Account registrato e sincronizzato.`
-              );
-            }
-          }
-        }}
+        initialRole={authInitialRole}
+        onLoginSuccess={handleAuthSuccess}
         onRegisterUser={handleRegisterUser}
         onOpenOnboarding={() => setIsOnboardingOpen(true)}
       />
@@ -2026,7 +2527,15 @@ function App() {
         onSubmitApplication={handleChefSubmitApplication}
         currentUser={currentUser} 
       />
-      <NotificationToast message={toastMessage} isVisible={isToastVisible} onClose={() => setIsToastVisible(false)} />
+      <NotificationToast
+        message={toastMessage}
+        title={toastTitle}
+        variant={toastVariant}
+        actionLabel={toastAction?.label}
+        onAction={toastAction?.onAction}
+        isVisible={isToastVisible}
+        onClose={() => setIsToastVisible(false)}
+      />
 
       <AddressGateModal 
         isOpen={isAddressGateOpen} 
