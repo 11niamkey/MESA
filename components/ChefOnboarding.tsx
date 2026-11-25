@@ -8,6 +8,7 @@ import {
 import { Chef, AppUser, ChefApplication, ChefDocument, Continent } from '../types';
 import { CountryFlag } from './CountryFlag';
 import { ImagePickerBox } from './ImagePickerBox';
+import { AllergensPicker } from './Allergens';
 import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, normalizeLocationToPordenone } from './italianTerritoryData';
 
 interface ChefOnboardingProps {
@@ -134,6 +135,7 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
   const [proposedDishDesc, setProposedDishDesc] = useState('Piatto preparato fresco su ordinazione con ingredienti selezionati.');
   const [proposedDishPrice, setProposedDishPrice] = useState<number>(14.50);
   const [proposedDishImage, setProposedDishImage] = useState<string>('');
+  const [proposedDishAllergens, setProposedDishAllergens] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -313,6 +315,7 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
       proposedDishDesc: proposedDishDesc.trim() || 'Piatto preparato fresco su ordinazione.',
       proposedDishPrice: proposedDishPrice || 14.50,
       ...(proposedDishImage.trim() ? { proposedDishImage: proposedDishImage.trim() } : {}),
+      proposedDishAllergens,
       availableDays: selectedDays.length > 0 ? selectedDays : [1, 2, 3, 4, 5, 6],
       availabilitySlots: selectedSlots.length > 0 ? selectedSlots : ['12:00 - 15:00', '19:00 - 22:00'],
       status: 'pending',
@@ -1045,6 +1048,13 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                         onChange={setProposedDishImage}
                         label="Foto del Primo Piatto (opzionale)"
                         helperText="Carica una foto reale del tuo piatto forte o incolla un link immagine."
+                      />
+
+                      <AllergensPicker
+                        selected={proposedDishAllergens}
+                        onChange={setProposedDishAllergens}
+                        label="Allergeni del Primo Piatto"
+                        helperText="Seleziona rapidamente gli allergeni presenti per informare i clienti in sicurezza."
                       />
 
                       {/* Summary Box */}

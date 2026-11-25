@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Plus, X, ImagePlus, Trash2, Loader2, Link2, Pencil, UtensilsCrossed } from 'lucide-react';
 import { Chef, Dish } from '../types';
+import { AllergensPicker, AllergensRow } from './Allergens';
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 
@@ -58,6 +59,7 @@ interface Draft {
   tags: string;
   ingredients: string;
   preparation: string;
+  allergens: string[];
 }
 
 interface AdminDishesPanelProps {
@@ -77,7 +79,7 @@ export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({
   onChefFilterChange,
   singleChefMode = false,
   title = 'Piatti del Catalogo',
-  subtitle = 'Tocca un piatto per cambiarne foto, nome, descrizione e prezzo. Le modifiche sono visibili subito a tutti.'
+  subtitle = 'Tocca un piatto per cambiarne foto, nome, descrizione, allergeni e prezzo. Le modifiche sono visibili subito a tutti.'
 }) => {
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -106,6 +108,7 @@ export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({
       tags: (dish.tags || []).join(', '),
       ingredients: (dish.ingredients || []).join(', '),
       preparation: dish.preparation || '',
+      allergens: dish.allergens || [],
     });
 
   const openNew = () =>
@@ -119,6 +122,7 @@ export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({
       tags: '',
       ingredients: '',
       preparation: '',
+      allergens: [],
     });
 
   return (
@@ -197,6 +201,7 @@ export const AdminDishesPanel: React.FC<AdminDishesPanelProps> = ({
               <div className="p-5 space-y-2">
                 <h4 className="font-extrabold text-base text-gray-900 leading-tight line-clamp-1">{dish.name}</h4>
                 <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 min-h-[2.5rem]">{dish.description}</p>
+                <AllergensRow allergens={dish.allergens} />
                 <p className="text-[10px] font-black uppercase tracking-widest text-orange-600 pt-1">
                   {chef.nationality} {chef.name}
                 </p>
@@ -295,6 +300,7 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, singleC
       price: Math.round(priceValue * 100) / 100,
       image: draft.image.trim(),
       tags,
+      allergens: draft.allergens,
       ...(ingredients.length > 0 ? { ingredients } : {}),
       ...(preparation ? { preparation } : {}),
     } as Dish;
@@ -486,6 +492,11 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, singleC
                   />
                 </Field>
               </div>
+
+              <AllergensPicker
+                selected={draft.allergens}
+                onChange={(allergens) => set({ allergens })}
+              />
 
               {error && (
                 <p className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">{error}</p>

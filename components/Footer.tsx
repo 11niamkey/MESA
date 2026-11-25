@@ -19,7 +19,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   };
 
   return (
-    <footer className="bg-black text-white border-t border-orange-900/30 pt-16 pb-24 md:pb-8 animate-fade-in">
+    <footer className="bg-black text-white border-t border-orange-900/30 pt-14 sm:pt-16 pb-28 md:pb-10 animate-fade-in">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           

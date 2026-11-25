@@ -34,6 +34,7 @@ import { LandingPage } from './components/LandingPage';
 import { PersonalArea } from './components/PersonalArea';
 import { DishCatalogByOrigin } from './components/DishCatalogByOrigin';
 import { CountryFlag } from './components/CountryFlag';
+import { AllergensRow } from './components/Allergens';
 import { isPordenoneLocation, normalizeLocationToPordenone, resolvePordenoneZip, findPordenoneComune } from './components/italianTerritoryData';
 import { MOCK_CHEFS } from './constants';
 import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderStatus, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
@@ -79,6 +80,7 @@ const DEFAULT_APPLICATIONS: ChefApplication[] = [
     proposedDishName: 'Attiéké con Pesce Fritto Croccante (Garba)',
     proposedDishDesc: 'Semola di manioca fermentata (Attiéké) soffice e acidula, servita con trancio di tonno fritto, cipolle rosse e peperoncino ivoriano.',
     proposedDishPrice: 13.50,
+    proposedDishAllergens: ['Pesce', 'Glutine'],
     status: 'pending',
     submittedAt: '12/08/2026 09:30'
   },
@@ -121,6 +123,7 @@ const DEFAULT_APPLICATIONS: ChefApplication[] = [
     proposedDishName: 'Tagliatelle d\'Anatra al Mattarello col Ragù di Mamma',
     proposedDishDesc: 'Uova di galline ruspanti e farina di grano tenero tipo 0, condite con ragù classico bolognese cotto 6 ore.',
     proposedDishPrice: 15.00,
+    proposedDishAllergens: ['Glutine', 'Uova', 'Lattosio', 'Sedano'],
     status: 'pending',
     submittedAt: '11/08/2026 18:45'
   }
@@ -183,9 +186,17 @@ const normalizeChef = (chef: Chef): Chef => {
     : (mockMatch?.location || 'Pordenone (PN), Centro');
 
   const hadOldCityText = /\b(Milano|Napoli|Genova|Prato|Trastevere)\b/i.test(`${chef.bio || ''} ${chef.fullBio || ''}`);
+  const normalizedDishes = Array.isArray(chef.dishes)
+    ? chef.dishes.map(dish => {
+        if (dish.allergens !== undefined) return dish;
+        const mockDish = mockMatch?.dishes.find(md => md.id === dish.id);
+        return mockDish?.allergens !== undefined ? { ...dish, allergens: mockDish.allergens } : dish;
+      })
+    : [];
 
   return {
     ...chef,
+    dishes: normalizedDishes,
     email: chef.email || `chef.${cleanName}@mesa.com`,
     password: chef.password || 'demo123',
     countryName: resolvedCountry,
@@ -255,14 +266,16 @@ const seedFirestoreDefaults = async () => {
       }
     });
 
-    // Enforce Provincia di Pordenone competence area on existing Firestore chef docs
+    // Enforce Provincia di Pordenone competence area and backfill allergens on existing Firestore chef docs
     chefsSnap.docs.forEach(docSnap => {
       const data = docSnap.data() as Chef;
       const normalized = normalizeChef(data);
+      const dishesChanged = JSON.stringify(normalized.dishes) !== JSON.stringify(data.dishes || []);
       if (
         normalized.location !== data.location ||
         normalized.bio !== data.bio ||
-        normalized.fullBio !== data.fullBio
+        normalized.fullBio !== data.fullBio ||
+        dishesChanged
       ) {
         writes.push(
           setDoc(
@@ -270,7 +283,8 @@ const seedFirestoreDefaults = async () => {
             {
               location: normalized.location,
               ...(normalized.bio !== data.bio ? { bio: normalized.bio } : {}),
-              ...(normalized.fullBio !== data.fullBio ? { fullBio: normalized.fullBio } : {})
+              ...(normalized.fullBio !== data.fullBio ? { fullBio: normalized.fullBio } : {}),
+              ...(dishesChanged ? { dishes: normalized.dishes } : {})
             },
             { merge: true }
           )
@@ -850,7 +864,8 @@ function App() {
               price: app.proposedDishPrice || 14.5,
               image: app.proposedDishImage || app.kitchenPhotos?.[0] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
               chefId: existingChef?.id || chefId,
-              tags: app.specialties || ['Tradizionale']
+              tags: app.specialties || ['Tradizionale'],
+              allergens: app.proposedDishAllergens || []
             }
           ],
       distance: existingChef?.distance || 1.1,
@@ -1579,7 +1594,7 @@ function App() {
 
   return (
     <div className={`min-h-screen bg-white text-gray-900 font-sans flex flex-col transition-all duration-300 ${
-      cartCount > 0 && !isCartBarDismissed && !isCartOpen ? 'pb-40 md:pb-24' : 'pb-20 md:pb-8'
+      cartCount > 0 && !isCartBarDismissed && !isCartOpen ? 'pb-44 md:pb-24' : 'pb-24 md:pb-8'
     }`}>
       <Header 
         cartCount={cartCount} 
@@ -1598,7 +1613,7 @@ function App() {
       
       {currentView === ViewState.HOME && <FilterBar filters={filters} onFilterChange={setFilters} chefs={chefs} />}
 
-      <main className="max-w-6xl mx-auto px-4 py-6 flex-grow w-full mb-8">
+      <main className="max-w-6xl mx-auto px-4 py-4 sm:py-6 flex-grow w-full mb-10 pb-4">
         {currentView === ViewState.HOME && (
           <div className="animate-fade-in">
             {!hasActiveFilters ? (
@@ -1680,16 +1695,16 @@ function App() {
                 {matchingDishes.length > 0 ? (
                   <>
                     {/* Risultati Diretti per Piatto */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-8">
                       {matchingDishes.map(({ dish, chef }) => {
                         const isFav = favorites.includes(dish.id);
                         return (
                           <div
                             key={`${chef.id}-${dish.id}`}
                             onClick={() => handleInitiateBooking(dish)}
-                            className="group bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-200 cursor-pointer"
+                            className="group bg-white rounded-[2rem] sm:rounded-[2.5rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-200 cursor-pointer shadow-sm"
                           >
-                            <div className="relative h-56 overflow-hidden">
+                            <div className="relative h-36 sm:h-56 overflow-hidden shrink-0">
                               <img
                                 src={dish.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'}
                                 alt={dish.name}
@@ -1699,11 +1714,11 @@ function App() {
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
 
-                              <div className="absolute top-4 left-4 bg-black/85 backdrop-blur-md text-white text-[11px] font-black px-3.5 py-1.5 rounded-2xl uppercase tracking-widest shadow-xl">
+                              <div className="absolute top-3 left-3 sm:top-4 sm:left-4 bg-black/85 backdrop-blur-md text-white text-[11px] font-black px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl uppercase tracking-widest shadow-xl">
                                 € {dish.price.toFixed(2)}
                               </div>
 
-                              <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm text-black text-[10px] font-black px-3 py-1.5 rounded-2xl uppercase tracking-wider shadow-md flex items-center gap-1.5">
+                              <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 bg-white/95 backdrop-blur-sm text-black text-[10px] font-black px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl uppercase tracking-wider shadow-md flex items-center gap-1.5">
                                 <CountryFlag flag={chef.nationality} title={chef.countryName} size="sm" />
                                 <span className="text-gray-800 tracking-tight">{chef.countryName}</span>
                               </div>
@@ -1713,44 +1728,45 @@ function App() {
                                   e.stopPropagation();
                                   handleToggleFavorite(dish.id);
                                 }}
-                                className="absolute top-4 right-4 p-2.5 bg-white/95 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all z-10"
+                                className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 sm:p-2.5 bg-white/95 backdrop-blur rounded-xl sm:rounded-2xl shadow-xl hover:bg-white transition-all z-10"
                               >
-                                <Heart className={`w-5 h-5 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+                                <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
                               </button>
                             </div>
 
-                            <div className="p-6 flex-1 flex flex-col justify-between">
+                            <div className="p-3.5 sm:p-6 flex-1 flex flex-col justify-between gap-2.5 sm:gap-3">
                               <div>
-                                <h3 className="font-black italic text-orange-600 text-base sm:text-lg leading-tight group-hover:text-orange-700 transition-colors mb-2 truncate">
+                                <h3 className="font-black italic text-orange-600 text-[15px] sm:text-lg leading-snug group-hover:text-orange-700 transition-colors mb-1 line-clamp-2">
                                   {dish.name}
                                 </h3>
-                                <p className="text-black text-xs leading-relaxed mb-3 line-clamp-2 italic font-medium">
+                                <p className="text-black text-xs leading-snug sm:leading-relaxed mb-2 line-clamp-2 italic font-medium">
                                   "{dish.description}"
                                 </p>
-                                <div className="flex flex-wrap gap-1.5 mb-4">
-                                  <span className="px-2.5 py-1 bg-orange-50 text-orange-800 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                                <AllergensRow allergens={dish.allergens} className="mb-2" />
+                                <div className="flex flex-wrap gap-1.5">
+                                  <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-orange-50 text-orange-800 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
                                     <Clock className="w-3 h-3 text-orange-600" /> 25-35 min
                                   </span>
-                                  {dish.tags.map(tag => (
-                                    <span key={tag} className="px-2.5 py-1 bg-gray-50 border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-500">
+                                  {dish.tags.slice(0, 2).map(tag => (
+                                    <span key={tag} className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-gray-50 border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-500">
                                       {tag}
                                     </span>
                                   ))}
                                 </div>
                               </div>
 
-                              <div className="space-y-3">
+                              <div className="space-y-2 sm:space-y-3">
                                 <div
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleViewProfile(chef);
                                   }}
-                                  className="flex items-center justify-between p-2.5 bg-gray-50 hover:bg-orange-50/60 rounded-2xl border border-gray-100 transition-colors"
+                                  className="flex items-center justify-between p-2 sm:p-2.5 bg-gray-50 hover:bg-orange-50/60 rounded-2xl border border-gray-100 transition-colors"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <img src={chef.avatar} alt={chef.name} className="w-8 h-8 rounded-xl object-cover shrink-0" />
+                                    <img src={chef.avatar} alt={chef.name} className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl object-cover shrink-0" />
                                     <div className="min-w-0">
-                                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none">Chef</p>
+                                      <p className="text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none">Chef</p>
                                       <span className="text-xs font-bold text-gray-800 truncate block">{chef.name}</span>
                                     </div>
                                   </div>
@@ -1766,7 +1782,7 @@ function App() {
                                   </div>
                                 </div>
 
-                                <button className="w-full py-3 rounded-2xl bg-orange-600 hover:bg-black text-white font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all shadow-md active:scale-95">
+                                <button className="w-full py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-orange-600 hover:bg-black text-white font-black uppercase tracking-widest text-[11px] sm:text-[10px] flex items-center justify-center gap-2 transition-all shadow-md active:scale-95">
                                   <ShoppingBag className="w-4 h-4" />
                                   <span>Scegli e Prenota</span>
                                 </button>

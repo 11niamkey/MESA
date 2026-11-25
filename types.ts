@@ -33,6 +33,7 @@ export interface Dish {
   dietary?: ('Vegetarian' | 'Vegan' | 'Gluten Free' | 'Lactose Free')[];
   ingredients?: string[];
   preparation?: string;
+  allergens?: string[];
 }
 
 export type Continent = 'Europa' | 'Asia' | 'Africa' | 'Americhe' | 'Oceania';
@@ -68,6 +69,7 @@ export interface ChefApplication {
   proposedDishDesc: string;
   proposedDishPrice: number;
   proposedDishImage?: string;
+  proposedDishAllergens?: string[];
   availableDays?: number[]; // [0 = Dom, 1 = Lun, 2 = Mar, 3 = Mer, 4 = Gio, 5 = Ven, 6 = Sab]
   availabilitySlots?: string[]; // e.g. ["12:00 - 15:00", "19:00 - 22:00"]
   status: 'pending' | 'approved' | 'rejected' | 'needs_info';

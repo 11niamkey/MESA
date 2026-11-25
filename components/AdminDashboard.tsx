@@ -14,6 +14,7 @@ import { COUNTRY_FLAG_PRESETS, getCountryNameByFlag } from './FilterBar';
 import { CountryFlag } from './CountryFlag';
 import { AdminDishesPanel } from './AdminDishesPanel';
 import { ImagePickerBox } from './ImagePickerBox';
+import { AllergensPicker, AllergensRow } from './Allergens';
 import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation } from './italianTerritoryData';
 
 interface AdminDashboardProps {
@@ -724,6 +725,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <p className="text-xs text-gray-600 font-medium leading-relaxed line-clamp-3">
                           {app.proposedDishDesc}
                         </p>
+                        <AllergensRow allergens={app.proposedDishAllergens} />
                         {(app.proposedDishImage || (app.kitchenPhotos && app.kitchenPhotos.length > 0)) && (
                           <div className="flex gap-2 pt-1">
                             {app.proposedDishImage && (
@@ -752,6 +754,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             onChange={(nextUrl) => onUpdateApplication(app.id, { proposedDishImage: nextUrl })}
                             label="Foto Piatto Proposto"
                             helperText="Aggiorna la foto del piatto proposto."
+                          />
+                          <AllergensPicker
+                            compact
+                            selected={app.proposedDishAllergens || []}
+                            onChange={(nextAllergens) => onUpdateApplication(app.id, { proposedDishAllergens: nextAllergens })}
+                            label="Allergeni Piatto Proposto"
                           />
                         </div>
                       )}

@@ -93,6 +93,7 @@
         "proposedDishName": { "type": "string" },
         "proposedDishPrice": { "type": "number" },
         "proposedDishImage": { "type": "string" },
+        "proposedDishAllergens": { "type": "array" },
         "availableDays": { "type": "array" },
         "availabilitySlots": { "type": "array" },
         "status": { "type": "string", "enum": ["pending", "approved", "rejected", "needs_info"] },

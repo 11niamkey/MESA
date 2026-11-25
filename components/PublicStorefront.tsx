@@ -4,6 +4,7 @@ import { Chef, Dish } from '../types';
 import { Star, MapPin, Utensils, Share2, ShoppingBag, ShieldCheck, ArrowLeft, Heart, Compass } from 'lucide-react';
 import { HeritageJourney } from './HeritageJourney';
 import { CountryFlag } from './CountryFlag';
+import { AllergensRow } from './Allergens';
 
 interface PublicStorefrontProps {
   chef: Chef;
@@ -117,8 +118,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
 
             <div className="grid grid-cols-1 gap-8">
               {chef.dishes.map(dish => (
-                <div key={dish.id} className="group bg-gray-50 rounded-[3.5rem] border border-gray-100 overflow-hidden flex flex-col md:flex-row hover:shadow-2xl transition-all duration-500 border-b-8 border-b-orange-600/10">
-                  <div className="w-full md:w-64 h-64 flex-shrink-0 relative overflow-hidden">
+                <div key={dish.id} className="group bg-gray-50 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-100 overflow-hidden flex flex-col md:flex-row hover:shadow-2xl transition-all duration-500 border-b-8 border-b-orange-600/10">
+                  <div className="w-full md:w-64 h-44 sm:h-64 flex-shrink-0 relative overflow-hidden">
                     <img 
                       src={dish.image || DEFAULT_FOOD_IMAGE} 
                       alt={dish.name} 
@@ -136,13 +137,14 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                       <span className="text-[10px] font-black uppercase">Scopri Eredità</span>
                     </button>
                   </div>
-                  <div className="p-8 flex flex-col justify-between flex-1">
+                  <div className="p-5 sm:p-8 flex flex-col justify-between flex-1 gap-3">
                     <div>
-                      <h3 className="text-2xl font-black italic text-orange-600 group-hover:text-orange-700 transition-colors mb-3 truncate">{dish.name}</h3>
-                      <p className="text-black text-sm leading-relaxed mb-6 italic font-medium">
+                      <h3 className="text-xl sm:text-2xl font-black italic text-orange-600 group-hover:text-orange-700 transition-colors mb-2 truncate">{dish.name}</h3>
+                      <p className="text-black text-xs sm:text-sm leading-snug sm:leading-relaxed mb-3 italic font-medium">
                         "{dish.description}"
                       </p>
-                      <div className="flex flex-wrap gap-2 mb-8">
+                      <AllergensRow allergens={dish.allergens} className="mb-3" />
+                      <div className="flex flex-wrap gap-2">
                          {dish.tags.map(tag => (
                            <span key={tag} className="px-3 py-1 bg-white border border-gray-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-400">{tag}</span>
                          ))}
@@ -150,7 +152,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                     </div>
                     <button 
                       onClick={() => onAddDish(dish)}
-                      className="w-full py-5 bg-orange-600 hover:bg-orange-700 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 shadow-orange-950/15 border-b-4 border-orange-850 hover:border-orange-950"
+                      className="w-full py-3.5 sm:py-5 bg-orange-600 hover:bg-orange-700 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 shadow-orange-950/15 border-b-4 border-orange-850 hover:border-orange-950"
                     >
                       <ShoppingBag className="w-5 h-5" /> Prenota questo piatto
                     </button>

@@ -38,6 +38,7 @@ body {
   font-family: 'Inter', sans-serif;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }

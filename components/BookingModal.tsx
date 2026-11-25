@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Clock, ChefHat, Truck, ShoppingBag, Flame, Utensils, MessageSquare, Leaf, Info, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { Dish, Chef } from '../types';
 import { CountryFlag } from './CountryFlag';
+import { AllergensRow } from './Allergens';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -271,6 +272,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                       </span>
                     ))}
                   </div>
+
+                  {/* Allergens Row */}
+                  <AllergensRow allergens={dish.allergens} className="mb-3" />
 
                   {/* Ingredients & Preparation Details */}
                   {(dish.ingredients || dish.preparation) && (

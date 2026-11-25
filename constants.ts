@@ -158,8 +158,8 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [1, 2, 3, 4, 5, 6],
     reviews: [{ id: 'r1', author: 'Marco', rating: 5, comment: 'Insuperabile.', date: '2023-10-15' }],
     dishes: [
-      { id: 'd1_1', name: 'Lasagna alla Bolognese', description: '5 strati di sfoglia fresca, besciamella vellutata e un ragù cotto 6 ore come vuole la tradizione.', price: 12.50, image: 'https://images.unsplash.com/photo-1574868294417-75902041265e?auto=format&fit=crop&w=800&q=80', chefId: 'c1', tags: ['Carne', 'Pasta'], ingredients: ['Sfoglia all\'uovo', 'Ragù di manzo e maiale', 'Besciamella', 'Parmigiano Reggiano', 'Noce moscata'], preparation: 'Il ragù viene cotto lentamente per 6 ore seguendo la ricetta di famiglia. Gli strati vengono composti a mano e infornati fino a doratura perfetta della superficie.' },
-      { id: 'd1_2', name: 'Carbonara di Trastevere', description: 'Rigatoni veraci con guanciale croccante, pecorino romano DOP e crema d\'uova freschissime.', price: 11.00, image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=800&q=80', chefId: 'c1', tags: ['Carne', 'Pasta'], ingredients: ['Rigatoni', 'Guanciale di Amatrice', 'Pecorino Romano DOP', 'Tuorlo biologico', 'Pepe nero macinato fresco'], preparation: 'Il guanciale viene sudato a fuoco dolce finché non è croccante. La crema si fa rigirando il tuorlo con il pecorino e un cucchiaio di grasso del guanciale. La pasta viene saltata a fuoco spento.' }
+      { id: 'd1_1', name: 'Lasagna alla Bolognese', description: '5 strati di sfoglia fresca, besciamella vellutata e un ragù cotto 6 ore come vuole la tradizione.', price: 12.50, image: 'https://images.unsplash.com/photo-1574868294417-75902041265e?auto=format&fit=crop&w=800&q=80', chefId: 'c1', tags: ['Carne', 'Pasta'], allergens: ['Glutine', 'Lattosio', 'Uova', 'Sedano'], ingredients: ['Sfoglia all\'uovo', 'Ragù di manzo e maiale', 'Besciamella', 'Parmigiano Reggiano', 'Noce moscata'], preparation: 'Il ragù viene cotto lentamente per 6 ore seguendo la ricetta di famiglia. Gli strati vengono composti a mano e infornati fino a doratura perfetta della superficie.' },
+      { id: 'd1_2', name: 'Carbonara di Trastevere', description: 'Rigatoni veraci con guanciale croccante, pecorino romano DOP e crema d\'uova freschissime.', price: 11.00, image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=800&q=80', chefId: 'c1', tags: ['Carne', 'Pasta'], allergens: ['Glutine', 'Lattosio', 'Uova'], ingredients: ['Rigatoni', 'Guanciale di Amatrice', 'Pecorino Romano DOP', 'Tuorlo biologico', 'Pepe nero macinato fresco'], preparation: 'Il guanciale viene sudato a fuoco dolce finché non è croccante. La crema si fa rigirando il tuorlo con il pecorino e un cucchiaio di grasso del guanciale. La pasta viene saltata a fuoco spento.' }
     ]
   },
   {
@@ -178,7 +178,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['20:00 - 22:30'],
     availableDays: [2, 3, 4, 5],
     reviews: [],
-    dishes: [{ id: 'd9_1', name: 'Coq au Vin', description: 'Pollo ruspante marinato nel vino rosso corposo con funghi, pancetta e cipolline borettane.', price: 19.50, image: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', chefId: 'c9', tags: ['Carne'] }]
+    dishes: [{ id: 'd9_1', name: 'Coq au Vin', description: 'Pollo ruspante marinato nel vino rosso corposo con funghi, pancetta e cipolline borettane.', price: 19.50, image: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', chefId: 'c9', tags: ['Carne'], allergens: ['Sedano'] }]
   },
   {
     id: 'c11',
@@ -196,7 +196,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['12:00 - 22:00'],
     availableDays: [1, 2, 4, 6],
     reviews: [],
-    dishes: [{ id: 'd11_1', name: 'Moussaka Tradizionale', description: 'Sformato di melanzane fritte, patate, carne trita speziata e uno strato generoso di besciamella gratinata.', price: 13.00, image: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?auto=format&fit=crop&w=800&q=80', chefId: 'c11', tags: ['Carne'] }]
+    dishes: [{ id: 'd11_1', name: 'Moussaka Tradizionale', description: 'Sformato di melanzane fritte, patate, carne trita speziata e uno strato generoso di besciamella gratinata.', price: 13.00, image: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?auto=format&fit=crop&w=800&q=80', chefId: 'c11', tags: ['Carne'], allergens: ['Glutine', 'Lattosio', 'Uova'] }]
   },
   {
     id: 'c27',
@@ -214,7 +214,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['18:00 - 22:00'],
     availableDays: [1, 2, 3, 4, 5],
     reviews: [],
-    dishes: [{ id: 'd27_1', name: 'Bratwurst & Sauerkraut', description: 'Coppia di salsicce bianche alla griglia servite con crauti artigianali e senape dolce.', price: 13.00, image: 'https://images.unsplash.com/photo-1534177616072-ef7dc120449d?auto=format&fit=crop&w=800&q=80', chefId: 'c27', tags: ['Carne'] }]
+    dishes: [{ id: 'd27_1', name: 'Bratwurst & Sauerkraut', description: 'Coppia di salsicce bianche alla griglia servite con crauti artigianali e senape dolce.', price: 13.00, image: 'https://images.unsplash.com/photo-1534177616072-ef7dc120449d?auto=format&fit=crop&w=800&q=80', chefId: 'c27', tags: ['Carne'], allergens: ['Senape'] }]
   },
   {
     id: 'c28',
@@ -232,7 +232,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['12:00 - 20:00'],
     availableDays: [2, 3, 4, 5, 6],
     reviews: [],
-    dishes: [{ id: 'd28_1', name: 'Bacalhau à Brás', description: 'Baccalà sminuzzato con patatine sottili fritte, cipolla, uova, olive nere e prezzemolo fresco.', price: 16.00, image: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=800&q=80', chefId: 'c28', tags: ['Pesce'] }]
+    dishes: [{ id: 'd28_1', name: 'Bacalhau à Brás', description: 'Baccalà sminuzzato con patatine sottili fritte, cipolla, uova, olive nere e prezzemolo fresco.', price: 16.00, image: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=800&q=80', chefId: 'c28', tags: ['Pesce'], allergens: ['Pesce', 'Uova'] }]
   },
   {
     id: 'c31',
@@ -250,7 +250,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['19:00 - 21:30'],
     availableDays: [1, 3, 5],
     reviews: [],
-    dishes: [{ id: 'd31_1', name: 'Swedish Meatballs', description: 'Polpettine saporite servite con purè di patate cremoso, salsa gravy e marmellata di mirtilli rossi.', price: 14.00, image: 'https://images.unsplash.com/photo-1529692236671-f1f6cf9583b5?auto=format&fit=crop&w=800&q=80', chefId: 'c31', tags: ['Carne'] }]
+    dishes: [{ id: 'd31_1', name: 'Swedish Meatballs', description: 'Polpettine saporite servite con purè di patate cremoso, salsa gravy e marmellata di mirtilli rossi.', price: 14.00, image: 'https://images.unsplash.com/photo-1529692236671-f1f6cf9583b5?auto=format&fit=crop&w=800&q=80', chefId: 'c31', tags: ['Carne'], allergens: ['Glutine', 'Lattosio', 'Uova'] }]
   },
   {
     id: 'c32',
@@ -268,7 +268,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['10:00 - 20:00'],
     availableDays: [1, 2, 3, 4, 5, 6, 0],
     reviews: [],
-    dishes: [{ id: 'd32_1', name: 'Arancina al Ragù', description: 'Palla di riso allo zafferano ripiena di ragù siciliano, piselli e caciocavallo, fritta a regola d\'arte.', price: 4.50, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c32', tags: ['Carne'] }]
+    dishes: [{ id: 'd32_1', name: 'Arancina al Ragù', description: 'Palla di riso allo zafferano ripiena di ragù siciliano, piselli e caciocavallo, fritta a regola d\'arte.', price: 4.50, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c32', tags: ['Carne'], allergens: ['Glutine', 'Lattosio', 'Sedano'] }]
   },
   {
     id: 'c33',
@@ -286,7 +286,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['12:00 - 15:00'],
     availableDays: [0, 6],
     reviews: [],
-    dishes: [{ id: 'd33_1', name: 'Shepherd\'s Pie', description: 'Carne di agnello macinata stufata con verdure e sormontata da una crosta dorata di purè di patate.', price: 14.50, image: 'https://images.unsplash.com/photo-1593504049359-74330189a345?auto=format&fit=crop&w=800&q=80', chefId: 'c33', tags: ['Carne'] }]
+    dishes: [{ id: 'd33_1', name: 'Shepherd\'s Pie', description: 'Carne di agnello macinata stufata con verdure e sormontata da una crosta dorata di purè di patate.', price: 14.50, image: 'https://images.unsplash.com/photo-1593504049359-74330189a345?auto=format&fit=crop&w=800&q=80', chefId: 'c33', tags: ['Carne'], allergens: ['Lattosio', 'Sedano'] }]
   },
   {
     id: 'c34',
@@ -304,7 +304,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['19:00 - 23:00'],
     availableDays: [1, 2, 4, 5, 6],
     reviews: [],
-    dishes: [{ id: 'd34_1', name: 'Paella de Marisco', description: 'Riso bomba con calamari, gamberi, cozze e zafferano, cucinato nella classica padella larga.', price: 22.00, image: 'https://images.unsplash.com/photo-1534080564607-c980d49451d7?auto=format&fit=crop&w=800&q=80', chefId: 'c34', tags: ['Pesce', 'Riso'] }]
+    dishes: [{ id: 'd34_1', name: 'Paella de Marisco', description: 'Riso bomba con calamari, gamberi, cozze e zafferano, cucinato nella classica padella larga.', price: 22.00, image: 'https://images.unsplash.com/photo-1534080564607-c980d49451d7?auto=format&fit=crop&w=800&q=80', chefId: 'c34', tags: ['Pesce', 'Riso'], allergens: ['Crostacei', 'Molluschi'] }]
   },
 
   // --- AFRICA (10) ---
@@ -325,9 +325,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [1, 2, 3, 4, 5],
     reviews: [],
     dishes: [
-      { id: 'd3_1', name: 'Party Jollof Rice', description: 'Riso a chicco lungo cotto in un sugo di peperoni e pomodori affumicati, servito con pollo fritto speziato.', price: 15.00, image: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=800&q=80', chefId: 'c3', tags: ['Carne', 'Piccante'] },
-      { id: 'd3_2', name: 'Suya Beef Skewers', description: 'Spiedini di manzo succulenti, marinati in una polvere speziata a base di arachidi macinate (Kuli-Kuli), zenzero e chili, cotti alla brace.', price: 12.50, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c3', tags: ['Carne', 'Piccante', 'Arachidi'] },
-      { id: 'd3_3', name: 'Egusi Soup & Pounded Yam', description: 'Zuppa densa preparata con semi di melone egusi tritati, foglie di zucca, gamberetti secchi e carne, servita con morbido Pounded Yam fatto a mano.', price: 17.00, image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80', chefId: 'c3', tags: ['Pesce', 'Carne', 'Tradizionale'] }
+      { id: 'd3_1', name: 'Party Jollof Rice', description: 'Riso a chicco lungo cotto in un sugo di peperoni e pomodori affumicati, servito con pollo fritto speziato.', price: 15.00, image: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=800&q=80', chefId: 'c3', tags: ['Carne', 'Piccante'], allergens: [] },
+      { id: 'd3_2', name: 'Suya Beef Skewers', description: 'Spiedini di manzo succulenti, marinati in una polvere speziata a base di arachidi macinate (Kuli-Kuli), zenzero e chili, cotti alla brace.', price: 12.50, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c3', tags: ['Carne', 'Piccante', 'Arachidi'], allergens: ['Arachidi'] },
+      { id: 'd3_3', name: 'Egusi Soup & Pounded Yam', description: 'Zuppa densa preparata con semi di melone egusi tritati, foglie di zucca, gamberetti secchi e carne, servita con morbido Pounded Yam fatto a mano.', price: 17.00, image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80', chefId: 'c3', tags: ['Pesce', 'Carne', 'Tradizionale'], allergens: ['Crostacei'] }
     ]
   },
   {
@@ -347,9 +347,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [4, 5, 6, 0],
     reviews: [],
     dishes: [
-      { id: 'd4_1', name: 'Thieboudienne Rosso', description: 'Il piatto nazionale senegalese: riso cotto nel sugo di pomodoro concentrato con cernia fresca, manioca, carote, cavolo e melanzane locali.', price: 16.50, image: 'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?auto=format&fit=crop&w=800&q=80', chefId: 'c4', tags: ['Pesce', 'Riso'] },
-      { id: 'd4_2', name: 'Yassa au Poulet', description: 'Cosce di pollo grigliate e poi stufate in un intingolo agrumato di cipolle caramellate, succo di lime fresco, senape e peperoncini del Senegal.', price: 14.00, image: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', chefId: 'c4', tags: ['Carne', 'Agrumato'] },
-      { id: 'd4_3', name: 'Pastels de Poisson', description: 'Sfiziosi fagottini di pasta fritti, ripieni di sgombro fresco tritato e speziato, accompagnati da una salsa dolce-piccante al pomodoro.', price: 8.00, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c4', tags: ['Pesce', 'Antipasti'] }
+      { id: 'd4_1', name: 'Thieboudienne Rosso', description: 'Il piatto nazionale senegalese: riso cotto nel sugo di pomodoro concentrato con cernia fresca, manioca, carote, cavolo e melanzane locali.', price: 16.50, image: 'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?auto=format&fit=crop&w=800&q=80', chefId: 'c4', tags: ['Pesce', 'Riso'], allergens: ['Pesce'] },
+      { id: 'd4_2', name: 'Yassa au Poulet', description: 'Cosce di pollo grigliate e poi stufate in un intingolo agrumato di cipolle caramellate, succo di lime fresco, senape e peperoncini del Senegal.', price: 14.00, image: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', chefId: 'c4', tags: ['Carne', 'Agrumato'], allergens: ['Senape'] },
+      { id: 'd4_3', name: 'Pastels de Poisson', description: 'Sfiziosi fagottini di pasta fritti, ripieni di sgombro fresco tritato e speziato, accompagnati da una salsa dolce-piccante al pomodoro.', price: 8.00, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c4', tags: ['Pesce', 'Antipasti'], allergens: ['Glutine', 'Pesce'] }
     ]
   },
   {
@@ -369,9 +369,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [5, 6, 0],
     reviews: [],
     dishes: [
-      { id: 'd8_1', name: 'Tagine d\'Agnello', description: 'Agnello tenerissimo cotto lentamente con prugne dolci, mandorle tostate e sesamo.', price: 18.00, image: 'https://images.unsplash.com/photo-1511690656952-34342d5c2895?auto=format&fit=crop&w=800&q=80', chefId: 'c8', tags: ['Carne'] },
-      { id: 'd8_2', name: 'Pastilla di Pollo', description: 'Un capolavoro agrodolce: strati di croccante sfoglia brick ripieni di pollo sfilacciato, uovo cremoso e mandorle tritate, decorati con cannella.', price: 13.50, image: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?auto=format&fit=crop&w=800&q=80', chefId: 'c8', tags: ['Pollo', 'Agrodolce'] },
-      { id: 'd8_3', name: 'Couscous alle Sette Verdure', description: 'Tradizionale couscous lavorato a mano e condito con una ricca varietà di verdure dell\'orto stufate nel loro brodo aromatico alle spezie.', price: 14.00, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c8', tags: ['Vegetariano'] }
+      { id: 'd8_1', name: 'Tagine d\'Agnello', description: 'Agnello tenerissimo cotto lentamente con prugne dolci, mandorle tostate e sesamo.', price: 18.00, image: 'https://images.unsplash.com/photo-1511690656952-34342d5c2895?auto=format&fit=crop&w=800&q=80', chefId: 'c8', tags: ['Carne'], allergens: ['Frutta a guscio', 'Sesamo'] },
+      { id: 'd8_2', name: 'Pastilla di Pollo', description: 'Un capolavoro agrodolce: strati di croccante sfoglia brick ripieni di pollo sfilacciato, uovo cremoso e mandorle tritate, decorati con cannella.', price: 13.50, image: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?auto=format&fit=crop&w=800&q=80', chefId: 'c8', tags: ['Pollo', 'Agrodolce'], allergens: ['Glutine', 'Uova', 'Frutta a guscio'] },
+      { id: 'd8_3', name: 'Couscous alle Sette Verdure', description: 'Tradizionale couscous lavorato a mano e condito con una ricca varietà di verdure dell\'orto stufate nel loro brodo aromatico alle spezie.', price: 14.00, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c8', tags: ['Vegetariano'], allergens: ['Glutine', 'Sedano'] }
     ]
   },
   {
@@ -391,9 +391,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [3, 4, 5, 6, 0],
     reviews: [],
     dishes: [
-      { id: 'd13_1', name: 'Zighinì di Manzo', description: 'Stufato di manzo piccante al berberé, servito con uova sode su una grande injera spugnosa.', price: 16.00, image: 'https://images.unsplash.com/photo-1542354256-4b68e7d7f26c?auto=format&fit=crop&w=800&q=80', chefId: 'c13', tags: ['Carne', 'Piccante'] },
-      { id: 'd13_2', name: 'Doro Wat delle Feste', description: 'Stufato denso di pollo intero marinato al limone, cotto a fuoco dolce in cipolle in purea e berberé etiope, servito con uova sode e injera.', price: 17.50, image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80', chefId: 'c13', tags: ['Carne', 'Piccante', 'Tradizionale'] },
-      { id: 'd13_3', name: 'Sambusa con Lenticchie (Tris)', description: 'Triangoli croccanti di pasta fillo ripieni di lenticchie speziate al cumino, aglio, zenzero e coriandolo fritto.', price: 7.50, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c13', tags: ['Vegetariano', 'Antipasti'] }
+      { id: 'd13_1', name: 'Zighinì di Manzo', description: 'Stufato di manzo piccante al berberé, servito con uova sode su una grande injera spugnosa.', price: 16.00, image: 'https://images.unsplash.com/photo-1542354256-4b68e7d7f26c?auto=format&fit=crop&w=800&q=80', chefId: 'c13', tags: ['Carne', 'Piccante'], allergens: ['Uova', 'Lattosio'] },
+      { id: 'd13_2', name: 'Doro Wat delle Feste', description: 'Stufato denso di pollo intero marinato al limone, cotto a fuoco dolce in cipolle in purea e berberé etiope, servito con uova sode e injera.', price: 17.50, image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80', chefId: 'c13', tags: ['Carne', 'Piccante', 'Tradizionale'], allergens: ['Uova', 'Lattosio'] },
+      { id: 'd13_3', name: 'Sambusa con Lenticchie (Tris)', description: 'Triangoli croccanti di pasta fillo ripieni di lenticchie speziate al cumino, aglio, zenzero e coriandolo fritto.', price: 7.50, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c13', tags: ['Vegetariano', 'Antipasti'], allergens: ['Glutine'] }
     ]
   },
   {
@@ -413,9 +413,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [1, 3, 5, 6],
     reviews: [],
     dishes: [
-      { id: 'd5_1', name: 'Attiéké con Pesce Fritto (Garba)', description: 'Couscous di manioca fermentata (Attiéké) soffice e leggermente acidulo, servito con trancio di tonno fritto croccante, cipolla rossa a cubetti, pomodori freschi e peperoncino ivoriano.', price: 12.00, image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=800&q=80', chefId: 'c5', tags: ['Pesce', 'Manioca', 'Ivoriano'], ingredients: ['Attiéké (Manioca fermentata)', 'Trancio di Tonno fresco', 'Cipolla rossa', 'Pomodoro fresco', 'Peperoncino piquant', 'Olio vegetale', 'Aromi ivoriani'], preparation: 'L\'Attiéké viene cotto al vapore secondo la tradizione abidjanese. Il tonno viene infarinato leggermente e fritto in olio bollente fino a doratura croccante, servito con brunoise di cipolle e pomodoro.' },
-      { id: 'd5_2', name: 'Alloco con Orata Grigliata', description: 'Tris di platani dolci fritti a tocchetti serviti con orata intera alla griglia, salsa cipolla-pomodoro e peperoncino piccante frantumato.', price: 16.00, image: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?auto=format&fit=crop&w=800&q=80', chefId: 'c5', tags: ['Pesce', 'Frutta'] },
-      { id: 'd5_3', name: 'Kédjénou di Pollo', description: 'Stufato aromatico ivoriano di pollo cotto dolcemente nel suo vapore in pentola d\'argilla chiusa ermeticamente con melanzane, pomodoro fresco e zenzero.', price: 14.50, image: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', chefId: 'c5', tags: ['Carne', 'Tradizionale'] }
+      { id: 'd5_1', name: 'Attiéké con Pesce Fritto (Garba)', description: 'Couscous di manioca fermentata (Attiéké) soffice e leggermente acidulo, servito con trancio di tonno fritto croccante, cipolla rossa a cubetti, pomodori freschi e peperoncino ivoriano.', price: 12.00, image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=800&q=80', chefId: 'c5', tags: ['Pesce', 'Manioca', 'Ivoriano'], allergens: ['Pesce', 'Glutine'], ingredients: ['Attiéké (Manioca fermentata)', 'Trancio di Tonno fresco', 'Cipolla rossa', 'Pomodoro fresco', 'Peperoncino piquant', 'Olio vegetale', 'Aromi ivoriani'], preparation: 'L\'Attiéké viene cotto al vapore secondo la tradizione abidjanese. Il tonno viene infarinato leggermente e fritto in olio bollente fino a doratura croccante, servito con brunoise di cipolle e pomodoro.' },
+      { id: 'd5_2', name: 'Alloco con Orata Grigliata', description: 'Tris di platani dolci fritti a tocchetti serviti con orata intera alla griglia, salsa cipolla-pomodoro e peperoncino piccante frantumato.', price: 16.00, image: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?auto=format&fit=crop&w=800&q=80', chefId: 'c5', tags: ['Pesce', 'Frutta'], allergens: ['Pesce'] },
+      { id: 'd5_3', name: 'Kédjénou di Pollo', description: 'Stufato aromatico ivoriano di pollo cotto dolcemente nel suo vapore in pentola d\'argilla chiusa ermeticamente con melanzane, pomodoro fresco e zenzero.', price: 14.50, image: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', chefId: 'c5', tags: ['Carne', 'Tradizionale'], allergens: [] }
     ]
   },
   {
@@ -435,9 +435,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [1, 2, 3, 4, 5, 6],
     reviews: [],
     dishes: [
-      { id: 'd6_1', name: 'Koshary Reale', description: 'Riso, lenticchie, pasta e ceci con una salsa al pomodoro speziata e pioggia di cipolle fritte.', price: 9.50, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c6', tags: ['Vegetariano'] },
-      { id: 'd6_2', name: 'Ta\'ameya Veg dell\'Antico Cairo', description: 'I famosissimi falafel egiziani dorati preparati esclusivamente con fave decorticate tritate, coriandolo fresco fritto, aglio, prezzemolo e semi di sesamo.', price: 8.00, image: 'https://images.unsplash.com/photo-1547928576-a4a33237ecd3?auto=format&fit=crop&w=800&q=80', chefId: 'c6', tags: ['Vegetariano', 'Antipasti'] },
-      { id: 'd6_3', name: 'Basbousa al Miele', description: 'Tradizionale e sofficissimo dolce egiziano di semolino bagnato generosamente con sciroppo caldo di fiori d\'arancio ed miele, sormontato da mandorle.', price: 6.50, image: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?auto=format&fit=crop&w=800&q=80', chefId: 'c6', tags: ['Dolci'] }
+      { id: 'd6_1', name: 'Koshary Reale', description: 'Riso, lenticchie, pasta e ceci con una salsa al pomodoro speziata e pioggia di cipolle fritte.', price: 9.50, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c6', tags: ['Vegetariano'], allergens: ['Glutine'] },
+      { id: 'd6_2', name: 'Ta\'ameya Veg dell\'Antico Cairo', description: 'I famosissimi falafel egiziani dorati preparati esclusivamente con fave decorticate tritate, coriandolo fresco fritto, aglio, prezzemolo e semi di sesamo.', price: 8.00, image: 'https://images.unsplash.com/photo-1547928576-a4a33237ecd3?auto=format&fit=crop&w=800&q=80', chefId: 'c6', tags: ['Vegetariano', 'Antipasti'], allergens: ['Sesamo'] },
+      { id: 'd6_3', name: 'Basbousa al Miele', description: 'Tradizionale e sofficissimo dolce egiziano di semolino bagnato generosamente con sciroppo caldo di fiori d\'arancio ed miele, sormontato da mandorle.', price: 6.50, image: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?auto=format&fit=crop&w=800&q=80', chefId: 'c6', tags: ['Dolci'], allergens: ['Glutine', 'Frutta a guscio', 'Lattosio'] }
     ]
   },
   {
@@ -457,9 +457,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [0, 2, 4, 5, 6],
     reviews: [],
     dishes: [
-      { id: 'd7_1', name: 'Waakye Mix', description: 'Riso e fagioli cotti con foglie di sorgo per un colore scuro naturale, con carne di capra stufata.', price: 14.00, image: 'https://images.unsplash.com/photo-1542354256-4b68e7d7f26c?auto=format&fit=crop&w=800&q=80', chefId: 'c7', tags: ['Carne'] },
-      { id: 'd7_2', name: 'Red Red Stew', description: 'Delizioso spezzatino di fagioli dell\'occhio cotti a fuoco lento in olio di palma rosso purissimo con pomodori freschi, servito con platani fritti dolcissimi.', price: 12.00, image: 'https://images.unsplash.com/photo-1511690656952-34342d5c2895?auto=format&fit=crop&w=800&q=80', chefId: 'c7', tags: ['Vegetariano', 'Tradizionale'] },
-      { id: 'd7_3', name: 'Kelewele Speziato ghanese', description: 'Cubetti dorati di platano maturo fritti, marinati precedentemente con zenzero fresco tritato, noce moscata, peperoncino di Cayenna selvatico e limone.', price: 7.00, image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=800&q=80', chefId: 'c7', tags: ['Vegetariano', 'Antipasti'] }
+      { id: 'd7_1', name: 'Waakye Mix', description: 'Riso e fagioli cotti con foglie di sorgo per un colore scuro naturale, con carne di capra stufata.', price: 14.00, image: 'https://images.unsplash.com/photo-1542354256-4b68e7d7f26c?auto=format&fit=crop&w=800&q=80', chefId: 'c7', tags: ['Carne'], allergens: [] },
+      { id: 'd7_2', name: 'Red Red Stew', description: 'Delizioso spezzatino di fagioli dell\'occhio cotti a fuoco lento in olio di palma rosso purissimo con pomodori freschi, servito con platani fritti dolcissimi.', price: 12.00, image: 'https://images.unsplash.com/photo-1511690656952-34342d5c2895?auto=format&fit=crop&w=800&q=80', chefId: 'c7', tags: ['Vegetariano', 'Tradizionale'], allergens: [] },
+      { id: 'd7_3', name: 'Kelewele Speziato ghanese', description: 'Cubetti dorati di platano maturo fritti, marinati precedentemente con zenzero fresco tritato, noce moscata, peperoncino di Cayenna selvatico e limone.', price: 7.00, image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=800&q=80', chefId: 'c7', tags: ['Vegetariano', 'Antipasti'], allergens: [] }
     ]
   },
   {
@@ -479,9 +479,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [5, 6, 0],
     reviews: [],
     dishes: [
-      { id: 'd21_1', name: 'Beef Pilau', description: 'Riso profumato con cannella, cardamomo e chiodi di garofano, cotto con pezzi di manzo tenero.', price: 14.00, image: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=800&q=80', chefId: 'c21', tags: ['Carne', 'Riso'] },
-      { id: 'd21_2', name: 'Swahili Nyama Choma', description: 'Saporita carne di pecora o capra marinata alle spezie di Mombasa, cotta lentamente alla griglia, servita con polenta Ugali e insalata fresca kachumbari.', price: 17.00, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c21', tags: ['Carne', 'Grigliato'] },
-      { id: 'd21_3', name: 'Samosa di Carne Swahili (Tris)', description: 'Fagottini triangolari di pasta stesi a mano, ripieni di carne bovina macinata aromatizzata alla cipolla, prezzemolo, coriandolo ed essenza di zenzero.', price: 8.00, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c21', tags: ['Carne', 'Antipasti'] }
+      { id: 'd21_1', name: 'Beef Pilau', description: 'Riso profumato con cannella, cardamomo e chiodi di garofano, cotto con pezzi di manzo tenero.', price: 14.00, image: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=800&q=80', chefId: 'c21', tags: ['Carne', 'Riso'], allergens: [] },
+      { id: 'd21_2', name: 'Swahili Nyama Choma', description: 'Saporita carne di pecora o capra marinata alle spezie di Mombasa, cotta lentamente alla griglia, servita con polenta Ugali e insalata fresca kachumbari.', price: 17.00, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c21', tags: ['Carne', 'Grigliato'], allergens: [] },
+      { id: 'd21_3', name: 'Samosa di Carne Swahili (Tris)', description: 'Fagottini triangolari di pasta stesi a mano, ripieni di carne bovina macinata aromatizzata alla cipolla, prezzemolo, coriandolo ed essenza di zenzero.', price: 8.00, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c21', tags: ['Carne', 'Antipasti'], allergens: ['Glutine'] }
     ]
   },
   {
@@ -501,9 +501,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [2, 4, 6],
     reviews: [],
     dishes: [
-      { id: 'd23_1', name: 'Ndolé con Gamberi', description: 'Foglie amare stufate con pasta di arachidi, spezie e gamberi freschi saltati.', price: 17.50, image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=800&q=80', chefId: 'c23', tags: ['Pesce'] },
-      { id: 'd23_2', name: 'Poulet DG Reale', description: 'Saporito pollo marinato saltato in un delizioso mix di platani dolci fritti, carote grigliate, piccoli peperoni e fagiolini freschi.', price: 15.50, image: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', chefId: 'c23', tags: ['Carne', 'Frutta'] },
-      { id: 'd23_3', name: 'Beignets Haricot calamaro', description: 'Soffici frittelle dolci dorate camerunensi fatte in casa servite calde con salsa speziata di fagioli neri stufati aromati.', price: 8.50, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c23', tags: ['Dolci', 'Tradizionale'] }
+      { id: 'd23_1', name: 'Ndolé con Gamberi', description: 'Foglie amare stufate con pasta di arachidi, spezie e gamberi freschi saltati.', price: 17.50, image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=800&q=80', chefId: 'c23', tags: ['Pesce'], allergens: ['Arachidi', 'Crostacei'] },
+      { id: 'd23_2', name: 'Poulet DG Reale', description: 'Saporito pollo marinato saltato in un delizioso mix di platani dolci fritti, carote grigliate, piccoli peperoni e fagiolini freschi.', price: 15.50, image: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', chefId: 'c23', tags: ['Carne', 'Frutta'], allergens: [] },
+      { id: 'd23_3', name: 'Beignets Haricot calamaro', description: 'Soffici frittelle dolci dorate camerunensi fatte in casa servite calde con salsa speziata di fagioli neri stufati aromati.', price: 8.50, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c23', tags: ['Dolci', 'Tradizionale'], allergens: ['Glutine'] }
     ]
   },
   {
@@ -523,9 +523,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [1, 2, 3, 4, 5, 6, 0],
     reviews: [],
     dishes: [
-      { id: 'd26_1', name: 'Couscous di Pesce', description: 'Semola incocciata a mano, servita con brodo di pesce piccante e pescato locale freschissimo.', price: 18.00, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c26', tags: ['Pesce', 'Piccante'] },
-      { id: 'd26_2', name: 'Brik Tunisino all\'Uovo (Duo)', description: 'Super croccante sfoglia triangolare "malsouka" fritta caldissima ripiena di tonno sott\'olio, capperi, uovo cremoso e prezzemolo.', price: 9.00, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c26', tags: ['Pesce', 'Antipasti'] },
-      { id: 'd26_3', name: 'Ojja piccante con Merguez', description: 'Uova affogate cotte dolcemente in un denso sugo speziato di pomodori e peperoni verdi, insaporito con Harissa tunisina artigianale e pezzetti di salsiccia di agnello Merguez.', price: 14.50, image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80', chefId: 'c26', tags: ['Carne', 'Piccante'] }
+      { id: 'd26_1', name: 'Couscous di Pesce', description: 'Semola incocciata a mano, servita con brodo di pesce piccante e pescato locale freschissimo.', price: 18.00, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c26', tags: ['Pesce', 'Piccante'], allergens: ['Glutine', 'Pesce'] },
+      { id: 'd26_2', name: 'Brik Tunisino all\'Uovo (Duo)', description: 'Super croccante sfoglia triangolare "malsouka" fritta caldissima ripiena di tonno sott\'olio, capperi, uovo cremoso e prezzemolo.', price: 9.00, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c26', tags: ['Pesce', 'Antipasti'], allergens: ['Glutine', 'Pesce', 'Uova'] },
+      { id: 'd26_3', name: 'Ojja piccante con Merguez', description: 'Uova affogate cotte dolcemente in un denso sugo speziato di pomodori e peperoni verdi, insaporito con Harissa tunisina artigianale e pezzetti di salsiccia di agnello Merguez.', price: 14.50, image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80', chefId: 'c26', tags: ['Carne', 'Piccante'], allergens: ['Uova'] }
     ]
   },
 
@@ -546,7 +546,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['18:30 - 23:00'],
     availableDays: [0, 2, 3, 4, 5, 6],
     reviews: [],
-    dishes: [{ id: 'd2_1', name: 'Sushi Moriawase', description: 'Selezione di 12 pezzi tra Nigiri e Sashimi con pesce abbattuto freschissimo di qualità premium.', price: 24.00, image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=800&q=80', chefId: 'c2', tags: ['Pesce', 'Sushi'] }]
+    dishes: [{ id: 'd2_1', name: 'Sushi Moriawase', description: 'Selezione di 12 pezzi tra Nigiri e Sashimi con pesce abbattuto freschissimo di qualità premium.', price: 24.00, image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=800&q=80', chefId: 'c2', tags: ['Pesce', 'Sushi'], allergens: ['Pesce', 'Soia', 'Sesamo'] }]
   },
   {
     id: 'c15',
@@ -564,7 +564,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['19:00 - 23:00'],
     availableDays: [1, 2, 3, 4, 5, 6],
     reviews: [],
-    dishes: [{ id: 'd15_1', name: 'Pad Thai Gamberi', description: 'Tagliolini di riso saltati con gamberi, uova, tofu, germogli di soia e granella di arachidi.', price: 14.00, image: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=800&q=80', chefId: 'c15', tags: ['Pesce', 'Riso'] }]
+    dishes: [{ id: 'd15_1', name: 'Pad Thai Gamberi', description: 'Tagliolini di riso saltati con gamberi, uova, tofu, germogli di soia e granella di arachidi.', price: 14.00, image: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=800&q=80', chefId: 'c15', tags: ['Pesce', 'Riso'], allergens: ['Crostacei', 'Uova', 'Soia', 'Arachidi'] }]
   },
   {
     id: 'c16',
@@ -582,7 +582,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['18:00 - 22:00'],
     availableDays: [1, 2, 4, 5],
     reviews: [],
-    dishes: [{ id: 'd16_1', name: 'Bibimbap Classico', description: 'Riso caldo in ciotola con verdure saltate, carne marinata, uovo occhio di bue e salsa gochujang.', price: 15.50, image: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=800&q=80', chefId: 'c16', tags: ['Carne', 'Piccante'] }]
+    dishes: [{ id: 'd16_1', name: 'Bibimbap Classico', description: 'Riso caldo in ciotola con verdure saltate, carne marinata, uovo occhio di bue e salsa gochujang.', price: 15.50, image: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=800&q=80', chefId: 'c16', tags: ['Carne', 'Piccante'], allergens: ['Uova', 'Soia', 'Sesamo'] }]
   },
   {
     id: 'c17',
@@ -600,7 +600,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['19:00 - 22:00'],
     availableDays: [2, 3, 4, 5, 6, 0],
     reviews: [],
-    dishes: [{ id: 'd17_1', name: 'Butter Chicken', description: 'Pollo cotto nel tandoori e poi tuffato in una salsa ricca di pomodoro, burro e crema di spezie.', price: 13.50, image: 'https://images.unsplash.com/photo-1603894584373-5ac82b0ae398?auto=format&fit=crop&w=800&q=80', chefId: 'c17', tags: ['Carne'] }]
+    dishes: [{ id: 'd17_1', name: 'Butter Chicken', description: 'Pollo cotto nel tandoori e poi tuffato in una salsa ricca di pomodoro, burro e crema di spezie.', price: 13.50, image: 'https://images.unsplash.com/photo-1603894584373-5ac82b0ae398?auto=format&fit=crop&w=800&q=80', chefId: 'c17', tags: ['Carne'], allergens: ['Lattosio'] }]
   },
   {
     id: 'c18',
@@ -618,7 +618,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['11:30 - 20:30'],
     availableDays: [1, 2, 3, 4, 5, 6],
     reviews: [],
-    dishes: [{ id: 'd18_1', name: 'Mix di Mezzé', description: 'Un assortimento di Hummus, Babaganoush, Falafel croccanti e pane pita appena sfornato.', price: 12.00, image: 'https://images.unsplash.com/photo-1547928576-a4a33237ecd3?auto=format&fit=crop&w=800&q=80', chefId: 'c18', tags: ['Vegetariano'] }]
+    dishes: [{ id: 'd18_1', name: 'Mix di Mezzé', description: 'Un assortimento di Hummus, Babaganoush, Falafel croccanti e pane pita appena sfornato.', price: 12.00, image: 'https://images.unsplash.com/photo-1547928576-a4a33237ecd3?auto=format&fit=crop&w=800&q=80', chefId: 'c18', tags: ['Vegetariano'], allergens: ['Glutine', 'Sesamo'] }]
   },
   {
     id: 'c19',
@@ -636,7 +636,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['12:00 - 15:00'],
     availableDays: [1, 2, 3, 4, 5],
     reviews: [],
-    dishes: [{ id: 'd19_1', name: 'Pho Bo', description: 'Zuppa di noodles di riso in brodo di manzo profumato con cannella, anice stellato e zenzero.', price: 14.50, image: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?auto=format&fit=crop&w=800&q=80', chefId: 'c19', tags: ['Carne', 'Zuppa'] }]
+    dishes: [{ id: 'd19_1', name: 'Pho Bo', description: 'Zuppa di noodles di riso in brodo di manzo profumato con cannella, anice stellato e zenzero.', price: 14.50, image: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?auto=format&fit=crop&w=800&q=80', chefId: 'c19', tags: ['Carne', 'Zuppa'], allergens: ['Soia'] }]
   },
   {
     id: 'c20',
@@ -654,7 +654,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['10:00 - 22:00'],
     availableDays: [1, 2, 3, 4, 5, 6, 0],
     reviews: [],
-    dishes: [{ id: 'd20_1', name: 'Baklava al Pistacchio', description: 'Strati croccanti di pasta fillo, miele di fiori e pistacchi di Bronte selezionati.', price: 8.00, image: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?auto=format&fit=crop&w=800&q=80', chefId: 'c20', tags: ['Dolci'] }]
+    dishes: [{ id: 'd20_1', name: 'Baklava al Pistacchio', description: 'Strati croccanti di pasta fillo, miele di fiori e pistacchi di Bronte selezionati.', price: 8.00, image: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?auto=format&fit=crop&w=800&q=80', chefId: 'c20', tags: ['Dolci'], allergens: ['Glutine', 'Frutta a guscio', 'Lattosio'] }]
   },
   {
     id: 'c35',
@@ -672,7 +672,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['12:00 - 22:00'],
     availableDays: [1, 2, 3, 4, 5, 6],
     reviews: [],
-    dishes: [{ id: 'd35_1', name: 'Dumplings di Maiale', description: 'Ravioli al vapore ripieni di maiale, zenzero e cipollotto, serviti con salsa di soia e aceto nero.', price: 9.00, image: 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80', chefId: 'c35', tags: ['Carne'] }]
+    dishes: [{ id: 'd35_1', name: 'Dumplings di Maiale', description: 'Ravioli al vapore ripieni di maiale, zenzero e cipollotto, serviti con salsa di soia e aceto nero.', price: 9.00, image: 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80', chefId: 'c35', tags: ['Carne'], allergens: ['Glutine', 'Soia', 'Sesamo'] }]
   },
 
   // --- AMERICHE (8) ---
@@ -692,7 +692,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['18:00 - 00:00'],
     availableDays: [4, 5, 6],
     reviews: [],
-    dishes: [{ id: 'd10_1', name: 'Tacos Al Pastor', description: 'Maiale marinato con achiote e spezie, servito con ananas, coriandolo e cipolla su tortilla di mais.', price: 12.00, image: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=800&q=80', chefId: 'c10', tags: ['Carne', 'Piccante'] }]
+    dishes: [{ id: 'd10_1', name: 'Tacos Al Pastor', description: 'Maiale marinato con achiote e spezie, servito con ananas, coriandolo e cipolla su tortilla di mais.', price: 12.00, image: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=800&q=80', chefId: 'c10', tags: ['Carne', 'Piccante'], allergens: [] }]
   },
   {
     id: 'c29',
@@ -710,7 +710,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['19:00 - 01:00'],
     availableDays: [4, 5, 6, 0],
     reviews: [],
-    dishes: [{ id: 'd29_1', name: 'Tris di Empanadas', description: 'Selezione di tre fagottini argentini: carne salteña, humita (mais) e prosciutto e formaggio.', price: 10.50, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c29', tags: ['Carne'] }]
+    dishes: [{ id: 'd29_1', name: 'Tris di Empanadas', description: 'Selezione di tre fagottini argentini: carne salteña, humita (mais) e prosciutto e formaggio.', price: 10.50, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c29', tags: ['Carne'], allergens: ['Glutine', 'Lattosio', 'Uova'] }]
   },
   {
     id: 'c12',
@@ -728,7 +728,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['12:00 - 18:00'],
     availableDays: [6, 0],
     reviews: [],
-    dishes: [{ id: 'd12_1', name: 'Feijoada Completa', description: 'Stufato di fagioli neri con tagli scelti di maiale, servito con riso, farofa, arancia e cavolo.', price: 17.00, image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80', chefId: 'c12', tags: ['Carne'] }]
+    dishes: [{ id: 'd12_1', name: 'Feijoada Completa', description: 'Stufato di fagioli neri con tagli scelti di maiale, servito con riso, farofa, arancia e cavolo.', price: 17.00, image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80', chefId: 'c12', tags: ['Carne'], allergens: [] }]
   },
   {
     id: 'c14',
@@ -746,7 +746,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['12:00 - 20:00'],
     availableDays: [2, 3, 4, 5, 6],
     reviews: [],
-    dishes: [{ id: 'd14_1', name: 'Ceviche Classico', description: 'Pesce bianco marinato in "leche de tigre" con lime, peperoncino, cipolla rossa e coriandolo.', price: 18.50, image: 'https://images.unsplash.com/photo-1535399831218-d5bd36d1a6b3?auto=format&fit=crop&w=800&q=80', chefId: 'c14', tags: ['Pesce'] }]
+    dishes: [{ id: 'd14_1', name: 'Ceviche Classico', description: 'Pesce bianco marinato in "leche de tigre" con lime, peperoncino, cipolla rossa e coriandolo.', price: 18.50, image: 'https://images.unsplash.com/photo-1535399831218-d5bd36d1a6b3?auto=format&fit=crop&w=800&q=80', chefId: 'c14', tags: ['Pesce'], allergens: ['Pesce'] }]
   },
   {
     id: 'c30',
@@ -764,7 +764,7 @@ export const MOCK_CHEFS: Chef[] = [
     availability: ['18:00 - 22:00'],
     availableDays: [1, 2, 4, 5, 6],
     reviews: [],
-    dishes: [{ id: 'd30_1', name: 'Pulled Pork Sandwich', description: 'Spalla di maiale affumicata 12 ore, sfilacciata e servita con salsa BBQ e insalata coleslaw.', price: 13.50, image: 'https://images.unsplash.com/photo-1527324688101-01b1b9a5f781?auto=format&fit=crop&w=800&q=80', chefId: 'c30', tags: ['Carne'] }]
+    dishes: [{ id: 'd30_1', name: 'Pulled Pork Sandwich', description: 'Spalla di maiale affumicata 12 ore, sfilacciata e servita con salsa BBQ e insalata coleslaw.', price: 13.50, image: 'https://images.unsplash.com/photo-1527324688101-01b1b9a5f781?auto=format&fit=crop&w=800&q=80', chefId: 'c30', tags: ['Carne'], allergens: ['Glutine', 'Uova', 'Senape'] }]
   },
   {
     id: 'c22',
@@ -783,9 +783,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [1, 2, 3, 4, 5],
     reviews: [],
     dishes: [
-      { id: 'd22_1', name: 'Bobotie Classico', description: 'Pasticcio di carne speziata con frutta secca e uvetta, sormontato da una crema dorata all\'uovo.', price: 15.00, image: 'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?auto=format&fit=crop&w=800&q=80', chefId: 'c22', tags: ['Carne'] },
-      { id: 'd22_2', name: 'Chakalaka & Pap', description: 'Contorno piccante e coloratissimo a base di fagioli stufati, carote, peperoni e spezie calde, servito con la classica polenta bianca di mais (Pap) densa.', price: 11.50, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c22', tags: ['Vegetariano', 'Piccante'] },
-      { id: 'd22_3', name: 'Spiedini di Boerewors alla griglia', description: 'Salsiccia tradizionale sudafricana artigianale a forma di spirale, preparata con carne bovina e suina speziata al coriandolo, chiodi di garofano e noce moscata.', price: 14.00, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c22', tags: ['Carne', 'Grigliato'] }
+      { id: 'd22_1', name: 'Bobotie Classico', description: 'Pasticcio di carne speziata con frutta secca e uvetta, sormontato da una crema dorata all\'uovo.', price: 15.00, image: 'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?auto=format&fit=crop&w=800&q=80', chefId: 'c22', tags: ['Carne'], allergens: ['Glutine', 'Lattosio', 'Uova', 'Frutta a guscio'] },
+      { id: 'd22_2', name: 'Chakalaka & Pap', description: 'Contorno piccante e coloratissimo a base di fagioli stufati, carote, peperoni e spezie calde, servito con la classica polenta bianca di mais (Pap) densa.', price: 11.50, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c22', tags: ['Vegetariano', 'Piccante'], allergens: [] },
+      { id: 'd22_3', name: 'Spiedini di Boerewors alla griglia', description: 'Salsiccia tradizionale sudafricana artigianale a forma di spirale, preparata con carne bovina e suina speziata al coriandolo, chiodi di garofano e noce moscata.', price: 14.00, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c22', tags: ['Carne', 'Grigliato'], allergens: [] }
     ]
   },
   {
@@ -805,9 +805,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [1, 3, 5],
     reviews: [],
     dishes: [
-      { id: 'd24_1', name: 'Pollo alla Moambe', description: 'Pollo stufato in una ricca salsa di noci di palma con spinaci selvatici e manioca.', price: 16.00, image: 'https://images.unsplash.com/photo-1542354256-4b68e7d7f26c?auto=format&fit=crop&w=800&q=80', chefId: 'c24', tags: ['Carne'] },
-      { id: 'd24_2', name: 'Liboke de Poisson', description: 'Pescato fresco di giornata cotto intero al cartoccio in profumate foglie di banano selvatico con pomodorini di collina, aglio, cipolla ed essenza di zenzero fresco.', price: 17.50, image: 'https://images.unsplash.com/photo-1535399831218-d5bd36d1a6b3?auto=format&fit=crop&w=800&q=80', chefId: 'c24', tags: ['Pesce'] },
-      { id: 'd24_3', name: 'Fufu caldissimo con Mikate', description: 'Tipico fufu soffice di farina di manioca servito con mikate croccanti (frittelle dorate congolesi aromatizzate alla vaniglia dolce).', price: 7.00, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c24', tags: ['Vegetariano', 'Dolci'] }
+      { id: 'd24_1', name: 'Pollo alla Moambe', description: 'Pollo stufato in una ricca salsa di noci di palma con spinaci selvatici e manioca.', price: 16.00, image: 'https://images.unsplash.com/photo-1542354256-4b68e7d7f26c?auto=format&fit=crop&w=800&q=80', chefId: 'c24', tags: ['Carne'], allergens: [] },
+      { id: 'd24_2', name: 'Liboke de Poisson', description: 'Pescato fresco di giornata cotto intero al cartoccio in profumate foglie di banano selvatico con pomodorini di collina, aglio, cipolla ed essenza di zenzero fresco.', price: 17.50, image: 'https://images.unsplash.com/photo-1535399831218-d5bd36d1a6b3?auto=format&fit=crop&w=800&q=80', chefId: 'c24', tags: ['Pesce'], allergens: ['Pesce'] },
+      { id: 'd24_3', name: 'Fufu caldissimo con Mikate', description: 'Tipico fufu soffice di farina di manioca servito con mikate croccanti (frittelle dorate congolesi aromatizzate alla vaniglia dolce).', price: 7.00, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c24', tags: ['Vegetariano', 'Dolci'], allergens: ['Glutine'] }
     ]
   },
   {
@@ -827,9 +827,9 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [1, 2, 4],
     reviews: [],
     dishes: [
-      { id: 'd25_1', name: 'Maafe di Agnello', description: 'Spezzatino di agnello in una densa e saporita salsa di arachidi e pomodoro, servito con riso bianco.', price: 14.50, image: 'https://images.unsplash.com/photo-1511690656952-34342d5c2895?auto=format&fit=crop&w=800&q=80', chefId: 'c25', tags: ['Carne', 'Piccante'] },
-      { id: 'd25_2', name: 'Yassa di Pesce alla maliana', description: 'Filetto di pesce persico freschissimo marinato al limone, frullato riccamente e cotto con cipolle dorate caramellate, servito con purè di platano bollito.', price: 15.00, image: 'https://images.unsplash.com/photo-1535399831218-d5bd36d1a6b3?auto=format&fit=crop&w=800&q=80', chefId: 'c25', tags: ['Pesce', 'Agrumato'] },
-      { id: 'd25_3', name: 'Widjila al Vapore', description: 'Insolito e tipico pane brioche cotto squisitamente a vapore sopra una pentola che bolle con salsa speziata di pomodoro ed erbe selvatiche.', price: 7.50, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c25', tags: ['Vegetariano', 'Antipasti'] }
+      { id: 'd25_1', name: 'Maafe di Agnello', description: 'Spezzatino di agnello in una densa e saporita salsa di arachidi e pomodoro, servito con riso bianco.', price: 14.50, image: 'https://images.unsplash.com/photo-1511690656952-34342d5c2895?auto=format&fit=crop&w=800&q=80', chefId: 'c25', tags: ['Carne', 'Piccante'], allergens: ['Arachidi'] },
+      { id: 'd25_2', name: 'Yassa di Pesce alla maliana', description: 'Filetto di pesce persico freschissimo marinato al limone, frullato riccamente e cotto con cipolle dorate caramellate, servito con purè di platano bollito.', price: 15.00, image: 'https://images.unsplash.com/photo-1535399831218-d5bd36d1a6b3?auto=format&fit=crop&w=800&q=80', chefId: 'c25', tags: ['Pesce', 'Agrumato'], allergens: ['Pesce'] },
+      { id: 'd25_3', name: 'Widjila al Vapore', description: 'Insolito e tipico pane brioche cotto squisitamente a vapore sopra una pentola che bolle con salsa speziata di pomodoro ed erbe selvatiche.', price: 7.50, image: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80', chefId: 'c25', tags: ['Vegetariano', 'Antipasti'], allergens: ['Glutine', 'Uova', 'Lattosio'] }
     ]
   },
   {
@@ -849,8 +849,8 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [2, 3, 4, 5, 6],
     reviews: [],
     dishes: [
-      { id: 'd40_1', name: 'Bariis Iskukaris aromatico', description: 'Cremoso riso basmati somalo aromatizzato con la storica miscela Xawaash (cumino, cardamomo, chiodi di garofano), ciliegino, uvetta dolce, cipolla fritta e servito con stufato d\'agnello tenerissimo.', price: 16.00, image: 'https://images.unsplash.com/photo-1542354256-4b68e7d7f26c?auto=format&fit=crop&w=800&q=80', chefId: 'c40', tags: ['Carne', 'Saporito'] },
-      { id: 'd40_2', name: 'Sambusa Somale Croccante (Tris)', description: 'Scrigni di sfoglia fritti preparati a mano ripieni di carne di manzo tritata finissima, aromatizzati con cipolle rosse fresche, aglio, cumino e coriandolo.', price: 7.50, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c40', tags: ['Carne', 'Antipasti'] }
+      { id: 'd40_1', name: 'Bariis Iskukaris aromatico', description: 'Cremoso riso basmati somalo aromatizzato con la storica miscela Xawaash (cumino, cardamomo, chiodi di garofano), ciliegino, uvetta dolce, cipolla fritta e servito con stufato d\'agnello tenerissimo.', price: 16.00, image: 'https://images.unsplash.com/photo-1542354256-4b68e7d7f26c?auto=format&fit=crop&w=800&q=80', chefId: 'c40', tags: ['Carne', 'Saporito'], allergens: [] },
+      { id: 'd40_2', name: 'Sambusa Somale Croccante (Tris)', description: 'Scrigni di sfoglia fritti preparati a mano ripieni di carne di manzo tritata finissima, aromatizzati con cipolle rosse fresche, aglio, cumino e coriandolo.', price: 7.50, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', chefId: 'c40', tags: ['Carne', 'Antipasti'], allergens: ['Glutine'] }
     ]
   },
   {
@@ -870,8 +870,8 @@ export const MOCK_CHEFS: Chef[] = [
     availableDays: [1, 2, 4, 5, 6, 0],
     reviews: [],
     dishes: [
-      { id: 'd41_1', name: 'Romazava Tradizionale', description: 'Lo straordinario stufato nazionale del Madagascar preparato con carne di manzo, zenzero fresco, aglio e un mix straordinario di foglie verdi leggermente piccanti.', price: 16.50, image: 'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?auto=format&fit=crop&w=800&q=80', chefId: 'c41', tags: ['Carne', 'Tradizionale'] },
-      { id: 'd41_2', name: 'Pollo al Cocco e Vaniglia', description: 'Bocconcini di pollo ruspante stufati dolcemente in latte di cocco cremoso, zenzero fresco, curcuma dorata ed un tocco profumatissimo di baccelli di vaniglia bourbon del Madagascar.', price: 15.00, image: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', chefId: 'c41', tags: ['Carne', 'Cocco'] }
+      { id: 'd41_1', name: 'Romazava Tradizionale', description: 'Lo straordinario stufato nazionale del Madagascar preparato con carne di manzo, zenzero fresco, aglio e un mix straordinario di foglie verdi leggermente piccanti.', price: 16.50, image: 'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?auto=format&fit=crop&w=800&q=80', chefId: 'c41', tags: ['Carne', 'Tradizionale'], allergens: [] },
+      { id: 'd41_2', name: 'Pollo al Cocco e Vaniglia', description: 'Bocconcini di pollo ruspante stufati dolcemente in latte di cocco cremoso, zenzero fresco, curcuma dorata ed un tocco profumatissimo di baccelli di vaniglia bourbon del Madagascar.', price: 15.00, image: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', chefId: 'c41', tags: ['Carne', 'Cocco'], allergens: [] }
     ]
   }
 ];

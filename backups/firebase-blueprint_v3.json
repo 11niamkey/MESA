@@ -1,0 +1,123 @@
+{
+  "entities": {
+    "User": {
+      "title": "AppUser",
+      "description": "Registered customer, partner chef, or administrator account.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "brandName": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "role": { "type": "string", "enum": ["client", "chef", "admin"] },
+        "addresses": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "favoriteDishIds": { "type": "array" }
+      },
+      "required": ["id", "name", "lastName", "email", "role", "createdAt"]
+    },
+    "Chef": {
+      "title": "Chef",
+      "description": "Active home chef profile and menu catalog.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "nationality": { "type": "string" },
+        "countryName": { "type": "string" },
+        "continent": { "type": "string", "enum": ["Europa", "Asia", "Africa", "Americhe", "Oceania"] },
+        "bio": { "type": "string" },
+        "avatar": { "type": "string" },
+        "rating": { "type": "number" },
+        "location": { "type": "string" },
+        "phone": { "type": "string" },
+        "distance": { "type": "number" },
+        "specialties": { "type": "array" },
+        "availability": { "type": "array" },
+        "availableDays": { "type": "array" },
+        "dishes": { "type": "array" },
+        "email": { "type": "string", "format": "email" },
+        "verificationStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      },
+      "required": ["id", "name", "nationality", "continent", "location", "dishes"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer dish booking synchronized across Client, Chef, and Admin views.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDING_CONFIRMATION",
+            "CONFIRMED",
+            "REJECTED",
+            "PLACED",
+            "PREPARING",
+            "READY",
+            "DELIVERING",
+            "COMPLETED"
+          ]
+        },
+        "timestamp": { "type": "string" },
+        "chefId": { "type": "string" },
+        "chefName": { "type": "string" },
+        "deliveryMode": { "type": "string", "enum": ["delivery", "pickup"] },
+        "estimatedTime": { "type": "string" },
+        "notificationChannel": { "type": "string", "enum": ["app", "whatsapp"] }
+      },
+      "required": ["id", "items", "total", "status", "chefId", "chefName", "deliveryMode", "estimatedTime"]
+    },
+    "ChefApplication": {
+      "title": "ChefApplication",
+      "description": "Onboarding application submitted by prospective home chefs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "brandName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "location": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "proposedDishName": { "type": "string" },
+        "proposedDishPrice": { "type": "number" },
+        "proposedDishImage": { "type": "string" },
+        "proposedDishAllergens": { "type": "array" },
+        "availableDays": { "type": "array" },
+        "availabilitySlots": { "type": "array" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "needs_info"] },
+        "submittedAt": { "type": "string" }
+      },
+      "required": ["id", "fullName", "brandName", "email", "status", "submittedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Registered user accounts and saved delivery addresses."
+    },
+    "/chefs/{chefId}": {
+      "schema": { "$ref": "#/entities/Chef" },
+      "description": "Active home chefs and their dishes."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Real-time bookings synced between Client Orders, Chef Area, and Admin Dashboard."
+    },
+    "/chefApplications/{applicationId}": {
+      "schema": { "$ref": "#/entities/ChefApplication" },
+      "description": "Chef onboarding applications reviewed by Admin."
+    }
+  }
+}

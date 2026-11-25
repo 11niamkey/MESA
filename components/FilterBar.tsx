@@ -97,30 +97,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
   const [isExpanded, setIsExpanded] = useState(false);
 
   const categoryOptions = [
-    { 
-      name: 'Carne', 
-      icon: Drumstick, 
-      image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=260&h=180&q=80',
-      description: 'Arrosti e brasati'
-    },
-    { 
-      name: 'Pesce', 
-      icon: Fish, 
-      image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=260&h=180&q=80',
-      description: 'Fresco e saporito'
-    },
-    { 
-      name: 'Piccante', 
-      icon: Flame, 
-      image: 'https://images.unsplash.com/photo-1595855759920-86582396756a?auto=format&fit=crop&w=260&h=180&q=80',
-      description: 'Sapori piccanti'
-    },
-    { 
-      name: 'Vegetariano', 
-      icon: Leaf, 
-      image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=260&h=180&q=80',
-      description: 'Orto a metro zero'
-    },
+    { name: 'Carne', icon: Drumstick },
+    { name: 'Pesce', icon: Fish },
+    { name: 'Piccante', icon: Flame },
+    { name: 'Vegetariano', icon: Leaf },
   ];
 
   // Build ordered list of active countries from live chefs with their original flags and country names
@@ -175,115 +155,51 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
   };
 
   return (
-    <div id="main-filter-bar" className="bg-white border-b border-orange-100 py-3.5 md:py-5 sticky top-16 md:top-20 z-40 shadow-sm animate-fade-in transition-all">
-      <div className="max-w-6xl mx-auto px-4">
-        {/* Search Header Container */}
-        <div className="flex items-center gap-2.5">
-          <div className="relative flex-1 min-w-0 overflow-hidden rounded-[1.3rem] md:rounded-[1.8rem]">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-orange-500" />
-            </div>
-            <input
-              type="text"
-              placeholder="Cerca piatti o ingredienti..."
-              className="block w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap pl-10 sm:pl-11 pr-9 sm:pr-10 py-3 md:py-4 border-2 border-gray-100 rounded-[1.3rem] md:rounded-[1.8rem] bg-gray-50/50 text-xs md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:bg-white transition-all shadow-inner placeholder-gray-400"
-              value={filters.search}
-              onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
-            />
-            {filters.search && (
-              <button 
-                onClick={() => onFilterChange({ ...filters, search: '' })}
-                className="absolute inset-y-0 right-0 pr-3.5 sm:pr-4 flex items-center text-gray-400 hover:text-orange-600"
-                title="Pulisci ricerca"
-              >
-                <X className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-              </button>
-            )}
-          </div>
-
-          <button 
-            onClick={() => setIsExpanded(!isExpanded)}
-            className={`relative flex items-center gap-2 px-4 md:px-7 py-3 md:py-4 rounded-[1.3rem] md:rounded-[1.8rem] border-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${
-              isExpanded || activeFiltersCount > 0 
-                ? 'bg-black border-black text-white shadow-xl' 
-                : 'bg-white border-gray-100 text-gray-700 hover:border-orange-500'
-            }`}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span className="hidden sm:inline">Filtri</span>
-            {activeFiltersCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-orange-600 text-black border-2 border-white rounded-full flex items-center justify-center text-[9px] font-black">
-                {activeFiltersCount}
-              </span>
-            )}
-            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-
-        {/* Categorie Section with Food Banners */}
-        <div className="mt-3.5 md:mt-5 pt-1">
-          <div>
-            <div className="flex items-center justify-between mb-2 px-1">
-              <span className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-1.5">
-                <UtensilsCrossed className="w-3 h-3 md:w-3.5 md:h-3.5 text-orange-500" />
-                Preferenze Alimentari
-              </span>
-              {filters.categories.length > 0 && (
+    <>
+      <div id="main-filter-bar" className="bg-white border-b border-gray-100 py-2 md:py-3.5 animate-fade-in transition-all">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4">
+          {/* Search Header Container */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="relative flex-1 min-w-0 overflow-hidden rounded-2xl md:rounded-[1.8rem]">
+              <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-orange-500" />
+              </div>
+              <input
+                type="text"
+                placeholder="Cerca piatti o ingredienti..."
+                className="block w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap pl-9 sm:pl-11 pr-9 sm:pr-10 py-2 md:py-3.5 border-2 border-gray-100 rounded-2xl md:rounded-[1.8rem] bg-gray-50/50 text-xs md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:bg-white transition-all shadow-inner placeholder-gray-400"
+                value={filters.search}
+                onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
+              />
+              {filters.search && (
                 <button 
-                  onClick={() => onFilterChange({ ...filters, categories: [] })}
-                  className="text-[9px] font-black text-orange-600 uppercase hover:underline"
+                  onClick={() => onFilterChange({ ...filters, search: '' })}
+                  className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center text-gray-400 hover:text-orange-600"
+                  title="Pulisci ricerca"
                 >
-                  Svuota Categorie
+                  <X className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                 </button>
               )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 md:gap-3.5 pb-1">
-              {categoryOptions.map(cat => {
-                const Icon = cat.icon;
-                const isActive = filters.categories.includes(cat.name);
-                return (
-                  <button
-                    key={cat.name}
-                    onClick={() => toggleCategory(cat.name)}
-                    className={`relative w-full h-16 sm:h-20 rounded-2xl overflow-hidden border-2 transition-all group cursor-pointer ${
-                      isActive 
-                        ? 'border-orange-500 shadow-lg ring-2 ring-orange-500/20' 
-                        : 'border-transparent hover:border-orange-200 hover:shadow-md'
-                    }`}
-                  >
-                    <img 
-                      src={cat.image} 
-                      alt={cat.name} 
-                      className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" 
-                    />
-                    <div className={`absolute inset-0 bg-gradient-to-t transition-opacity duration-300 ${
-                      isActive ? 'from-orange-600/90 to-black/35 opacity-95' : 'from-black/80 via-black/45 to-transparent'
-                    }`}></div>
-
-                    <div className="absolute inset-0 p-2.5 md:p-3 flex flex-col justify-end text-left z-10 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5 min-w-0">
-                        <Icon className={`w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 ${isActive ? 'text-black' : 'text-orange-500'}`} />
-                        <span className={`text-[11px] md:text-[13px] font-black tracking-tight uppercase leading-none truncate ${isActive ? 'text-black' : 'text-white'}`}>
-                          {cat.name}
-                        </span>
-                      </div>
-                      <span className={`text-[9px] md:text-[10px] font-medium leading-tight truncate ${isActive ? 'text-orange-950 font-bold' : 'text-gray-200'}`}>
-                        {cat.description}
-                      </span>
-                    </div>
-
-                    {isActive && (
-                      <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 bg-black text-orange-500 p-1 rounded-full shadow-lg">
-                        <Check className="w-2.5 h-2.5 md:w-3 md:h-3 stroke-[3]" />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            <button 
+              onClick={() => setIsExpanded(!isExpanded)}
+              className={`relative flex items-center gap-1.5 sm:gap-2 px-3.5 md:px-6 py-2 md:py-3.5 rounded-2xl md:rounded-[1.8rem] border-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${
+                isExpanded || activeFiltersCount > 0 
+                  ? 'bg-black border-black text-white shadow-xl' 
+                  : 'bg-white border-gray-100 text-gray-700 hover:border-orange-500'
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 md:w-4 md:h-4" />
+              <span className="hidden sm:inline">Filtri</span>
+              {activeFiltersCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-orange-600 text-black border-2 border-white rounded-full flex items-center justify-center text-[9px] font-black">
+                  {activeFiltersCount}
+                </span>
+              )}
+              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
           </div>
-        </div>
 
         {/* Advanced Filters Expandable Drawer */}
         {isExpanded && (
@@ -350,7 +266,60 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+
+      {/* Sticky Single-Row Dietary Preferences Bar */}
+      <div
+        id="dietary-preferences-bar"
+        className="sticky top-16 md:top-20 z-20 bg-white/95 backdrop-blur-md border-b border-orange-100 shadow-sm"
+      >
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2">
+          <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-2 sm:overflow-x-auto scrollbar-hide">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-[0.14em] shrink-0 whitespace-nowrap pr-0.5">
+              <UtensilsCrossed className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+              <span>Preferenze Alimentari</span>
+            </span>
+
+            {categoryOptions.map(cat => {
+              const Icon = cat.icon;
+              const isActive = filters.categories.includes(cat.name);
+              return (
+                <button
+                  key={cat.name}
+                  type="button"
+                  onClick={() => toggleCategory(cat.name)}
+                  title={cat.name}
+                  aria-label={cat.name}
+                  aria-pressed={isActive}
+                  className={`shrink-0 whitespace-nowrap w-11 h-11 sm:w-auto sm:h-auto sm:px-4 sm:py-2 rounded-full border-2 inline-flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-wide transition-all cursor-pointer active:scale-95 ${
+                    isActive
+                      ? 'bg-orange-600 border-orange-600 text-white shadow-md ring-2 ring-orange-500/30'
+                      : 'bg-gray-50 hover:bg-orange-50 border-gray-200 hover:border-orange-300 text-gray-800'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 sm:w-3.5 sm:h-3.5 shrink-0 ${isActive ? 'text-white' : 'text-orange-500'}`} />
+                  <span className="hidden sm:inline whitespace-nowrap">{cat.name}</span>
+                  {isActive && <Check className="hidden sm:inline w-3 h-3 stroke-[3] shrink-0 text-white" />}
+                </button>
+              );
+            })}
+
+            {filters.categories.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onFilterChange({ ...filters, categories: [] })}
+                title="Svuota preferenze"
+                aria-label="Svuota preferenze"
+                className="shrink-0 whitespace-nowrap w-10 h-10 sm:w-auto sm:h-auto sm:px-2.5 sm:py-1.5 rounded-full bg-black text-white hover:bg-orange-600 inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95"
+              >
+                <X className="w-4 h-4 sm:w-3 sm:h-3 shrink-0" />
+                <span className="hidden sm:inline whitespace-nowrap">Svuota</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   );
 };

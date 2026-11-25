@@ -11,6 +11,7 @@ import { ReviewList } from './ReviewList';
 import { StarRating } from './StarRating';
 import { HeritageJourney } from './HeritageJourney';
 import { CountryFlag } from './CountryFlag';
+import { AllergensRow } from './Allergens';
 
 interface ChefProfileProps {
   chef: Chef;
@@ -138,19 +139,19 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                 key={dish.id} 
                 className="group bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-500 flex flex-col md:flex-row h-full"
               >
-                <div className="w-full md:w-2/5 h-48 md:h-auto relative overflow-hidden">
+                <div className="w-full md:w-2/5 h-36 sm:h-48 md:h-auto relative overflow-hidden">
                   <img 
                     src={dish.image || DEFAULT_FOOD_IMAGE} 
                     alt={dish.name} 
                     onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_FOOD_IMAGE; }}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
                   />
-                  <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black text-white">€ {dish.price.toFixed(2)}</div>
+                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black text-white">€ {dish.price.toFixed(2)}</div>
                 </div>
-                <div className="p-6 flex-1 flex flex-col justify-between">
+                <div className="p-4 sm:p-6 flex-1 flex flex-col justify-between gap-3">
                   <div>
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="text-xl font-black text-orange-600">{dish.name}</h4>
+                    <div className="flex justify-between items-start mb-1.5">
+                      <h4 className="text-lg sm:text-xl font-black text-orange-600 leading-tight">{dish.name}</h4>
                       <button
                         onClick={() => toggleDishDetails(dish.id)}
                         className="p-1 min-w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex-shrink-0"
@@ -160,9 +161,10 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                       </button>
                     </div>
                     <p className="text-xs text-black line-clamp-2 italic">{dish.description}</p>
+                    <AllergensRow allergens={dish.allergens} className="mt-2" />
                     
                     {expandedDishId === dish.id && (
-                      <div className="mt-4 p-4 bg-orange-50/50 rounded-2xl border border-orange-100 space-y-3 animate-fade-in text-sm">
+                      <div className="mt-3 p-3.5 bg-orange-50/50 rounded-2xl border border-orange-100 space-y-2.5 animate-fade-in text-sm">
                         {dish.ingredients && dish.ingredients.length > 0 && (
                           <div>
                             <span className="block text-[10px] font-black uppercase tracking-widest text-orange-800 mb-1">Ingredienti Chiave</span>
@@ -181,10 +183,10 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                       </div>
                     )}
                   </div>
-                  <div className="mt-6 space-y-3">
+                  <div className="space-y-2">
                     <button 
                       onClick={() => onAddDish(dish)}
-                      className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] transition-all font-bold border-b-2 border-orange-800"
+                      className="w-full py-2.5 sm:py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] transition-all font-bold border-b-2 border-orange-800"
                     >
                       Prenota
                     </button>
