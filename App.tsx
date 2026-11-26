@@ -1806,7 +1806,7 @@ function App() {
     return validateBetaOrderSubmission(cart, chefs, 'cart');
   };
 
-  const handlePaymentSuccess = async (notificationChannel?: 'app' | 'whatsapp') => {
+  const handlePaymentSuccess = async () => {
     if (!currentUser) {
       promptClientAuth("Accedi o registrati come Cliente per completare l'ordine.");
       return;
@@ -1836,7 +1836,7 @@ function App() {
       chefName: chefName,
       deliveryMode: cart[0]?.deliveryMode || 'pickup',
       estimatedTime: 'In arrivo...',
-      notificationChannel: notificationChannel || 'app',
+      notificationChannel: 'app',
       timeline: [
         {
           id: `tl-init-${orderId}`,
