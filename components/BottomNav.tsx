@@ -48,7 +48,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               }`}
             >
               <div className={`relative transition-transform duration-300 ${isActive ? '-translate-y-0.5' : ''}`}>
-                <Icon className={`w-[18px] h-[18px] sm:w-5 sm:h-5 ${isActive ? 'fill-orange-500/10' : ''}`} />
+                <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'fill-orange-500/10' : ''}`} />
                 {showOrdersBadge ? (
                   <span
                     className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 inline-flex items-center justify-center text-[9px] font-black leading-none text-white rounded-full border border-black shadow-md ${
@@ -84,7 +84,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           aria-label="Apri Carrello"
         >
           <div className={`relative transition-transform duration-300 ${isCartOpen ? '-translate-y-0.5' : ''}`}>
-            <ShoppingBag className={`w-[18px] h-[18px] sm:w-5 sm:h-5 ${isCartOpen ? 'fill-orange-500/10' : ''}`} />
+            <ShoppingBag className={`w-5 h-5 shrink-0 ${isCartOpen ? 'fill-orange-500/10' : ''}`} />
             {cartCount > 0 && (
               <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 inline-flex items-center justify-center text-[9px] font-black leading-none text-white bg-orange-600 rounded-full border border-black shadow-md">
                 {cartCount}

@@ -62,7 +62,7 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
       {/* Grid of Dishes with Smooth Category Swap AnimatePresence */}
       <motion.div 
         layout
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
       >
         <AnimatePresence mode="popLayout">
           {allDishesWithChef.map((dish) => {
@@ -78,11 +78,11 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                 exit={{ opacity: 0, scale: 0.9, y: 10 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
                 key={dish.id}
-                className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-100 relative shadow-sm cursor-pointer"
+                className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between h-full hover:shadow-2xl transition-all duration-300 hover:border-orange-100 relative shadow-sm cursor-pointer"
                 onClick={() => onAddDish(dish)}
               >
                 {/* Image & Badges */}
-                <div className="relative h-44 overflow-hidden shrink-0">
+                <div className="relative aspect-[16/10] w-full overflow-hidden shrink-0">
                   <img
                     src={dish.image || DEFAULT_FOOD_IMAGE}
                     alt={dish.name}
@@ -111,7 +111,7 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                     }}
                     className="absolute top-3 right-3 p-2 bg-white/95 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all transform hover:scale-110 active:scale-95 z-10 border border-gray-100"
                   >
-                    <Heart className={`w-4 h-4 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+                    <Heart className={`w-4 h-4 shrink-0 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
                   </button>
                 </div>
 

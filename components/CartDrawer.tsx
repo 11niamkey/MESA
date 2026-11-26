@@ -111,26 +111,26 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         <div className="w-full h-full flex flex-col bg-white shadow-2xl animate-slide-in-right">
           
           <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-100 bg-white shadow-sm">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 min-w-0">
               <button 
                 onClick={onClose} 
-                className="p-2 hover:bg-gray-100 rounded-xl text-gray-600 transition-colors flex items-center gap-1.5 text-xs font-black uppercase tracking-wider"
+                className="p-2 hover:bg-gray-100 rounded-xl text-gray-600 transition-colors flex items-center gap-1.5 text-xs font-black uppercase tracking-wider shrink-0"
                 title="Torna alla navigazione"
               >
-                <ArrowLeft className="w-4 h-4 text-orange-600" />
+                <ArrowLeft className="w-4 h-4 text-orange-600 shrink-0" />
                 <span className="hidden xs:inline">Menu</span>
               </button>
-              <h2 className="text-lg sm:text-xl font-black text-gray-900 flex items-center">
-                <ShoppingBag className="w-5 h-5 mr-2 text-orange-600" />
-                Prenotazioni
+              <h2 className="text-lg sm:text-xl font-black text-gray-900 flex items-center min-w-0">
+                <ShoppingBag className="w-5 h-5 mr-2 text-orange-600 shrink-0" />
+                <span className="truncate">Prenotazioni</span>
               </h2>
             </div>
             <button 
               onClick={onClose} 
-              className="p-2 hover:bg-orange-50 rounded-full text-gray-400 hover:text-orange-600 transition-colors"
+              className="p-2 hover:bg-orange-50 rounded-full text-gray-400 hover:text-orange-600 transition-colors shrink-0"
               title="Chiudi"
             >
-              <X className="w-6 h-6" />
+              <X className="w-6 h-6 shrink-0" />
             </button>
           </div>
 

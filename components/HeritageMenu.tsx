@@ -130,14 +130,14 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
 
       {/* Galleria dell'Eredità Culinaria */}
       {filteredDishes.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredDishes.map((dish) => (
             <div 
               key={dish.id} 
               className="group bg-white rounded-[3rem] shadow-sm border border-gray-100 overflow-hidden hover:shadow-2xl transition-all duration-700 flex flex-col h-full relative"
             >
               {/* Box Superiore: Emozionale/Visivo */}
-              <div className="relative h-72 overflow-hidden">
+              <div className="relative aspect-[16/10] w-full overflow-hidden shrink-0">
                 <img 
                   src={dish.image || DEFAULT_FOOD_IMAGE} 
                   alt={dish.name} 
@@ -147,18 +147,18 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>
                 
                 {/* Badge Autenticità dell'Archivio */}
-                <div className="absolute top-5 left-5">
+                <div className="absolute top-4 left-4">
                    <span className="px-3 py-1.5 bg-black/80 backdrop-blur-md rounded-xl text-[8px] font-black uppercase tracking-wider text-orange-400 flex items-center gap-1.5 shadow-xl border border-white/10">
-                     <History className="w-3 h-3 text-orange-500" /> Custodia Storica
+                     <History className="w-3 h-3 text-orange-500 shrink-0" /> Custodia Storica
                    </span>
                 </div>
 
                 {/* Preferiti */}
                 <button 
                   onClick={(e) => { e.stopPropagation(); onToggleFavorite(dish.id); }}
-                  className="absolute top-5 right-5 p-3 bg-white/90 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all transform hover:scale-110 active:scale-95"
+                  className="absolute top-4 right-4 p-2.5 bg-white/90 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all transform hover:scale-110 active:scale-95"
                 >
-                  <Heart className={`w-4 h-4 ${favorites.includes(dish.id) ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+                  <Heart className={`w-4 h-4 shrink-0 ${favorites.includes(dish.id) ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
                 </button>
 
                 {/* Titoli Sopra l'immagine */}

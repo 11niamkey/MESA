@@ -2403,7 +2403,7 @@ function App() {
       
       {currentView === ViewState.HOME && <FilterBar filters={filters} onFilterChange={setFilters} chefs={chefs} />}
 
-      <main className="max-w-6xl mx-auto px-4 py-4 sm:py-6 flex-grow w-full mb-10 pb-4">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-grow w-full mb-10 pb-4">
         {currentView === ViewState.HOME && (
           <div className="animate-fade-in">
             {!hasActiveFilters ? (
@@ -2485,7 +2485,7 @@ function App() {
                 {matchingDishes.length > 0 ? (
                   <>
                     {/* Risultati Diretti per Piatto */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                       {matchingDishes.map(({ dish, chef }) => {
                         const isFav = favorites.includes(dish.id);
                         const canBook = isChefBookable(chef);
@@ -2493,9 +2493,9 @@ function App() {
                           <div
                             key={`${chef.id}-${dish.id}`}
                             onClick={() => handleInitiateBooking(dish)}
-                            className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-200 shadow-sm cursor-pointer"
+                            className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between h-full hover:shadow-2xl transition-all duration-300 hover:border-orange-200 shadow-sm cursor-pointer"
                           >
-                            <div className="relative h-44 overflow-hidden shrink-0">
+                            <div className="relative aspect-[16/10] w-full overflow-hidden shrink-0">
                               <img
                                 src={dish.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'}
                                 alt={dish.name}
@@ -2521,7 +2521,7 @@ function App() {
                                 }}
                                 className="absolute top-3 right-3 p-2 bg-white/95 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all z-10"
                               >
-                                <Heart className={`w-4 h-4 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+                                <Heart className={`w-4 h-4 shrink-0 ${isFav ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
                               </button>
                             </div>
 
@@ -2615,7 +2615,7 @@ function App() {
                       <h3 className="text-xl font-black text-gray-900 tracking-tight">
                         Cuochi Corrispondenti ({filteredChefs.length})
                       </h3>
-                      <div className="grid grid-cols-1 gap-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                         {filteredChefs.map(chef => (
                           <ChefCard key={chef.id} chef={chef} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
                         ))}

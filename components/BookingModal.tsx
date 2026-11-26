@@ -235,25 +235,25 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
         <div className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl border-t-8 border-orange-500 animate-fade-in-up">
           
           {/* Header */}
-          <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-b border-gray-100">
-            <h3 className="text-xl font-bold text-orange-600 flex items-center">
-              <Utensils className="w-5 h-5 mr-2 text-orange-600" />
-              Dettagli & Prenotazione
+          <div className="bg-gray-50 px-5 sm:px-6 py-4 flex items-center justify-between border-b border-gray-100">
+            <h3 className="text-lg sm:text-xl font-bold text-orange-600 flex items-center gap-2 min-w-0">
+              <Utensils className="w-5 h-5 text-orange-600 shrink-0" />
+              <span className="truncate">Dettagli & Prenotazione</span>
             </h3>
-            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm hover:shadow-md transition-all">
-              <X className="w-5 h-5" />
+            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm hover:shadow-md transition-all shrink-0">
+              <X className="w-5 h-5 shrink-0" />
             </button>
           </div>
 
-          <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+          <div className="p-5 sm:p-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
             {/* Dish Info Expanded */}
-            <div className="mb-8 bg-white rounded-xl">
-              <div className="flex flex-col md:flex-row md:items-start gap-5">
+            <div className="mb-6 sm:mb-8 bg-white rounded-xl">
+              <div className="flex flex-col md:flex-row md:items-start gap-4 sm:gap-5">
                 <img 
                   src={dish.image || DEFAULT_FOOD_IMAGE} 
                   alt={dish.name} 
                   onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_FOOD_IMAGE; }}
-                  className="w-full md:w-32 md:h-32 rounded-xl object-cover shadow-md" 
+                  className="w-full aspect-[16/10] md:aspect-auto md:w-32 md:h-32 rounded-xl object-cover shadow-md shrink-0" 
                 />
                 <div className="flex-1">
                   <div className="flex justify-between items-start">

@@ -38,7 +38,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/30"></div>
       </motion.div>
 
-      <div className="relative z-10 text-center max-w-4xl w-full flex flex-col items-center">
+      <div className="relative z-10 text-center max-w-lg md:max-w-2xl mx-auto w-full flex flex-col items-center">
         {/* Logo MESA con fondo arancione e scritta bianca */}
         <motion.div 
           initial={{ opacity: 0, y: 16 }}
@@ -46,10 +46,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
           className="mb-2 sm:mb-3"
         >
-          <div className="w-[74px] h-[74px] sm:w-22 sm:h-22 rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 flex flex-col items-center justify-center shadow-2xl shadow-orange-600/50 border-2 border-orange-400/40 p-2 transition-transform hover:scale-105 mx-auto relative group">
+          <div className="w-[74px] h-[74px] sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 flex flex-col items-center justify-center shadow-2xl shadow-orange-600/50 border-2 border-orange-400/40 p-2 transition-transform hover:scale-105 mx-auto relative group">
             <div className="absolute -inset-2 bg-orange-600/30 rounded-3xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity -z-10"></div>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-0.5 shadow-inner">
-              <UtensilsCrossed className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white drop-shadow-sm" />
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-0.5 shadow-inner shrink-0">
+              <UtensilsCrossed className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white drop-shadow-sm shrink-0" />
             </div>
             <span className="text-base sm:text-xl font-black tracking-widest text-white font-sans leading-none drop-shadow-md">
               MESA<span className="text-amber-200 font-extrabold">.</span>
@@ -84,18 +84,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut", delay: 0.45 }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4 w-full max-w-4xl"
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 w-full"
         >
           {/* Card 1: Area Cliente (Arancione MESA) */}
           <button
             type="button"
             onClick={onEnterApp}
-            className="group text-left px-3.5 py-2.5 sm:px-5 sm:py-3.5 rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 hover:from-orange-400 hover:to-amber-500 border-2 border-orange-300/60 shadow-[0_0_28px_rgba(234,88,12,0.3)] transition-all transform hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-between gap-2.5 sm:gap-3"
+            className="group text-left px-3.5 py-2.5 sm:px-4 sm:py-3.5 rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 hover:from-orange-400 hover:to-amber-500 border-2 border-orange-300/60 shadow-[0_0_28px_rgba(234,88,12,0.3)] transition-all transform hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-between gap-2.5 sm:gap-3 h-full"
           >
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
               <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-black/20 backdrop-blur-sm border border-white/25 flex items-center justify-center gap-0.5 shrink-0 shadow-inner">
-                <Utensils className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-                <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                <Utensils className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
+                <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-white shrink-0" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-0.5">
@@ -118,11 +118,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <button
             type="button"
             onClick={onNavigateToBecomeChef}
-            className="group text-left px-3.5 py-2.5 sm:px-5 sm:py-3.5 rounded-2xl bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-950 hover:from-emerald-600 hover:to-emerald-900 border-2 border-emerald-400/60 shadow-[0_0_28px_rgba(16,185,129,0.24)] transition-all transform hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-between gap-2.5 sm:gap-3"
+            className="group text-left px-3.5 py-2.5 sm:px-4 sm:py-3.5 rounded-2xl bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-950 hover:from-emerald-600 hover:to-emerald-900 border-2 border-emerald-400/60 shadow-[0_0_28px_rgba(16,185,129,0.24)] transition-all transform hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-between gap-2.5 sm:gap-3 h-full"
           >
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
               <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-400/20 backdrop-blur-sm border border-emerald-300/40 flex items-center justify-center shrink-0 shadow-inner">
-                <ChefHat className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-200" />
+                <ChefHat className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-200 shrink-0" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-0.5">
@@ -150,15 +150,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           className="mt-3.5 sm:mt-5 flex flex-wrap items-center justify-center gap-3.5 sm:gap-8 text-[9.5px] sm:text-[10px] font-black uppercase tracking-widest text-gray-400 bg-black/40 backdrop-blur-sm px-4 py-2 rounded-full border border-white/10"
         >
           <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-orange-500" />
+            <ShieldCheck className="w-3.5 h-3.5 text-orange-500 shrink-0" />
             <span className="hidden sm:inline">Cucine</span> Certificate
           </div>
           <div className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-orange-500" />
+            <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0" />
             <span className="hidden sm:inline">Solo Cuochi</span> Locali
           </div>
           <button type="button" onClick={onShareClick} className="flex items-center gap-1.5 hover:text-orange-500 transition-colors">
-            <Share2 className="w-3.5 h-3.5" /> Scopri di più
+            <Share2 className="w-3.5 h-3.5 shrink-0" /> Scopri di più
           </button>
         </motion.div>
 

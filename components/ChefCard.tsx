@@ -71,17 +71,17 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
       </div>
 
       {/* Enlarged Featured Dishes List */}
-      <div className="p-4 sm:p-7 bg-white">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
+      <div className="p-4 sm:p-6 bg-white flex-1 flex flex-col">
+        <div className="flex items-center justify-between mb-4">
           <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Specialità in evidenza</h4>
           <span className="h-px flex-1 bg-gray-100 ml-4"></span>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 flex-1">
           {chef.dishes.slice(0, 2).map((dish) => (
             <div key={dish.id} className="group flex flex-col h-full bg-white rounded-3xl border border-gray-100 overflow-hidden hover:border-orange-300 transition-all shadow-sm hover:shadow-lg relative">
               <div 
-                className="relative h-36 sm:h-60 md:h-72 overflow-hidden shrink-0 cursor-pointer"
+                className="relative aspect-[16/10] w-full overflow-hidden shrink-0 cursor-pointer"
                 onClick={() => onAddDish(dish)}
               >
                 <img 
@@ -95,29 +95,29 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
                     e.stopPropagation();
                     onToggleFavorite(dish.id);
                   }}
-                  className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 sm:p-2.5 bg-white/90 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all transform hover:scale-110 active:scale-95 z-10"
+                  className="absolute top-2.5 right-2.5 p-2 bg-white/90 backdrop-blur rounded-2xl shadow-xl hover:bg-white transition-all transform hover:scale-110 active:scale-95 z-10"
                 >
-                  <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${favorites.includes(dish.id) ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+                  <Heart className={`w-4 h-4 shrink-0 ${favorites.includes(dish.id) ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
                 </button>
-                <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 bg-black/80 backdrop-blur-md px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-sm sm:text-lg font-black text-white shadow-2xl">
+                <div className="absolute bottom-2.5 left-2.5 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-xs sm:text-sm font-black text-white shadow-2xl">
                   € {dish.price.toFixed(2)}
                 </div>
               </div>
-              <div className="p-3.5 sm:p-6 flex flex-col flex-grow justify-between gap-2.5">
+              <div className="p-3.5 sm:p-4 flex flex-col flex-grow justify-between gap-2.5">
                 <div className="space-y-1.5">
                   <h5 
-                    className="text-base sm:text-lg font-black text-orange-600 leading-snug line-clamp-2 cursor-pointer hover:text-orange-700 transition-colors"
+                    className="text-sm sm:text-base font-black text-orange-600 leading-snug line-clamp-2 cursor-pointer hover:text-orange-700 transition-colors"
                     onClick={() => onAddDish(dish)}
                   >
                     {dish.name}
                   </h5>
-                  <p className="text-xs sm:text-sm text-black line-clamp-2 leading-snug sm:leading-relaxed">{dish.description}</p>
+                  <p className="text-xs text-black line-clamp-2 leading-snug">{dish.description}</p>
                   <AllergensRow allergens={dish.allergens} />
                 </div>
                 {canBook ? (
                   <button 
                     onClick={() => onAddDish(dish)}
-                    className="w-full py-2.5 sm:py-4 bg-orange-600 hover:bg-black text-white text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl sm:rounded-2xl shadow-lg shadow-orange-200 transition-all transform active:scale-95"
+                    className="w-full py-2.5 bg-orange-600 hover:bg-black text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-orange-200 transition-all transform active:scale-95"
                   >
                     Aggiungi al carrello
                   </button>

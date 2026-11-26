@@ -117,7 +117,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
       labelActiveClass: 'text-rose-700 font-black',
       badgeClass: 'bg-rose-600',
       illustration: (
-        <svg viewBox="0 0 32 32" className="w-6 h-6" aria-hidden="true">
+        <svg viewBox="0 0 32 32" className="w-6 h-6 shrink-0" aria-hidden="true">
           {/* Bone */}
           <path
             d="M21.8 10.2l3.4-3.4a2.2 2.2 0 1 1 3.1 3.1l-.4.4a2.2 2.2 0 1 1-3.1 3.1l-3.4 3.4"
@@ -158,7 +158,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
       labelActiveClass: 'text-sky-700 font-black',
       badgeClass: 'bg-sky-600',
       illustration: (
-        <svg viewBox="0 0 32 32" className="w-6 h-6" aria-hidden="true">
+        <svg viewBox="0 0 32 32" className="w-6 h-6 shrink-0" aria-hidden="true">
           {/* Tail fin */}
           <path
             d="M22 16l6.5-5.5c.6-.5 1.5 0 1.4.8l-.8 4.7.8 4.7c.1.8-.8 1.3-1.4.8L22 16z"
@@ -197,7 +197,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
       labelActiveClass: 'text-red-700 font-black',
       badgeClass: 'bg-red-600',
       illustration: (
-        <svg viewBox="0 0 32 32" className="w-6 h-6" aria-hidden="true">
+        <svg viewBox="0 0 32 32" className="w-6 h-6 shrink-0" aria-hidden="true">
           {/* Stem */}
           <path
             d="M21 8.5c1-2.6 2.8-4 5-4.3"
@@ -243,7 +243,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
       labelActiveClass: 'text-emerald-700 font-black',
       badgeClass: 'bg-emerald-600',
       illustration: (
-        <svg viewBox="0 0 32 32" className="w-6 h-6" aria-hidden="true">
+        <svg viewBox="0 0 32 32" className="w-6 h-6 shrink-0" aria-hidden="true">
           {/* Bright green leaf */}
           <path
             d="M7 23C5.8 14.5 11.2 6.8 25.5 5.5c-.6 13.6-7.6 19.8-16 18.8-.9-.1-1.9-.6-2.5-1.3z"
@@ -328,12 +328,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
   return (
     <>
       <div id="main-filter-bar" className="bg-white border-b border-gray-100 py-2.5 sm:py-3 animate-fade-in transition-all">
-        <div className="max-w-xl mx-auto px-3 sm:px-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mx-auto">
           {/* Search Header Container */}
           <div className="flex items-center gap-2 sm:gap-2.5">
             <div className="relative flex-1 min-w-0 overflow-hidden rounded-2xl">
               <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-orange-500" />
+                <Search className="w-4 h-4 text-orange-500 shrink-0" />
               </div>
               <input
                 type="text"
@@ -348,7 +349,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
                   className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center text-gray-400 hover:text-orange-600"
                   title="Pulisci ricerca"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="w-4 h-4 shrink-0" />
                 </button>
               )}
             </div>
@@ -361,14 +362,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
                   : 'bg-white border-gray-100 text-gray-700 hover:border-orange-500'
               }`}
             >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
               <span className="hidden sm:inline">Filtri</span>
               {activeFiltersCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-orange-600 text-black border-2 border-white rounded-full flex items-center justify-center text-[9px] font-black">
                   {activeFiltersCount}
                 </span>
               )}
-              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {isExpanded ? <ChevronUp className="w-3.5 h-3.5 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
             </button>
           </div>
 
@@ -437,6 +438,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
             </div>
           </div>
         )}
+          </div>
         </div>
       </div>
 
@@ -445,8 +447,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, c
         id="dietary-preferences-bar"
         className="sticky top-16 md:top-20 z-20 bg-white/95 backdrop-blur-md border-b border-orange-100 shadow-sm"
       >
-        <div className="max-w-xl mx-auto px-3 sm:px-4 py-2">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+          <div className="max-w-2xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <div aria-hidden="true" />
 
             <div className="flex items-center justify-center gap-3.5 sm:gap-5">

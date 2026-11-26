@@ -343,17 +343,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         
-        <div className="relative bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-up">
+        <div className="relative bg-white rounded-[2.5rem] sm:rounded-[3rem] shadow-2xl w-full max-w-md sm:max-w-lg overflow-hidden animate-fade-in-up">
           <button 
             onClick={onClose} 
-            className={`absolute top-3 right-3 sm:top-3.5 sm:right-3.5 p-2 rounded-full z-30 transition-all shadow-md active:scale-95 flex items-center justify-center border ${
+            className={`absolute top-3 right-3 sm:top-3.5 sm:right-3.5 p-2 rounded-full z-30 transition-all shadow-md active:scale-95 flex items-center justify-center border shrink-0 ${
               role === 'admin'
                 ? 'bg-neutral-900/90 hover:bg-neutral-800 text-gray-300 hover:text-white border-white/20'
                 : 'bg-white/90 hover:bg-gray-100 text-gray-500 hover:text-gray-900 border-gray-200'
             }`}
             title="Chiudi"
           >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
           </button>
 
           {/* Switch dei Ruoli */}
@@ -369,7 +369,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 role === 'client' ? 'bg-orange-50 text-orange-700 border-b-4 border-orange-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
                }`}
             >
-              <ShoppingBag className="w-4 h-4" />
+              <ShoppingBag className="w-4 h-4 shrink-0" />
               <span>Cliente</span>
             </button>
             <button
@@ -383,7 +383,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 role === 'chef' ? 'bg-emerald-50 text-emerald-800 border-b-4 border-emerald-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
               }`}
             >
-              <ChefHat className="w-4 h-4" />
+              <ChefHat className="w-4 h-4 shrink-0" />
               <span>Cuoco</span>
             </button>
             <button
@@ -399,7 +399,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 role === 'admin' ? 'bg-slate-900 text-violet-300 border-b-4 border-violet-500' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-500'
               }`}
             >
-              <ShieldCheck className="w-4 h-4" />
+              <ShieldCheck className="w-4 h-4 shrink-0" />
               <span>Admin</span>
             </button>
           </div>

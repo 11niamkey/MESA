@@ -72,7 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={`sticky top-0 z-50 bg-black text-white border-b shadow-lg transition-all duration-300 ${roleTheme.headerBorderClass}`}>
-      <div className="max-w-6xl mx-auto px-3 sm:px-5 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center gap-2 sm:gap-3 lg:gap-4 h-16 md:h-20">
           
           {/* Left Group: Dynamic Role Brand Logo + Active Coverage Location */}

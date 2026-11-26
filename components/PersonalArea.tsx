@@ -354,10 +354,10 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   };
 
   return (
-    <div className="animate-fade-in max-w-4xl mx-auto space-y-10 pb-16">
+    <div className="animate-fade-in max-w-5xl mx-auto space-y-8 pb-16">
       
       {/* Profilo Header Card */}
-      <div className="bg-black text-white rounded-[3rem] p-8 md:p-12 shadow-2xl relative overflow-hidden border-b-8 border-orange-600">
+      <div className="bg-black text-white rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 md:p-10 shadow-2xl relative overflow-hidden border-b-8 border-orange-600">
         <div className="absolute top-0 right-0 w-96 h-96 bg-orange-600/10 rounded-full blur-3xl"></div>
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">

@@ -128,10 +128,10 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({
           <div
             key={dish.id}
             onClick={() => onAddDish(dish)}
-            className="w-[244px] sm:w-[258px] shrink-0 snap-start bg-white rounded-2xl shadow-md hover:shadow-xl border border-gray-100 overflow-hidden group transition-all duration-200 relative flex flex-col justify-between cursor-pointer"
+            className="w-[250px] sm:w-[270px] shrink-0 snap-start bg-white rounded-2xl shadow-md hover:shadow-xl border border-gray-100 overflow-hidden group transition-all duration-200 relative flex flex-col justify-between cursor-pointer"
           >
             {/* Compact Image Header */}
-            <div className="relative h-28 sm:h-32 overflow-hidden shrink-0">
+            <div className="relative aspect-[16/10] w-full overflow-hidden shrink-0">
               <img
                 src={dish.image || DEFAULT_FOOD_IMAGE}
                 alt={dish.name}
@@ -142,7 +142,7 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({
 
               <div className="absolute top-2 left-2">
                 <span className="bg-orange-600 text-white text-[8.5px] font-black px-2 py-0.5 rounded-lg uppercase tracking-wider shadow-md inline-flex items-center gap-1">
-                  <Sparkles className="w-2.5 h-2.5" />
+                  <Sparkles className="w-2.5 h-2.5 shrink-0" />
                   Speciale
                 </span>
               </div>
@@ -156,7 +156,7 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({
                 aria-label={`Aggiungi ${dish.name} ai preferiti`}
                 className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur rounded-xl shadow-md hover:bg-white transition-transform hover:scale-110 active:scale-95 z-10 border border-gray-100"
               >
-                <Heart className={`w-3.5 h-3.5 ${favorites.includes(dish.id) ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+                <Heart className={`w-3.5 h-3.5 shrink-0 ${favorites.includes(dish.id) ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
               </button>
             </div>
 
@@ -187,7 +187,7 @@ export const DailySpecials: React.FC<DailySpecialsProps> = ({
                   }}
                   className="w-full py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-wider text-[11px] flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95"
                 >
-                  <Utensils className="w-3.5 h-3.5" />
+                  <Utensils className="w-3.5 h-3.5 shrink-0" />
                   <span>Prenota Ora</span>
                 </button>
               ) : (

@@ -34,24 +34,24 @@ export const MesaChefs: React.FC<MesaChefsProps> = ({ chefs, onViewProfile }) =>
       </div>
 
       {/* Trust Indicators */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-10">
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center text-center">
-          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4">
-            <Users className="w-6 h-6 text-orange-600" />
+          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4 shrink-0">
+            <Users className="w-6 h-6 text-orange-600 shrink-0" />
           </div>
           <h3 className="font-bold text-orange-600 mb-2">Scelti dalla Comunità</h3>
           <p className="text-sm text-black">Solo i cuochi con recensioni eccellenti e approvazione locale entrano in MESA.</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center text-center">
-          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4">
-            <ShieldCheck className="w-6 h-6 text-orange-600" />
+          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4 shrink-0">
+            <ShieldCheck className="w-6 h-6 text-orange-600 shrink-0" />
           </div>
           <h3 className="font-bold text-orange-600 mb-2">Sicurezza Certificata</h3>
           <p className="text-sm text-black">Ogni cucina è verificata e ogni cuoco possiede certificazioni HACCP aggiornate.</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center text-center">
-          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4">
-            <Award className="w-6 h-6 text-orange-600" />
+          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4 shrink-0">
+            <Award className="w-6 h-6 text-orange-600 shrink-0" />
           </div>
           <h3 className="font-bold text-orange-600 mb-2">Autenticità Garantita</h3>
           <p className="text-sm text-black">Nessuna imitazione. Solo ricette originali tramandate e ingredienti verificati.</p>
@@ -60,14 +60,14 @@ export const MesaChefs: React.FC<MesaChefsProps> = ({ chefs, onViewProfile }) =>
 
       {/* Chefs Grid */}
       <h3 className="text-lg sm:text-2xl font-black text-orange-600 mb-5 border-l-4 border-orange-500 pl-4 whitespace-nowrap truncate">Esplora i Talenti</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {chefs.map((chef) => (
           <div 
             key={chef.id} 
             className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex flex-col h-full"
           >
             {/* Image Header with Flag Overlay */}
-            <div className="relative h-72 overflow-hidden bg-gray-100">
+            <div className="relative aspect-[16/10] w-full overflow-hidden bg-gray-100 shrink-0">
               <img 
                 src={chef.avatar || DEFAULT_AVATAR} 
                 alt={chef.name} 
@@ -82,7 +82,7 @@ export const MesaChefs: React.FC<MesaChefsProps> = ({ chefs, onViewProfile }) =>
                 </div>
                 <h3 className="text-2xl font-bold text-orange-400">{chef.name}</h3>
                 <div className="flex items-center text-sm text-gray-300 mt-1">
-                  <MapPin className="w-3 h-3 mr-1" />
+                  <MapPin className="w-3 h-3 mr-1 shrink-0" />
                   {chef.location}
                 </div>
               </div>

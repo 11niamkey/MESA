@@ -52,11 +52,11 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
         <h2 className="text-lg sm:text-2xl font-black text-orange-600 tracking-tight whitespace-nowrap truncate">Salvati per dopo</h2>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {favoriteDishes.map((dish) => (
-          <div key={dish.id} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col">
+          <div key={dish.id} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col h-full">
             <div 
-              className="relative h-44 overflow-hidden shrink-0 cursor-pointer"
+              className="relative aspect-[16/10] w-full overflow-hidden shrink-0 cursor-pointer"
               onClick={() => onAddDish(dish)}
             >
               <img 
@@ -72,7 +72,7 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
                 }}
                 className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur rounded-2xl shadow-lg z-10 hover:bg-white transition-all"
               >
-                <Heart className="w-4 h-4 text-red-500 fill-current" />
+                <Heart className="w-4 h-4 text-red-500 fill-current shrink-0" />
               </button>
               <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-black text-gray-900 shadow-xl flex items-center gap-1.5 border border-white">
                  <CountryFlag flag={dish.chefNationality} size="sm" />
