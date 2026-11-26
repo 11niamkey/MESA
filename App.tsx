@@ -37,12 +37,12 @@ import { CountryFlag } from './components/CountryFlag';
 import { AllergensRow } from './components/Allergens';
 import { ConfirmDeleteOrdersModal } from './components/ConfirmDeleteOrdersModal';
 import { isPordenoneLocation, normalizeLocationToPordenone, resolvePordenoneZip, findPordenoneComune } from './components/italianTerritoryData';
-import { playNewOrderChime } from './utils/soundAlert';
-import { isConcludedOrder, formatOrderDeleteError, OrderDeleteResult } from './utils/orderUtils';
+import { playNewOrderChime, unlockAudioContext } from './utils/soundAlert';
+import { isConcludedOrder, canClientCancelOrder, formatOrderDeleteError, OrderDeleteResult } from './utils/orderUtils';
 import { isChefBookable, validateBetaOrderSubmission, BetaOrderValidationResult } from './utils/chefUtils';
 import { MOCK_CHEFS } from './constants';
 import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
-import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock, Volume2, VolumeX, Trash2 } from 'lucide-react';
+import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock, Volume2, VolumeX, Trash2, BellRing, XCircle } from 'lucide-react';
 
 const formatChefDisplayName = (name?: string) => {
   const trimmed = (name || 'MESA').trim();
@@ -357,11 +357,14 @@ const seedFirestoreDefaults = async () => {
 
 const normalizeOrderStatus = (rawStatus: unknown): OrderStatus => {
   const s = String(rawStatus || '').trim();
-  if (s.toLowerCase() === 'pending') return 'PENDING_CONFIRMATION';
+  const lower = s.toLowerCase();
+  if (lower === 'pending' || lower === 'in_attesa' || lower === 'ricevuto') return 'PENDING_CONFIRMATION';
+  if (lower === 'cancelled' || lower === 'canceled' || lower === 'annullato') return 'CANCELLED';
   if (
     s === 'PENDING_CONFIRMATION' ||
     s === 'CONFIRMED' ||
     s === 'REJECTED' ||
+    s === 'CANCELLED' ||
     s === 'PLACED' ||
     s === 'PREPARING' ||
     s === 'READY' ||
@@ -451,6 +454,7 @@ function App() {
     const saved = localStorage.getItem('mesa_chef_sound_alerts');
     return saved === null ? true : saved === 'true';
   });
+  const [audioAutoplayBlocked, setAudioAutoplayBlocked] = useState(false);
 
   const prevOrderStatusesRef = useRef<Record<string, OrderStatus>>({});
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
@@ -471,7 +475,27 @@ function App() {
   useEffect(() => {
     chefSoundEnabledRef.current = chefSoundEnabled;
     localStorage.setItem('mesa_chef_sound_alerts', String(chefSoundEnabled));
+    if (!chefSoundEnabled) {
+      setAudioAutoplayBlocked(false);
+    }
   }, [chefSoundEnabled]);
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'chef' || !chefSoundEnabled) return;
+    const handleUserGesture = () => {
+      void unlockAudioContext().then((unlocked) => {
+        if (unlocked) {
+          setAudioAutoplayBlocked(false);
+        }
+      });
+    };
+    window.addEventListener('pointerdown', handleUserGesture, { passive: true });
+    window.addEventListener('keydown', handleUserGesture, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', handleUserGesture);
+      window.removeEventListener('keydown', handleUserGesture);
+    };
+  }, [currentUser?.id, currentUser?.role, chefSoundEnabled]);
 
   useEffect(() => {
     if (!isFirebaseConfigured) return;
@@ -520,6 +544,9 @@ function App() {
               : undefined;
             return {
               ...data,
+              id: data.id || d.id,
+              items: Array.isArray(data.items) ? data.items : [],
+              total: Number(data.total) || 0,
               status: normalizeOrderStatus(data.status),
               timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
               ...(parsedTimeline ? { timeline: parsedTimeline } : {}),
@@ -548,7 +575,9 @@ function App() {
                   Array.from(new Set([...prev, ...incomingChefOrders.map(o => o.id)]))
                 );
                 if (chefSoundEnabledRef.current) {
-                  playNewOrderChime();
+                  void playNewOrderChime().then((played) => {
+                    setAudioAutoplayBlocked(!played);
+                  });
                 }
                 showNotification(
                   incomingChefOrders.length === 1
@@ -565,12 +594,41 @@ function App() {
                   }
                 );
               }
+
+              // Also notify chef in real time if a client cancels a pending order
+              const cancelledChefOrders = ordersData.filter(order => {
+                const prevStatus = prevMap[order.id];
+                return (
+                  Boolean(prevStatus && prevStatus !== order.status) &&
+                  order.status === 'CANCELLED' &&
+                  isOrderForChefUser(order, activeUser, activeChefs)
+                );
+              });
+              if (cancelledChefOrders.length > 0) {
+                const cancelledOrder = cancelledChefOrders[0];
+                setUnreadOrderAlertIds(prev => prev.filter(id => !cancelledChefOrders.some(c => c.id === id)));
+                showNotification(
+                  `Ordine #${cancelledOrder.id.split('-')[0]} annullato dal cliente.`,
+                  {
+                    title: 'Ordine Annullato',
+                    variant: 'warning',
+                    actionLabel: 'Dettagli',
+                    onAction: () => {
+                      setSelectedOrder(cancelledOrder);
+                      setCurrentView(ViewState.ORDERS);
+                    },
+                  }
+                );
+              }
             }
 
             // 2. Client Real-Time Alert: order status updates for logged-in client
             const updatedClientOrders = ordersData.filter(order => {
               const prevStatus = prevMap[order.id];
-              return Boolean(prevStatus && prevStatus !== order.status && order.userId === activeUser.id);
+              return (
+                Boolean(prevStatus && prevStatus !== order.status && order.userId === activeUser.id) &&
+                order.status !== 'CANCELLED'
+              );
             });
 
             if (updatedClientOrders.length > 0) {
@@ -1349,56 +1407,6 @@ function App() {
     }
   }, []);
 
-  useEffect(() => {
-    const activeOrders = orders.filter(
-      o =>
-        o.status !== 'COMPLETED' &&
-        o.status !== 'PENDING_CONFIRMATION' &&
-        o.status !== 'CONFIRMED' &&
-        o.status !== 'REJECTED'
-    );
-    if (activeOrders.length === 0) return;
-
-    const timer = setInterval(() => {
-      orders.forEach(async order => {
-        if (
-          order.status === 'COMPLETED' ||
-          order.status === 'PENDING_CONFIRMATION' ||
-          order.status === 'CONFIRMED' ||
-          order.status === 'REJECTED'
-        ) {
-          return;
-        }
-        
-        // Solo l'utente che ha fatto l'ordine (o l'admin come fallback) esegue l'aggiornamento
-        if (currentUser?.id === order.userId || currentUser?.role === 'admin') {
-          const statusFlow: OrderStatus[] = order.deliveryMode === 'pickup' 
-            ? ['PLACED', 'PREPARING', 'READY', 'COMPLETED']
-            : ['PLACED', 'PREPARING', 'READY', 'DELIVERING', 'COMPLETED'];
-          
-          const currentIndex = statusFlow.indexOf(order.status);
-          if (currentIndex >= 0 && currentIndex < statusFlow.length - 1) {
-            const nextStatus = statusFlow[currentIndex + 1];
-            if (currentUser?.id === order.userId && order.id === orders[0]?.id) {
-              const messages = {
-                'PREPARING': `👨‍🍳 ${order.chefName} ha iniziato a cucinare!`,
-                'READY': `✅ Il tuo piatto è pronto per il ritiro!`,
-                'DELIVERING': `🛵 Il rider è partito con il tuo ordine!`,
-                'COMPLETED': `🎉 Buon appetito! L'ordine è stato consegnato.`
-              };
-              showNotification(messages[nextStatus as keyof typeof messages] || "Stato ordine aggiornato");
-              if (nextStatus === 'COMPLETED') {
-                setTimeout(() => setReviewOrder(order), 2500);
-              }
-            }
-            await firestoreWrite('orders', order.id, { ...order, status: nextStatus }, true);
-          }
-        }
-      });
-    }, 10000);
-    return () => clearInterval(timer);
-  }, [orders, currentUser]);
-
   const promptClientAuth = (message: string) => {
     setAuthInitialRole('client');
     setIsCartOpen(false);
@@ -1494,6 +1502,11 @@ function App() {
       announcedChefSessionRef.current = currentUser.id;
       const latestPending = pendingForChef[0];
       setUnreadOrderAlertIds(prev => Array.from(new Set([...prev, ...pendingForChef.map(o => o.id)])));
+      if (chefSoundEnabledRef.current) {
+        void playNewOrderChime().then((played) => {
+          setAudioAutoplayBlocked(!played);
+        });
+      }
       showNotification(
         pendingForChef.length === 1
           ? `Ordine #${latestPending.id.split('-')[0]} in attesa di conferma.`
@@ -1510,6 +1523,36 @@ function App() {
       );
     }
   }, [currentUser?.id, currentUser?.role, orders, chefs]);
+
+  const handleToggleChefSoundAlerts = () => {
+    setChefSoundEnabled(prev => {
+      const next = !prev;
+      if (next) {
+        void unlockAudioContext().then(async (unlocked) => {
+          setAudioAutoplayBlocked(!unlocked);
+          if (unlocked) {
+            await playNewOrderChime();
+          }
+        });
+      } else {
+        setAudioAutoplayBlocked(false);
+      }
+      return next;
+    });
+  };
+
+  const handleUnlockChefAudio = async (): Promise<boolean> => {
+    const unlocked = await unlockAudioContext();
+    setAudioAutoplayBlocked(!unlocked);
+    if (unlocked) {
+      await playNewOrderChime();
+      showNotification('Avvisi sonori attivi per i nuovi ordini!', {
+        title: 'Audio Attivato',
+        variant: 'success',
+      });
+    }
+    return unlocked;
+  };
 
   const handleToggleFavorite = (dishId: string) => {
     const isFav = favorites.includes(dishId);
@@ -1531,6 +1574,7 @@ function App() {
     const timelineNoteMap: Partial<Record<OrderStatus, string>> = {
       CONFIRMED: 'Prenotazione confermata dallo chef.',
       REJECTED: 'Prenotazione rifiutata dallo chef.',
+      CANCELLED: 'Ordine annullato dal cliente prima della conferma.',
       PREPARING: 'Lo chef ha iniziato la preparazione.',
       READY: 'Ordine pronto per ritiro o consegna.',
       DELIVERING: 'Ordine affidato al rider per la consegna.',
@@ -1553,8 +1597,20 @@ function App() {
     await firestoreWrite('orders', orderId, { status, timeline: nextTimeline }, true);
     showNotification(`Ordine #${orderId.split('-')[0]} aggiornato: ${statusLabel}`, {
       title: 'Stato Aggiornato',
-      variant: status === 'REJECTED' ? 'warning' : 'success',
+      variant: status === 'REJECTED' || status === 'CANCELLED' ? 'warning' : 'success',
     });
+  };
+
+  const handleCancelOrderByClient = async (orderId: string) => {
+    const targetOrder = orders.find(o => o.id === orderId);
+    if (!canClientCancelOrder(targetOrder)) {
+      showNotification('Questo ordine è già stato preso in carico e non può più essere annullato.', {
+        title: 'Annullamento non disponibile',
+        variant: 'warning',
+      });
+      return;
+    }
+    await handleUpdateOrderStatus(orderId, 'CANCELLED');
   };
 
   const handleDeleteOrder = async (orderId: string): Promise<OrderDeleteResult> => {
@@ -2118,7 +2174,7 @@ function App() {
       return pendingOrUnreadIds.size;
     }
     const activeIds = new Set<string>([
-      ...visibleClientOrders.filter(o => o.status !== 'COMPLETED' && o.status !== 'REJECTED').map(o => o.id),
+      ...visibleClientOrders.filter(o => o.status !== 'COMPLETED' && o.status !== 'REJECTED' && o.status !== 'CANCELLED').map(o => o.id),
       ...unreadOrderAlertIds,
     ]);
     return activeIds.size;
@@ -2533,6 +2589,7 @@ function App() {
               userRole={currentUser.role}
               justPlaced={selectedOrder.id === recentlyPlacedOrderId}
               onUpdateOrderStatus={currentUser.role === 'chef' || currentUser.role === 'admin' ? handleUpdateOrderStatus : undefined}
+              onCancelOrder={currentUser.role === 'client' ? handleCancelOrderByClient : undefined}
             />
           ) : (
             <div className="animate-fade-in space-y-6">
@@ -2558,7 +2615,7 @@ function App() {
                     <>
                       <button
                         type="button"
-                        onClick={() => setChefSoundEnabled(prev => !prev)}
+                        onClick={handleToggleChefSoundAlerts}
                         className={`px-3.5 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
                           chefSoundEnabled
                             ? 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100'
@@ -2577,11 +2634,41 @@ function App() {
                   )}
                 </div>
               </div>
+              {currentUser.role === 'chef' && chefPendingBadgeCount > 0 && (
+                <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-orange-600 to-amber-500 text-white shadow-xl border-2 border-orange-400 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-black/20 flex items-center justify-center shrink-0">
+                      <BellRing className="w-6 h-6 text-white animate-bounce" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-orange-100">
+                        Firestore Live Sync
+                      </p>
+                      <p className="text-sm sm:text-base font-black">
+                        {chefPendingBadgeCount === 1
+                          ? '1 nuovo ordine in attesa di conferma'
+                          : `${chefPendingBadgeCount} nuovi ordini in attesa di conferma`}
+                      </p>
+                    </div>
+                  </div>
+                  {chefSoundEnabled && audioAutoplayBlocked && (
+                    <button
+                      type="button"
+                      onClick={() => void handleUnlockChefAudio()}
+                      className="px-4 py-2.5 bg-black hover:bg-gray-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shrink-0 shadow-md"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>Attiva Audio</span>
+                    </button>
+                  )}
+                </div>
+              )}
               {visibleClientOrders.length === 0 ? <p className="text-gray-400 font-bold py-20 text-center bg-gray-50 rounded-[3rem]">Nessun ordine attivo.</p> : visibleClientOrders.map(order => {
                 const firstItem = order.items[0];
                 const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status;
                 const isConfirmed = order.status === 'CONFIRMED' || order.status === 'PLACED';
                 const canDeleteOrder = isConcludedOrder(order) || currentUser.role === 'admin';
+                const allowCancel = currentUser.role === 'client' && canClientCancelOrder(order);
                 return (
                   <div
                     key={order.id}
@@ -2607,7 +2694,7 @@ function App() {
                       <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
                         order.status === 'COMPLETED' || isConfirmed
                           ? 'bg-green-100 text-green-700 border-green-200'
-                          : order.status === 'REJECTED'
+                          : order.status === 'REJECTED' || order.status === 'CANCELLED'
                             ? 'bg-red-100 text-red-700 border-red-200'
                             : order.status === 'PENDING_CONFIRMATION'
                               ? 'bg-amber-50 text-amber-800 border-amber-200'
@@ -2615,6 +2702,19 @@ function App() {
                       }`}>
                         {statusLabel}
                       </span>
+                      {allowCancel && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleCancelOrderByClient(order.id);
+                          }}
+                          className="px-3 py-2 rounded-xl bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1 transition-all shrink-0"
+                        >
+                          <XCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>Annulla</span>
+                        </button>
+                      )}
                       {canDeleteOrder && (
                         <button
                           type="button"
@@ -2666,10 +2766,13 @@ function App() {
             onUpdateChef={handleUpdateChef}
             onSaveChefDishes={handleSaveChefDishes}
             onUpdateOrderStatus={handleUpdateOrderStatus}
+            onCancelOrder={currentUser.role === 'client' ? handleCancelOrderByClient : undefined}
             onDeleteOrder={handleDeleteOrder}
             onDeleteConcludedOrders={handleDeleteConcludedOrders}
             soundAlertsEnabled={chefSoundEnabled}
-            onToggleSoundAlerts={() => setChefSoundEnabled(prev => !prev)}
+            onToggleSoundAlerts={handleToggleChefSoundAlerts}
+            audioAutoplayBlocked={audioAutoplayBlocked}
+            onUnlockAudio={handleUnlockChefAudio}
             registeredUsers={registeredUsers}
             chefApplications={chefApplications}
             onOpenOnboarding={() => setIsOnboardingOpen(true)}

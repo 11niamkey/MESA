@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   User, MapPin, ShieldCheck, ShieldAlert, Trash2, 
   Plus, LogOut, ChefHat, Calendar, ClipboardList, 
-  Clock, CheckCircle, Smartphone, Mail, Globe, Check, XCircle, Sparkles, AlertCircle, Volume2, VolumeX 
+  Clock, CheckCircle, Smartphone, Mail, Globe, Check, XCircle, Sparkles, AlertCircle, Volume2, VolumeX, BellRing 
 } from 'lucide-react';
 import { AppUser, UserAddress, Order, OrderStatus, ViewState, Chef, Dish, ChefApplication, ORDER_STATUS_LABELS } from '../types';
 import { CountryFlag } from './CountryFlag';
@@ -10,7 +10,7 @@ import { ImagePickerBox } from './ImagePickerBox';
 import { AdminDishesPanel } from './AdminDishesPanel';
 import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, normalizeLocationToPordenone } from './italianTerritoryData';
 import { ConfirmDeleteOrdersModal } from './ConfirmDeleteOrdersModal';
-import { isConcludedOrder, OrderDeleteResult } from '../utils/orderUtils';
+import { canClientCancelOrder, isConcludedOrder, OrderDeleteResult } from '../utils/orderUtils';
 
 interface PersonalAreaProps {
   currentUser: AppUser;
@@ -23,10 +23,13 @@ interface PersonalAreaProps {
   onUpdateChef?: (updatedChef: Chef) => Promise<boolean> | void;
   onSaveChefDishes?: (chefId: string, dishes: Dish[]) => Promise<boolean>;
   onUpdateOrderStatus?: (orderId: string, status: OrderStatus) => Promise<void> | void;
+  onCancelOrder?: (orderId: string) => Promise<void> | void;
   onDeleteOrder?: (orderId: string) => Promise<OrderDeleteResult>;
   onDeleteConcludedOrders?: (orderIds: string[]) => Promise<OrderDeleteResult>;
   soundAlertsEnabled?: boolean;
   onToggleSoundAlerts?: () => void;
+  audioAutoplayBlocked?: boolean;
+  onUnlockAudio?: () => Promise<boolean> | void;
   registeredUsers?: AppUser[];
   chefApplications?: ChefApplication[];
   onOpenOnboarding?: () => void;
@@ -45,10 +48,13 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   onUpdateChef,
   onSaveChefDishes,
   onUpdateOrderStatus,
+  onCancelOrder,
   onDeleteOrder,
   onDeleteConcludedOrders,
   soundAlertsEnabled = true,
   onToggleSoundAlerts,
+  audioAutoplayBlocked = false,
+  onUnlockAudio,
   registeredUsers = [],
   chefApplications = [],
   onOpenOnboarding
@@ -855,7 +861,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                         <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${
                           order.status === 'COMPLETED' || order.status === 'CONFIRMED' || order.status === 'PLACED'
                             ? 'bg-green-50 text-green-700 border-green-200' 
-                            : order.status === 'REJECTED'
+                            : order.status === 'REJECTED' || order.status === 'CANCELLED'
                               ? 'bg-red-50 text-red-700 border-red-200'
                               : order.status === 'PENDING_CONFIRMATION'
                                 ? 'bg-amber-50 text-amber-800 border-amber-200'
@@ -863,6 +869,19 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                         }`}>
                           {ORDER_STATUS_LABELS[order.status] || order.status}
                         </span>
+                        {canClientCancelOrder(order) && onCancelOrder && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void onCancelOrder(order.id);
+                            }}
+                            className="px-3 py-2 rounded-xl bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1 transition-all shrink-0"
+                          >
+                            <XCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>Annulla</span>
+                          </button>
+                        )}
                         {concluded && onDeleteOrder && (
                           <button
                             type="button"
@@ -1252,6 +1271,52 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
               </div>
             </div>
 
+            {pendingChefOrdersCount > 0 && (
+              <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-orange-600 to-amber-500 text-white shadow-xl border-2 border-orange-400 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-black/20 flex items-center justify-center shrink-0">
+                    <BellRing className="w-6 h-6 text-white animate-bounce" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-orange-100">
+                      Sincronizzazione Firestore Live
+                    </p>
+                    <p className="text-sm sm:text-base font-black">
+                      {pendingChefOrdersCount === 1
+                        ? 'Hai 1 nuovo ordine in attesa di conferma!'
+                        : `Hai ${pendingChefOrdersCount} nuovi ordini in attesa di conferma!`}
+                    </p>
+                  </div>
+                </div>
+                {soundAlertsEnabled && audioAutoplayBlocked && onUnlockAudio && (
+                  <button
+                    type="button"
+                    onClick={() => void onUnlockAudio()}
+                    className="px-4 py-2.5 bg-black hover:bg-gray-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shrink-0 shadow-md"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>Attiva Audio</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {pendingChefOrdersCount === 0 && soundAlertsEnabled && audioAutoplayBlocked && onUnlockAudio && (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold text-amber-900">
+                  Il browser richiede un clic per attivare gli avvisi sonori automatici dei nuovi ordini.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void onUnlockAudio()}
+                  className="px-3.5 py-2 bg-amber-900 hover:bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shrink-0"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>Attiva Audio</span>
+                </button>
+              </div>
+            )}
+
             {chefOrders.length === 0 ? (
               <div className="py-12 bg-gray-50 rounded-3xl text-center border-2 border-dashed border-gray-200">
                 <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -1272,7 +1337,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                       className={`p-6 bg-white border-2 rounded-[2rem] shadow-sm transition-all space-y-4 ${
                         order.status === 'PENDING_CONFIRMATION'
                           ? 'border-amber-300 bg-amber-50/20'
-                          : order.status === 'REJECTED'
+                          : order.status === 'REJECTED' || order.status === 'CANCELLED'
                             ? 'border-red-200 bg-red-50/15'
                             : isConfirmed || order.status === 'COMPLETED'
                               ? 'border-green-200'
@@ -1282,6 +1347,11 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
+                            {order.status === 'PENDING_CONFIRMATION' && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-widest animate-pulse">
+                                Nuovo
+                              </span>
+                            )}
                             <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono">
                               #{order.id.split('-')[0]}
                             </span>
@@ -1324,7 +1394,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                               ? 'bg-amber-100 text-amber-900 border-amber-300'
                               : isConfirmed || order.status === 'COMPLETED'
                                 ? 'bg-green-100 text-green-800 border-green-300'
-                                : order.status === 'REJECTED'
+                                : order.status === 'REJECTED' || order.status === 'CANCELLED'
                                   ? 'bg-red-100 text-red-800 border-red-300'
                                   : 'bg-orange-100 text-orange-800 border-orange-300'
                           }`}>

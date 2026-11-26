@@ -464,6 +464,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 { key: 'PENDING_CONFIRMATION', label: `In attesa (${pendingOrdersCount})` },
                 { key: 'CONFIRMED', label: 'Confermati' },
                 { key: 'REJECTED', label: `Rifiutati (${rejectedOrdersCount})` },
+                { key: 'CANCELLED', label: 'Annullati' },
                 { key: 'COMPLETED', label: 'Completati' }
               ] as const).map(tab => (
                 <button
@@ -544,7 +545,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               ? 'bg-amber-100 text-amber-900 border-amber-300'
                               : isConfirmed || order.status === 'COMPLETED'
                                 ? 'bg-green-100 text-green-800 border-green-300'
-                                : order.status === 'REJECTED'
+                                : order.status === 'REJECTED' || order.status === 'CANCELLED'
                                   ? 'bg-red-100 text-red-800 border-red-300'
                                   : 'bg-orange-100 text-orange-800 border-orange-300'
                           }`}>

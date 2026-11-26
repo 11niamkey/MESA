@@ -1,30 +1,60 @@
 let sharedAudioCtx: AudioContext | null = null;
 
-export const playNewOrderChime = (): void => {
-  if (typeof window === 'undefined') return;
+const getOrCreateAudioContext = (): AudioContext | null => {
+  if (typeof window === 'undefined') return null;
+  const AudioCtx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return null;
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new AudioCtx();
+  }
+  return sharedAudioCtx;
+};
+
+export const isAudioUnlocked = (): boolean =>
+  Boolean(sharedAudioCtx && sharedAudioCtx.state === 'running');
+
+export const unlockAudioContext = async (): Promise<boolean> => {
   try {
-    const AudioCtx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-
-    if (!sharedAudioCtx) {
-      sharedAudioCtx = new AudioCtx();
+    const ctx = getOrCreateAudioContext();
+    if (!ctx) return false;
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
     }
-    if (sharedAudioCtx.state === 'suspended') {
-      void sharedAudioCtx.resume();
+    return ctx.state === 'running';
+  } catch {
+    return false;
+  }
+};
+
+export const playNewOrderChime = async (): Promise<boolean> => {
+  if (typeof window === 'undefined') return false;
+  try {
+    const ctx = getOrCreateAudioContext();
+    if (!ctx) return false;
+
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume();
+      } catch {
+        return false;
+      }
     }
 
-    const now = sharedAudioCtx.currentTime;
+    if (ctx.state !== 'running') {
+      return false;
+    }
+
+    const now = ctx.currentTime;
     const notes = [
       { freq: 880, start: 0, duration: 0.14 },
       { freq: 1174.66, start: 0.13, duration: 0.22 },
     ];
 
     notes.forEach(({ freq, start, duration }) => {
-      if (!sharedAudioCtx) return;
-      const osc = sharedAudioCtx.createOscillator();
-      const gain = sharedAudioCtx.createGain();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, now + start);
 
@@ -33,11 +63,12 @@ export const playNewOrderChime = (): void => {
       gain.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
 
       osc.connect(gain);
-      gain.connect(sharedAudioCtx.destination);
+      gain.connect(ctx.destination);
       osc.start(now + start);
       osc.stop(now + start + duration + 0.02);
     });
+    return true;
   } catch {
-    // Ignore autoplay restrictions or browsers without Web Audio API
+    return false;
   }
 };

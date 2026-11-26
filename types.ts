@@ -107,6 +107,7 @@ export type OrderStatus =
   | 'PENDING_CONFIRMATION'
   | 'CONFIRMED'
   | 'REJECTED'
+  | 'CANCELLED'
   | 'PLACED'
   | 'PREPARING'
   | 'READY'
@@ -117,6 +118,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING_CONFIRMATION: 'In attesa di conferma',
   CONFIRMED: 'Confermato',
   REJECTED: 'Rifiutato',
+  CANCELLED: 'Annullato',
   PLACED: 'Confermato',
   PREPARING: 'In Cucina',
   READY: 'Pronto',

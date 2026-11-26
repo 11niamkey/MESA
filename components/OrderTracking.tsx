@@ -19,9 +19,11 @@ import {
   Activity, 
   Smartphone as PhoneIcon, 
   Share2, 
-  AlertCircle 
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
 import { Order, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Chef, AppUser } from '../types';
+import { canClientCancelOrder } from '../utils/orderUtils';
 
 const formatChefDisplayName = (name?: string) => {
   const trimmed = (name || 'MESA').trim();
@@ -35,6 +37,7 @@ interface OrderTrackingProps {
   userRole?: AppUser['role'];
   justPlaced?: boolean;
   onUpdateOrderStatus?: (orderId: string, status: OrderStatus) => void;
+  onCancelOrder?: (orderId: string) => void;
 }
 
 const STATUS_CHAT_UPDATES: Partial<Record<OrderStatus, string>> = {
@@ -45,6 +48,7 @@ const STATUS_CHAT_UPDATES: Partial<Record<OrderStatus, string>> = {
   DELIVERING: '🛵 Il rider è partito con il tuo ordine!',
   COMPLETED: '🎉 Ordine completato! Buon appetito da Chef e da MESA!',
   REJECTED: '❌ Mi dispiace, non posso accettare questa prenotazione per la data richiesta.',
+  CANCELLED: '🚫 Ordine annullato dal cliente prima della conferma.',
 };
 
 export const OrderTracking: React.FC<OrderTrackingProps> = ({ 
@@ -53,7 +57,8 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
   chefs,
   userRole,
   justPlaced = false,
-  onUpdateOrderStatus 
+  onUpdateOrderStatus,
+  onCancelOrder
 }) => {
   const isChefView = userRole === 'chef';
   const [activeTab, setActiveTab] = useState<'chat' | 'chef-sim'>(isChefView ? 'chef-sim' : 'chat');
@@ -95,6 +100,9 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
   const rawStepIndex = activeSteps.findIndex(s => s.status === normalizedStepStatus);
   const currentStepIndex = rawStepIndex >= 0 ? rawStepIndex : 0;
   const isRejected = order.status === 'REJECTED';
+  const isCancelled = order.status === 'CANCELLED';
+  const isTerminated = isRejected || isCancelled;
+  const allowClientCancel = !isChefView && Boolean(onCancelOrder) && canClientCancelOrder(order);
   const lastTrackedStatusRef = React.useRef<OrderStatus>(order.status);
 
   // Sync messages from Firestore
@@ -222,23 +230,35 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
       </div>
 
       {!isChefView && (justPlaced || order.status === 'PENDING_CONFIRMATION') && (
-        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-3xl p-4 sm:p-5 flex items-start sm:items-center gap-3.5 shadow-sm">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
-            <CheckCircle className="w-5 h-5" />
+        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-sm">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs sm:text-sm font-black text-emerald-950">
+                Ordine inviato! In attesa di conferma dallo chef
+              </p>
+              <p className="text-[11px] sm:text-xs font-medium text-emerald-800 mt-0.5">
+                Riceverai un avviso in tempo reale nella barra in alto e in questa timeline appena {formatChefDisplayName(order.chefName)} aggiornerà lo stato.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs sm:text-sm font-black text-emerald-950">
-              Ordine inviato! In attesa di conferma dallo chef
-            </p>
-            <p className="text-[11px] sm:text-xs font-medium text-emerald-800 mt-0.5">
-              Riceverai un avviso in tempo reale nella barra in alto e in questa timeline appena {formatChefDisplayName(order.chefName)} aggiornerà lo stato.
-            </p>
-          </div>
+          {allowClientCancel && (
+            <button
+              type="button"
+              onClick={() => onCancelOrder?.(order.id)}
+              className="px-4 py-2.5 bg-white hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all shrink-0"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              <span>Annulla Ordine</span>
+            </button>
+          )}
         </div>
       )}
 
       <div className={`rounded-[2.5rem] p-6 sm:p-8 text-white relative overflow-hidden shadow-2xl ${
-        isRejected
+        isTerminated
           ? 'bg-gradient-to-r from-red-600 to-rose-700'
           : order.status === 'CONFIRMED' || order.status === 'COMPLETED'
             ? 'bg-gradient-to-r from-emerald-600 to-green-600'
@@ -254,12 +274,14 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
               </p>
             </div>
             <h3 className="text-3xl sm:text-4xl font-black tracking-tight">
-              {isRejected ? 'Rifiutato' : activeSteps[currentStepIndex]?.label}
+              {isRejected ? 'Rifiutato' : isCancelled ? 'Annullato' : activeSteps[currentStepIndex]?.label}
             </h3>
             <p className="text-xs sm:text-sm text-white/95 mt-1 font-medium">
               {isRejected
                 ? 'Lo chef non ha potuto accettare questa prenotazione. Nessun addebito è stato effettuato.'
-                : activeSteps[currentStepIndex]?.description}
+                : isCancelled
+                  ? 'Prenotazione annullata dal cliente prima della conferma. Nessun addebito è stato effettuato.'
+                  : activeSteps[currentStepIndex]?.description}
             </p>
           </div>
           <div className="bg-white/10 backdrop-blur-md p-4 rounded-3xl border border-white/25 text-right w-full md:w-auto">
@@ -271,7 +293,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
         </div>
 
         {/* Progress Bar steps */}
-        {!isRejected && (
+        {!isTerminated && (
           <div className="relative mt-8 px-2 sm:px-6">
             <div className="absolute top-5 left-8 right-8 h-1 bg-white/20"></div>
             <div 
@@ -390,7 +412,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
                     <div className="flex flex-col items-center">
                       <span
                         className={`w-3 h-3 rounded-full mt-1 ${
-                          isEntryRejected
+                          isEntryRejected || entry.status === 'CANCELLED'
                             ? 'bg-red-500'
                             : isLast
                               ? 'bg-orange-600 ring-4 ring-orange-100'
@@ -545,11 +567,11 @@ Attendo conferma, grazie!`;
                 <div className={`px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider border ${
                   order.status === 'PENDING_CONFIRMATION'
                     ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
-                    : order.status === 'REJECTED'
+                    : isTerminated
                       ? 'bg-red-500/15 border-red-500/30 text-red-300'
                       : 'bg-green-500/15 border-green-500/20 text-green-400'
                 }`}>
-                  {order.status === 'PENDING_CONFIRMATION' ? 'In attesa' : order.status === 'REJECTED' ? 'Rifiutato' : 'Confermato'} €{order.total.toFixed(2)}
+                  {order.status === 'PENDING_CONFIRMATION' ? 'In attesa' : isRejected ? 'Rifiutato' : isCancelled ? 'Annullato' : 'Confermato'} €{order.total.toFixed(2)}
                 </div>
               </div>
 
@@ -562,18 +584,16 @@ Attendo conferma, grazie!`;
                   <div>
                     <span className="text-[8px] font-black uppercase tracking-widest text-[#ea580c]">NOTIFICA PRENOTAZIONE</span>
                     <h5 className="font-bold text-xs text-white mt-0.5">
-                      {order.notificationChannel === 'whatsapp' 
-                        ? 'Notificato tramite WhatsApp!' 
-                        : order.status === 'PENDING_CONFIRMATION'
-                          ? 'Prenotazione ricevuta (pagamento al ritiro/consegna)'
-                          : order.status === 'REJECTED'
-                            ? 'Prenotazione rifiutata dallo chef'
+                      {order.status === 'PENDING_CONFIRMATION'
+                        ? 'Prenotazione ricevuta (pagamento al ritiro/consegna)'
+                        : isRejected
+                          ? 'Prenotazione rifiutata dallo chef'
+                          : isCancelled
+                            ? 'Prenotazione annullata dal cliente'
                             : 'Prenotazione confermata dallo chef'}
                     </h5>
                     <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">
-                      L'ordine si è agganciato automaticamente. {order.notificationChannel === 'whatsapp' 
-                        ? 'Puoi simulare le fasi direttamente da questa console del Cuoco!' 
-                        : 'Il sistema in tempo reale aggiorna istantaneamente Cliente, Cuoco e Admin.'}
+                      Il sistema in tempo reale aggiorna istantaneamente Cliente, Cuoco e Admin su Firestore.
                     </p>
                   </div>
                 </div>
@@ -617,10 +637,12 @@ Attendo conferma, grazie!`;
                   </div>
                 )}
 
-                {order.status === 'REJECTED' && (
+                {(isRejected || isCancelled) && (
                   <div className="bg-red-500/10 border border-red-500/20 text-red-300 p-4 rounded-2xl text-center">
                     <AlertCircle className="w-7 h-7 text-red-400 mx-auto mb-1.5" />
-                    <p className="font-black uppercase tracking-wider text-[11px]">Prenotazione Rifiutata</p>
+                    <p className="font-black uppercase tracking-wider text-[11px]">
+                      {isCancelled ? 'Prenotazione Annullata' : 'Prenotazione Rifiutata'}
+                    </p>
                     <p className="text-[10px] text-gray-400 mt-1">Stato sincronizzato con Cliente e Admin.</p>
                   </div>
                 )}
