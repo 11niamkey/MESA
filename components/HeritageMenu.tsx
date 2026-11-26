@@ -241,15 +241,19 @@ export const HeritageMenu: React.FC<HeritageMenuProps> = ({
                         <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" /> Ordina Tradizione
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        disabled
-                        aria-disabled="true"
-                        className="w-full py-3 bg-gray-100 text-gray-500 border border-gray-200 rounded-xl font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 cursor-not-allowed"
-                      >
-                        <Clock className="w-3.5 h-3.5 shrink-0" />
-                        <span>Disponibile a breve</span>
-                      </button>
+                      <div className="space-y-1.5">
+                        <div className="w-full py-1 px-2 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg font-black uppercase tracking-widest text-[8px] flex items-center justify-center gap-1">
+                          <Clock className="w-3 h-3 shrink-0" />
+                          <span>Disponibile a breve</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onAddDish(dish)}
+                          className="w-full py-2.5 bg-black hover:bg-orange-600 text-white hover:text-black rounded-xl font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
+                        >
+                          <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" /> Aggiungi al carrello
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

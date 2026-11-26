@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
-import { X, CreditCard, Banknote, CheckCircle, Smartphone } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, CreditCard, Banknote, CheckCircle, Smartphone, AlertCircle, ShoppingBag } from 'lucide-react';
 import { CartItem, Chef } from '../types';
+import { BetaOrderValidationResult, validateBetaOrderSubmission } from '../utils/chefUtils';
 
 const formatChefDisplayName = (name?: string) => {
   const trimmed = (name || 'MESA').trim();
@@ -15,6 +16,9 @@ interface PaymentModalProps {
   onSuccess: (channel: 'app' | 'whatsapp') => void;
   cart?: CartItem[];
   availableChefs?: Chef[];
+  onValidateOrder?: () => BetaOrderValidationResult;
+  onValidationError?: (result: BetaOrderValidationResult) => void;
+  onBackToCart?: () => void;
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ 
@@ -23,16 +27,39 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   total, 
   onSuccess,
   cart,
-  availableChefs
+  availableChefs,
+  onValidateOrder,
+  onValidationError,
+  onBackToCart
 }) => {
   const [method, setMethod] = useState<'card' | 'paypal' | 'cash' | 'whatsapp'>('whatsapp'); // Prefers WhatsApp as it's highly requested!
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [validationError, setValidationError] = useState<BetaOrderValidationResult | null>(null);
   const [testPhone, setTestPhone] = useState(() => localStorage.getItem('mesa_test_phone') || '');
+
+  useEffect(() => {
+    if (isOpen) {
+      setValidationError(null);
+      setIsProcessing(false);
+      setIsSuccess(false);
+    }
+  }, [isOpen, cart]);
 
   if (!isOpen) return null;
 
   const handlePay = () => {
+    const validation = onValidateOrder
+      ? onValidateOrder()
+      : validateBetaOrderSubmission(cart || [], availableChefs || [], 'cart');
+
+    if (!validation.ok) {
+      setValidationError(validation);
+      onValidationError?.(validation);
+      return;
+    }
+
+    setValidationError(null);
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
@@ -250,6 +277,34 @@ Ci coordiniamo qui per la consegna o il ritiro! Grazie mille! 🙌`;
                   </div>
                 </button>
               </div>
+
+              {validationError && !validationError.ok && (
+                <div className="mb-4 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-left space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      {validationError.title && (
+                        <p className="text-xs font-black uppercase tracking-wider text-amber-900">
+                          {validationError.title}
+                        </p>
+                      )}
+                      <p className="text-xs font-semibold text-amber-950 leading-relaxed">
+                        {validationError.message}
+                      </p>
+                    </div>
+                  </div>
+                  {onBackToCart && (
+                    <button
+                      type="button"
+                      onClick={onBackToCart}
+                      className="w-full py-2.5 px-3 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      <span>Torna al Carrello</span>
+                    </button>
+                  )}
+                </div>
+              )}
 
               <button
                 onClick={handlePay}

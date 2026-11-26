@@ -56,8 +56,8 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
         {favoriteDishes.map((dish) => (
           <div key={dish.id} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col">
             <div 
-              className={`relative h-44 overflow-hidden shrink-0 ${dish.canBook ? 'cursor-pointer' : 'cursor-default'}`}
-              onClick={dish.canBook ? () => onAddDish(dish) : undefined}
+              className="relative h-44 overflow-hidden shrink-0 cursor-pointer"
+              onClick={() => onAddDish(dish)}
             >
               <img 
                 src={dish.image || DEFAULT_FOOD_IMAGE} 
@@ -84,8 +84,8 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
               <div>
                 <div className="flex justify-between items-start gap-2 mb-1.5">
                   <h3 
-                    className={`text-[15px] font-black text-orange-600 leading-snug line-clamp-2 ${dish.canBook ? 'cursor-pointer hover:text-orange-700 transition-colors' : ''}`}
-                    onClick={dish.canBook ? () => onAddDish(dish) : undefined}
+                    className="text-[15px] font-black text-orange-600 leading-snug line-clamp-2 cursor-pointer hover:text-orange-700 transition-colors"
+                    onClick={() => onAddDish(dish)}
                   >
                     {dish.name}
                   </h3>
@@ -108,15 +108,20 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
                   <span>Prenota ora</span>
                 </button>
               ) : (
-                <button
-                  type="button"
-                  disabled
-                  aria-disabled="true"
-                  className="w-full py-2.5 bg-gray-100 text-gray-500 border border-gray-200 font-black uppercase tracking-widest text-xs rounded-xl flex items-center justify-center space-x-2 cursor-not-allowed"
-                >
-                  <Clock className="w-4 h-4 shrink-0" />
-                  <span>Disponibile a breve</span>
-                </button>
+                <div className="space-y-1.5">
+                  <div className="w-full py-1 px-2.5 bg-amber-50 text-amber-800 border border-amber-200 font-black uppercase tracking-widest text-[10px] rounded-lg flex items-center justify-center space-x-1.5">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
+                    <span>Disponibile a breve</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onAddDish(dish)}
+                    className="w-full py-2.5 bg-black hover:bg-orange-600 text-white font-black uppercase tracking-widest text-xs rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md active:scale-95"
+                  >
+                    <ShoppingBag className="w-4 h-4 shrink-0" />
+                    <span>Aggiungi al carrello</span>
+                  </button>
+                </div>
               )}
             </div>
           </div>

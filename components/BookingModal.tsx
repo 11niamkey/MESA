@@ -3,6 +3,7 @@ import { X, Clock, ChefHat, Truck, ShoppingBag, Flame, Utensils, MessageSquare, 
 import { Dish, Chef } from '../types';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
+import { isChefBookable } from '../utils/chefUtils';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface BookingModalProps {
   dish: Dish;
   chef: Chef | undefined;
   onConfirm: (date: string, time: string, deliveryMode: 'delivery' | 'pickup', preferences: any) => void;
+  onAddToCart?: (date: string, time: string, deliveryMode: 'delivery' | 'pickup', preferences: any) => void;
 }
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
@@ -40,7 +42,8 @@ const getTodayStart = (): Date => {
   return now;
 };
 
-export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dish, chef, onConfirm }) => {
+export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dish, chef, onConfirm, onAddToCart }) => {
+  const canBook = isChefBookable(chef) && !dish.isAvailableSoon;
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [deliveryMode, setDeliveryMode] = useState<'delivery' | 'pickup'>('pickup');
@@ -78,7 +81,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   const weekdays = ['Lu', 'Ma', 'Me', 'Gi', 'Ve', 'Sa', 'Do'];
 
   const normalizedAvailableDays = useMemo<number[]>(() => {
-    if (!chef || !Array.isArray(chef.availableDays)) {
+    if (!chef || !Array.isArray(chef.availableDays) || chef.availableDays.length === 0) {
       return [...MONDAY_FIRST_ORDER];
     }
     const validSet = new Set(
@@ -86,7 +89,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
         .map((d) => Number(d))
         .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
     );
-    return MONDAY_FIRST_ORDER.filter((d) => validSet.has(d));
+    return validSet.size > 0 ? MONDAY_FIRST_ORDER.filter((d) => validSet.has(d)) : [...MONDAY_FIRST_ORDER];
   }, [chef]);
 
   const todayNow = new Date();
@@ -201,15 +204,26 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
 
   if (!isOpen) return null;
 
+  const resetBookingFields = () => {
+    setSpiceLevel(1);
+    setSaltLevel('Normal');
+    setNotes('');
+    setDeliveryMode('pickup');
+    setDate('');
+    setTime('');
+  };
+
   const handleConfirm = () => {
     if (isSelectedDateValid && time) {
       onConfirm(date, time, deliveryMode, { spiceLevel, saltLevel, notes });
-      setSpiceLevel(1);
-      setSaltLevel('Normal');
-      setNotes('');
-      setDeliveryMode('pickup');
-      setDate('');
-      setTime('');
+      resetBookingFields();
+    }
+  };
+
+  const handleAddToCartClick = () => {
+    if (isSelectedDateValid && time && onAddToCart) {
+      onAddToCart(date, time, deliveryMode, { spiceLevel, saltLevel, notes });
+      resetBookingFields();
     }
   };
 
@@ -260,6 +274,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
 
                   {/* Badges: Prep time, Portion, Tags */}
                   <div className="flex flex-wrap gap-1.5 mb-4">
+                    {!canBook && (
+                      <span className="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-amber-700" /> Disponibile a breve
+                      </span>
+                    )}
                     <span className="px-2.5 py-1 bg-orange-50 text-orange-800 rounded-lg text-[10px] font-bold flex items-center gap-1">
                       <Clock className="w-3 h-3 text-orange-600" /> Preavviso: 25-35 min
                     </span>
@@ -551,26 +570,39 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
             <div className="bg-orange-50 border border-orange-200 rounded-xl px-3.5 py-2.5 flex items-start gap-2.5 text-left">
               <Info className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
               <p className="text-xs font-semibold text-black leading-snug">
-                Nessun addebito online ora: il pagamento avviene al ritiro o alla consegna secondo le indicazioni dell'ordine.
+                {canBook
+                  ? "Nessun addebito online ora: il pagamento avviene al ritiro o alla consegna secondo le indicazioni dell'ordine."
+                  : "Profilo in attivazione per la beta: puoi aggiungere liberamente il piatto al carrello, ma l'invio definitivo dell'ordine sarà attivo a breve."}
               </p>
             </div>
-            <div className="flex justify-between items-center gap-3">
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
               <div className="text-sm text-black font-medium hidden sm:block">
                 {deliveryMode === 'delivery' ? 'Consegna a Domicilio (+€2.50)' : 'Ritiro presso Chef'}
               </div>
-              <div className="flex space-x-3 w-full sm:w-auto">
+              <div className="flex flex-wrap sm:flex-nowrap gap-2.5 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 sm:flex-none px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition-colors"
+                  className="flex-1 sm:flex-none px-4 py-2.5 text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition-colors"
                 >
                   Annulla
                 </button>
+                {onAddToCart && (
+                  <button
+                    type="button"
+                    onClick={handleAddToCartClick}
+                    disabled={!isSelectedDateValid || !time}
+                    className="flex-1 sm:flex-none px-5 py-2.5 bg-black hover:bg-gray-800 text-white font-bold rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>Aggiungi al carrello</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleConfirm}
                   disabled={!isSelectedDateValid || !time}
-                  className="flex-1 sm:flex-none px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center"
                 >
                   Invia Prenotazione
                 </button>

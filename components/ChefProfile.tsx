@@ -4,7 +4,7 @@ import {
   ArrowLeft, MapPin, Clock, Award, Star, Share2, 
   Heart, ChefHat, Info, ChevronDown, ChevronUp, 
   Leaf, Utensils, Globe, Compass, BookOpen, 
-  History, Sparkles, Music, Wind
+  History, Sparkles, Music, Wind, ShoppingBag
 } from 'lucide-react';
 import { Chef, Dish, ViewState } from '../types';
 import { ReviewList } from './ReviewList';
@@ -195,15 +195,20 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                         Prenota
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        disabled
-                        aria-disabled="true"
-                        className="w-full py-2.5 sm:py-3 bg-gray-100 text-gray-500 border border-gray-200 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-1.5 cursor-not-allowed"
-                      >
-                        <Clock className="w-3.5 h-3.5 shrink-0" />
-                        <span>Disponibile a breve</span>
-                      </button>
+                      <div className="space-y-1.5">
+                        <div className="w-full py-1 px-2.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5">
+                          <Clock className="w-3 h-3 shrink-0" />
+                          <span>Disponibile a breve</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onAddDish(dish)}
+                          className="w-full py-2.5 sm:py-3 bg-black hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95"
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+                          <span>Aggiungi al carrello</span>
+                        </button>
+                      </div>
                     )}
                     <button 
                       onClick={() => setHeritageDish(dish)}
@@ -286,15 +291,20 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                         Voglio assaggiare questa storia →
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        disabled
-                        aria-disabled="true"
-                        className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.15em] text-gray-500 bg-gray-100 border border-gray-200 px-4 py-2.5 rounded-xl mt-2 cursor-not-allowed"
-                      >
-                        <Clock className="w-4 h-4 shrink-0" />
-                        <span>Disponibile a breve</span>
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2.5 pt-2">
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
+                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                          <span>Disponibile a breve</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onAddDish(dish)}
+                          className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.15em] text-white bg-black hover:bg-orange-600 px-4 py-2.5 rounded-xl transition-all active:scale-95"
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+                          <span>Aggiungi al carrello</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                </div>

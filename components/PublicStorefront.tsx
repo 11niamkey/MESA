@@ -160,15 +160,19 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                         <ShoppingBag className="w-5 h-5" /> Prenota questo piatto
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        disabled
-                        aria-disabled="true"
-                        className="w-full py-3.5 sm:py-5 bg-gray-100 text-gray-500 border border-gray-200 rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 cursor-not-allowed"
-                      >
-                        <Clock className="w-5 h-5 shrink-0" />
-                        <span>Disponibile a breve</span>
-                      </button>
+                      <div className="space-y-2">
+                        <div className="w-full py-1.5 px-3 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2">
+                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                          <span>Disponibile a breve</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onAddDish(dish)}
+                          className="w-full py-3.5 sm:py-4 bg-black hover:bg-orange-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 transition-all shadow-lg active:scale-95"
+                        >
+                          <ShoppingBag className="w-5 h-5 shrink-0" /> Aggiungi al carrello
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

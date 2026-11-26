@@ -78,8 +78,8 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                 exit={{ opacity: 0, scale: 0.9, y: 10 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
                 key={dish.id}
-                className={`group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-100 relative shadow-sm ${canBook ? 'cursor-pointer' : 'cursor-default'}`}
-                onClick={canBook ? () => onAddDish(dish) : undefined}
+                className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-100 relative shadow-sm cursor-pointer"
+                onClick={() => onAddDish(dish)}
               >
                 {/* Image & Badges */}
                 <div className="relative h-44 overflow-hidden shrink-0">
@@ -240,15 +240,23 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                         <span>Scegli e Prenota</span>
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        disabled
-                        aria-disabled="true"
-                        className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-500 border border-gray-200 font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 cursor-not-allowed"
-                      >
-                        <Clock className="w-4 h-4 shrink-0" />
-                        <span>Disponibile a breve</span>
-                      </button>
+                      <div className="space-y-1.5">
+                        <div className="w-full py-1 px-2.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                          <span>Disponibile a breve</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAddDish(dish);
+                          }}
+                          className="w-full py-2.5 rounded-xl bg-black hover:bg-orange-600 text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+                        >
+                          <ShoppingBag className="w-4 h-4 shrink-0" />
+                          <span>Aggiungi al carrello</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

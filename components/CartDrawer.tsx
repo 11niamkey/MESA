@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect } from 'react';
-import { X, Minus, Plus, ShoppingBag, CalendarClock, Truck, Store, Info, Sparkles, ArrowLeft, UtensilsCrossed } from 'lucide-react';
+import { X, Minus, Plus, ShoppingBag, CalendarClock, Truck, Store, Info, Sparkles, ArrowLeft, UtensilsCrossed, Clock, AlertCircle } from 'lucide-react';
 import { CartItem, Dish, Chef } from '../types';
-import { isChefBookable } from '../utils/chefUtils';
+import { isChefBookable, isItemAvailableSoon } from '../utils/chefUtils';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -48,18 +48,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const suggestedDishes = useMemo(() => {
     const activeChefIds = Array.from(new Set(cart.map(item => item.chefId)));
     const bookableChefs = availableChefs.filter(isChefBookable);
+    const pool = bookableChefs.length > 0 ? bookableChefs : availableChefs;
     
     let candidates: Dish[] = [];
     
     if (activeChefIds.length > 0) {
       activeChefIds.forEach(id => {
-        const chef = bookableChefs.find(c => c.id === id);
+        const chef = pool.find(c => c.id === id);
         if (chef) {
            candidates.push(...chef.dishes);
         }
       });
-    } else {
-       candidates = bookableChefs.flatMap(c => c.dishes);
+    }
+    if (candidates.length === 0) {
+       candidates = pool.flatMap(c => c.dishes);
     }
 
     const cartDishIds = new Set(cart.map(i => i.id));
@@ -67,6 +69,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
     return filtered.sort(() => 0.5 - Math.random()).slice(0, 3);
   }, [cart, availableChefs]);
+
+  const hasAvailableSoonItems = useMemo(
+    () => cart.some(item => isItemAvailableSoon(item, availableChefs)),
+    [cart, availableChefs]
+  );
 
   if (!isOpen) return null;
 
@@ -130,7 +137,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <button onClick={onClose} className="text-orange-600 hover:underline">Aggiungi altri piatti +</button>
                 </div>
                 
-                {cart.map((item, idx) => (
+                {cart.map((item, idx) => {
+                  const itemAvailableSoon = isItemAvailableSoon(item, availableChefs);
+                  return (
                   <div key={`${item.id}-${idx}`} className="flex flex-col bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                     <div className="flex items-start space-x-4">
                       <img 
@@ -149,6 +158,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                            )}
                         </div>
                         <p className="text-sm font-medium text-orange-600 mb-1">€ {item.price.toFixed(2)}</p>
+                        {itemAvailableSoon && (
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-black uppercase tracking-wider mb-1.5">
+                            <Clock className="w-3 h-3 shrink-0" />
+                            <span>Disponibile a breve</span>
+                          </div>
+                        )}
                         
                         <div className="flex items-center text-xs text-gray-500 mb-2 bg-gray-50 px-2 py-1 rounded-md w-fit">
                           <CalendarClock className="w-3 h-3 mr-1.5" />
@@ -186,7 +201,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -242,6 +258,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <span className="text-orange-600">€ {total.toFixed(2)}</span>
                 </div>
               </div>
+              {hasAvailableSoonItems && (
+                <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2 text-left">
+                  <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <p className="text-[11px] font-semibold text-amber-900 leading-snug">
+                    Alcuni piatti nel carrello sono contrassegnati come "Disponibile a breve": potrai procedere all'invio definitivo solo per i cuochi verificati e attivi nella public beta.
+                  </p>
+                </div>
+              )}
               <button 
                 onClick={() => onCheckout(total)}
                 className="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-black text-base uppercase tracking-wider rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center space-x-2 border-b-4 border-orange-800"

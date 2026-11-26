@@ -34,6 +34,7 @@ export interface Dish {
   ingredients?: string[];
   preparation?: string;
   allergens?: string[];
+  isAvailableSoon?: boolean;
 }
 
 export type Continent = 'Europa' | 'Asia' | 'Africa' | 'Americhe' | 'Oceania';

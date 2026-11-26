@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, MapPin, ChevronRight, Heart, Clock } from 'lucide-react';
+import { Star, MapPin, ChevronRight, Heart, Clock, ShoppingBag } from 'lucide-react';
 import { Chef, Dish } from '../types';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
@@ -81,8 +81,8 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
           {chef.dishes.slice(0, 2).map((dish) => (
             <div key={dish.id} className="group flex flex-col h-full bg-white rounded-3xl border border-gray-100 overflow-hidden hover:border-orange-300 transition-all shadow-sm hover:shadow-lg relative">
               <div 
-                className={`relative h-36 sm:h-60 md:h-72 overflow-hidden shrink-0 ${canBook ? 'cursor-pointer' : 'cursor-default'}`}
-                onClick={canBook ? () => onAddDish(dish) : undefined}
+                className="relative h-36 sm:h-60 md:h-72 overflow-hidden shrink-0 cursor-pointer"
+                onClick={() => onAddDish(dish)}
               >
                 <img 
                   src={dish.image || DEFAULT_FOOD_IMAGE} 
@@ -106,8 +106,8 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
               <div className="p-3.5 sm:p-6 flex flex-col flex-grow justify-between gap-2.5">
                 <div className="space-y-1.5">
                   <h5 
-                    className={`text-base sm:text-lg font-black text-orange-600 leading-snug line-clamp-2 ${canBook ? 'cursor-pointer hover:text-orange-700 transition-colors' : ''}`}
-                    onClick={canBook ? () => onAddDish(dish) : undefined}
+                    className="text-base sm:text-lg font-black text-orange-600 leading-snug line-clamp-2 cursor-pointer hover:text-orange-700 transition-colors"
+                    onClick={() => onAddDish(dish)}
                   >
                     {dish.name}
                   </h5>
@@ -122,15 +122,20 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
                     Aggiungi al carrello
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="w-full py-2.5 sm:py-4 bg-gray-100 text-gray-500 border border-gray-200 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed"
-                  >
-                    <Clock className="w-4 h-4 shrink-0" />
-                    <span>Disponibile a breve</span>
-                  </button>
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-widest">
+                      <Clock className="w-3.5 h-3.5 shrink-0" />
+                      <span>Disponibile a breve</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onAddDish(dish)}
+                      className="w-full py-2.5 sm:py-3.5 bg-black hover:bg-orange-600 text-white text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+                    >
+                      <ShoppingBag className="w-4 h-4 shrink-0" />
+                      <span>Aggiungi al carrello</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

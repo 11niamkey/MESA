@@ -39,7 +39,7 @@ import { ConfirmDeleteOrdersModal } from './components/ConfirmDeleteOrdersModal'
 import { isPordenoneLocation, normalizeLocationToPordenone, resolvePordenoneZip, findPordenoneComune } from './components/italianTerritoryData';
 import { playNewOrderChime } from './utils/soundAlert';
 import { isConcludedOrder, formatOrderDeleteError, OrderDeleteResult } from './utils/orderUtils';
-import { isChefBookable } from './utils/chefUtils';
+import { isChefBookable, validateBetaOrderSubmission, BetaOrderValidationResult } from './utils/chefUtils';
 import { MOCK_CHEFS } from './constants';
 import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
 import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock, Volume2, VolumeX, Trash2 } from 'lucide-react';
@@ -1523,19 +1523,6 @@ function App() {
   };
 
   const handleInitiateBooking = (dish: Dish) => {
-    const dishChef = chefs.find(c => c.id === dish.chefId);
-    if (!isChefBookable(dishChef)) {
-      showNotification('Questo cuoco sarà disponibile a breve per le prenotazioni su MESA.', {
-        title: 'Disponibile a breve',
-        variant: 'info',
-      });
-      return;
-    }
-    if (!currentUser) {
-      setPendingBookingDish(dish);
-      promptClientAuth("Accedi o registrati come Cliente per ordinare questo piatto.");
-      return;
-    }
     setBookingDish(dish);
   };
 
@@ -1661,6 +1648,16 @@ function App() {
     }
   };
 
+  const notifyBetaOrderBlocked = (validation: BetaOrderValidationResult) => {
+    showNotification(
+      validation.message || 'Gli ordini per questo profilo saranno attivi a breve.',
+      {
+        title: validation.title || 'Ordini attivi a breve',
+        variant: validation.reason === 'AVAILABLE_SOON_IN_CART' ? 'warning' : 'info',
+      }
+    );
+  };
+
   const createAndSaveOrder = async (
     authenticatedUser: AppUser,
     dishToBook: Dish,
@@ -1678,6 +1675,12 @@ function App() {
       deliveryMode,
       preferences
     };
+    const validation = validateBetaOrderSubmission([bookedItem], chefs, 'direct');
+    if (!validation.ok) {
+      notifyBetaOrderBlocked(validation);
+      setBookingDish(null);
+      return;
+    }
     const chefName = chefs.find(c => c.id === dishToBook.chefId)?.name || 'Chef MESA';
     const customerName = `${authenticatedUser.name} ${authenticatedUser.lastName}`.trim() || authenticatedUser.email;
     const now = new Date();
@@ -1724,8 +1727,47 @@ function App() {
     });
   };
 
+  const handleAddToCart = (date: string, time: string, deliveryMode: 'delivery' | 'pickup', preferences: any) => {
+    if (!bookingDish) return;
+    const dishChef = chefs.find(c => c.id === bookingDish.chefId);
+    const isAvailableSoon =
+      Boolean(bookingDish.isAvailableSoon) ||
+      Boolean(bookingDish.tags?.some(t => t.trim().toLowerCase() === 'disponibile a breve')) ||
+      !isChefBookable(dishChef);
+
+    const newItem: CartItem = {
+      ...bookingDish,
+      quantity: 1,
+      scheduledDate: date,
+      scheduledTime: time,
+      deliveryMode,
+      preferences,
+      ...(isAvailableSoon ? { isAvailableSoon: true } : {}),
+    };
+
+    setCart(prev => [...prev, newItem]);
+    setBookingDish(null);
+    setIsCartBarDismissed(false);
+    setIsCartOpen(true);
+    showNotification(
+      isAvailableSoon
+        ? `"${bookingDish.name}" aggiunto al carrello (contrassegnato "Disponibile a breve").`
+        : `"${bookingDish.name}" aggiunto al carrello!`,
+      {
+        title: 'Carrello Aggiornato',
+        variant: isAvailableSoon ? 'info' : 'success',
+      }
+    );
+  };
+
   const handleConfirmBooking = async (date: string, time: string, deliveryMode: 'delivery' | 'pickup', preferences: any) => {
     if (!bookingDish) return;
+    const validation = validateBetaOrderSubmission([bookingDish], chefs, 'direct');
+    if (!validation.ok) {
+      notifyBetaOrderBlocked(validation);
+      setBookingDish(null);
+      return;
+    }
     if (!currentUser) {
       setPendingBookingPayload({ dish: bookingDish, date, time, deliveryMode, preferences });
       promptClientAuth("Accedi o registrati come Cliente per completare la prenotazione.");
@@ -1761,9 +1803,20 @@ function App() {
     setIsPaymentOpen(true);
   };
 
+  const handleValidateCartOrder = (): BetaOrderValidationResult => {
+    return validateBetaOrderSubmission(cart, chefs, 'cart');
+  };
+
   const handlePaymentSuccess = async (notificationChannel?: 'app' | 'whatsapp') => {
     if (!currentUser) {
       promptClientAuth("Accedi o registrati come Cliente per completare l'ordine.");
+      return;
+    }
+    const validation = validateBetaOrderSubmission(cart, chefs, 'cart');
+    if (!validation.ok) {
+      notifyBetaOrderBlocked(validation);
+      setIsPaymentOpen(false);
+      setIsCartOpen(true);
       return;
     }
     const firstChefId = cart[0]?.chefId || 'c1';
@@ -2128,11 +2181,25 @@ function App() {
             onClose={() => setBookingDish(null)} 
             dish={bookingDish} 
             chef={selectedChef} 
-            onConfirm={handleConfirmBooking} 
+            onConfirm={handleConfirmBooking}
+            onAddToCart={handleAddToCart}
           />
         )}
         <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} onUpdateQuantity={handleUpdateQuantity} onCheckout={handleCheckout} onAddDish={handleInitiateBooking} availableChefs={chefs} />
-        <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} total={checkoutTotal} onSuccess={handlePaymentSuccess} cart={cart} availableChefs={chefs} />
+        <PaymentModal
+          isOpen={isPaymentOpen}
+          onClose={() => setIsPaymentOpen(false)}
+          total={checkoutTotal}
+          onSuccess={handlePaymentSuccess}
+          cart={cart}
+          availableChefs={chefs}
+          onValidateOrder={handleValidateCartOrder}
+          onValidationError={notifyBetaOrderBlocked}
+          onBackToCart={() => {
+            setIsPaymentOpen(false);
+            setIsCartOpen(true);
+          }}
+        />
         <AuthModal 
           isOpen={isAuthOpen} 
           onClose={handleAuthModalClose} 
@@ -2283,8 +2350,8 @@ function App() {
                         return (
                           <div
                             key={`${chef.id}-${dish.id}`}
-                            onClick={canBook ? () => handleInitiateBooking(dish) : undefined}
-                            className={`group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-200 shadow-sm ${canBook ? 'cursor-pointer' : 'cursor-default'}`}
+                            onClick={() => handleInitiateBooking(dish)}
+                            className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden flex flex-col justify-between hover:shadow-2xl transition-all duration-300 hover:border-orange-200 shadow-sm cursor-pointer"
                           >
                             <div className="relative h-44 overflow-hidden shrink-0">
                               <img
@@ -2376,15 +2443,23 @@ function App() {
                                     <span>Scegli e Prenota</span>
                                   </button>
                                 ) : (
-                                  <button
-                                    type="button"
-                                    disabled
-                                    aria-disabled="true"
-                                    className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-500 border border-gray-200 font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 cursor-not-allowed"
-                                  >
-                                    <Clock className="w-4 h-4 shrink-0" />
-                                    <span>Disponibile a breve</span>
-                                  </button>
+                                  <div className="space-y-1.5">
+                                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-wider w-full justify-center">
+                                      <Clock className="w-3.5 h-3.5 shrink-0" />
+                                      <span>Disponibile a breve</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleInitiateBooking(dish);
+                                      }}
+                                      className="w-full py-2.5 rounded-xl bg-black hover:bg-orange-600 text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+                                    >
+                                      <ShoppingBag className="w-4 h-4" />
+                                      <span>Aggiungi al carrello</span>
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -2688,12 +2763,26 @@ function App() {
           onClose={() => setBookingDish(null)} 
           dish={bookingDish} 
           chef={chefs.find(c => c.id === bookingDish.chefId)} 
-          onConfirm={handleConfirmBooking} 
+          onConfirm={handleConfirmBooking}
+          onAddToCart={handleAddToCart}
         />
       )}
       
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} onUpdateQuantity={handleUpdateQuantity} onCheckout={handleCheckout} onAddDish={handleInitiateBooking} availableChefs={chefs} />
-      <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} total={checkoutTotal} onSuccess={handlePaymentSuccess} cart={cart} availableChefs={chefs} />
+      <PaymentModal
+        isOpen={isPaymentOpen}
+        onClose={() => setIsPaymentOpen(false)}
+        total={checkoutTotal}
+        onSuccess={handlePaymentSuccess}
+        cart={cart}
+        availableChefs={chefs}
+        onValidateOrder={handleValidateCartOrder}
+        onValidationError={notifyBetaOrderBlocked}
+        onBackToCart={() => {
+          setIsPaymentOpen(false);
+          setIsCartOpen(true);
+        }}
+      />
       
       <AuthModal 
         isOpen={isAuthOpen} 
