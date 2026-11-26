@@ -34,26 +34,72 @@ export const Header: React.FC<HeaderProps> = ({
   activeAddress,
   onChangeAddress
 }) => {
+  const roleTheme = (() => {
+    if (
+      currentView === ViewState.ADMIN_DASHBOARD ||
+      (currentUser?.role === 'admin' && currentView === ViewState.PROFILE)
+    ) {
+      return {
+        label: 'ADMIN',
+        pillClass:
+          'bg-gradient-to-r from-[#312E81] via-[#4C1D95] to-slate-900 hover:from-[#4C1D95] hover:to-[#312E81] border-violet-400/50 shadow-violet-950/60',
+        badgeClass: 'bg-violet-300 text-slate-950',
+        headerBorderClass: 'border-violet-800/50',
+        Icon: ShieldCheck,
+      };
+    }
+    if (currentUser?.role === 'chef' || currentView === ViewState.BECOME_CHEF) {
+      return {
+        label: 'CUOCO',
+        pillClass:
+          'bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 hover:from-emerald-500 hover:to-teal-600 border-emerald-300/50 shadow-emerald-950/60',
+        badgeClass: 'bg-emerald-200 text-emerald-950',
+        headerBorderClass: 'border-emerald-700/50',
+        Icon: ChefHat,
+      };
+    }
+    return {
+      label: currentUser?.role === 'client' ? 'CLIENTE' : 'OSPITE',
+      pillClass:
+        'bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 hover:from-orange-400 hover:to-amber-500 border-orange-300/50 shadow-orange-950/50',
+      badgeClass: 'bg-black text-orange-400',
+      headerBorderClass: 'border-orange-900/30',
+      Icon: UtensilsCrossed,
+    };
+  })();
+
+  const RoleIcon = roleTheme.Icon;
+
   return (
-    <header className="sticky top-0 z-50 bg-black text-white border-b border-orange-900/30 shadow-lg transition-all duration-300">
+    <header className={`sticky top-0 z-50 bg-black text-white border-b shadow-lg transition-all duration-300 ${roleTheme.headerBorderClass}`}>
       <div className="max-w-6xl mx-auto px-3 sm:px-5 lg:px-8">
         <div className="flex justify-between items-center gap-2 sm:gap-3 lg:gap-4 h-16 md:h-20">
           
-          {/* Left Group: Brand Logo + Active Coverage Location */}
+          {/* Left Group: Dynamic Role Brand Logo + Active Coverage Location */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink">
             <button
               type="button"
               className="flex items-center gap-2 cursor-pointer group py-1 shrink-0 focus:outline-none"
-              onClick={() => onNavigate(ViewState.HOME)}
-              aria-label="Torna alla Home MESA"
+              onClick={() => onNavigate(ViewState.LANDING)}
+              title="Torna alla schermata di benvenuto per cambiare ruolo"
+              aria-label="Torna alla schermata di benvenuto MESA"
             >
-              <div className="flex items-center gap-2 bg-gradient-to-r from-orange-600 via-orange-500 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl shadow-lg shadow-orange-950/50 border border-orange-400/40 transition-transform group-hover:scale-105 shrink-0">
+              <div
+                className={`flex items-center gap-1.5 sm:gap-2 text-white px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl shadow-lg border transition-all duration-300 group-hover:scale-105 shrink-0 ${roleTheme.pillClass}`}
+              >
                 <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
-                  <UtensilsCrossed className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                  <RoleIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                 </div>
-                <span className="text-lg sm:text-xl font-black tracking-wider text-white font-sans leading-none whitespace-nowrap drop-shadow-sm">
-                  MESA<span className="text-amber-200 font-black">.</span>
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base sm:text-lg font-black tracking-wider text-white font-sans leading-none whitespace-nowrap drop-shadow-sm">
+                    MESA<span className="text-amber-200 font-black">.</span>
+                  </span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-md text-[8px] sm:text-[9px] font-black uppercase tracking-wider leading-none whitespace-nowrap shadow-sm ${roleTheme.badgeClass}`}
+                  >
+                    {roleTheme.label}
+                  </span>
+                </div>
               </div>
             </button>
 
