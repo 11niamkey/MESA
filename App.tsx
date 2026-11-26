@@ -11,7 +11,6 @@ import { FilterBar, nationalityNames } from './components/FilterBar';
 import { ChefProfile } from './components/ChefProfile';
 import { BookingModal } from './components/BookingModal';
 import { DailySpecials } from './components/DailySpecials';
-import { PaymentModal } from './components/PaymentModal';
 import { AuthModal } from './components/AuthModal';
 import { MesaChefs } from './components/MesaChefs';
 import { CultureSection } from './components/CultureSection';
@@ -1369,12 +1368,10 @@ function App() {
   const [pendingPostAuthView, setPendingPostAuthView] = useState<ViewState | null>(null);
   const [pendingCheckoutTotal, setPendingCheckoutTotal] = useState<number | null>(null);
   const [authInitialRole, setAuthInitialRole] = useState<'client' | 'chef' | 'admin'>('client');
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [showTour, setShowTour] = useState(false);
-  const [checkoutTotal, setCheckoutTotal] = useState(0);
 
   const [toastMessage, setToastMessage] = useState('');
   const [toastTitle, setToastTitle] = useState<string | undefined>(undefined);
@@ -1835,10 +1832,68 @@ function App() {
     setCart(prev => prev.map(item => item.id === id ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item).filter(i => i.quantity > 0));
   };
 
-  const handleCheckout = (total: number) => {
+  const submitCartOrder = async (authenticatedUser: AppUser, totalAmount: number) => {
+    const validation = validateBetaOrderSubmission(cart, chefs, 'cart');
+    if (!validation.ok) {
+      notifyBetaOrderBlocked(validation);
+      setIsCartOpen(true);
+      return;
+    }
+    const firstChefId = cart[0]?.chefId || 'c1';
+    const chefName = chefs.find(c => c.id === firstChefId)?.name || 'Chef MESA';
+    const customerName = `${authenticatedUser.name} ${authenticatedUser.lastName}`.trim() || authenticatedUser.email;
+    const now = new Date();
+    const orderId = `MESA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const newOrder: Order = {
+      id: orderId,
+      userId: authenticatedUser.id,
+      customerName,
+      ...(authenticatedUser.email ? { customerEmail: authenticatedUser.email } : {}),
+      items: [...cart],
+      total: totalAmount,
+      status: 'PENDING_CONFIRMATION',
+      timestamp: now,
+      chefId: firstChefId,
+      chefName: chefName,
+      deliveryMode: cart[0]?.deliveryMode || 'pickup',
+      estimatedTime: 'In arrivo...',
+      notificationChannel: 'app',
+      timeline: [
+        {
+          id: `tl-init-${orderId}`,
+          status: 'PENDING_CONFIRMATION',
+          title: 'Ordine inviato',
+          description: 'Ordine inviato! Pagamento diretto al ritiro o alla consegna.',
+          timestamp: now,
+        },
+      ],
+    };
+    prevOrderStatusesRef.current[newOrder.id] = newOrder.status;
+    knownOrderIdsRef.current.add(newOrder.id);
+    setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrder.id)]);
+    await firestoreWrite('orders', newOrder.id, newOrder);
+    setCart([]);
+    setIsCartOpen(false);
+    setRecentlyPlacedOrderId(newOrder.id);
+    setSelectedOrder(newOrder);
+    setCurrentView(ViewState.ORDERS);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showNotification('Ordine inviato! In attesa di conferma dallo chef', {
+      title: 'Ordine Confermato',
+      variant: 'success',
+    });
+  };
+
+  const handleCheckout = async (total: number) => {
+    const validation = validateBetaOrderSubmission(cart, chefs, 'cart');
+    if (!validation.ok) {
+      notifyBetaOrderBlocked(validation);
+      return;
+    }
+
     if (!currentUser) {
       setPendingCheckoutTotal(total);
-      promptClientAuth("Accedi o registrati come Cliente per completare l'ordine.");
+      promptClientAuth("Accedi o registrati come Cliente per confermare l'ordine.");
       return;
     }
 
@@ -1853,71 +1908,7 @@ function App() {
       }
     }
 
-    setCheckoutTotal(total);
-    setIsCartOpen(false);
-    setIsPaymentOpen(true);
-  };
-
-  const handleValidateCartOrder = (): BetaOrderValidationResult => {
-    return validateBetaOrderSubmission(cart, chefs, 'cart');
-  };
-
-  const handlePaymentSuccess = async () => {
-    if (!currentUser) {
-      promptClientAuth("Accedi o registrati come Cliente per completare l'ordine.");
-      return;
-    }
-    const validation = validateBetaOrderSubmission(cart, chefs, 'cart');
-    if (!validation.ok) {
-      notifyBetaOrderBlocked(validation);
-      setIsPaymentOpen(false);
-      setIsCartOpen(true);
-      return;
-    }
-    const firstChefId = cart[0]?.chefId || 'c1';
-    const chefName = chefs.find(c => c.id === firstChefId)?.name || 'Chef MESA';
-    const customerName = `${currentUser.name} ${currentUser.lastName}`.trim() || currentUser.email;
-    const now = new Date();
-    const orderId = `MESA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-    const newOrder: Order = {
-      id: orderId,
-      userId: currentUser.id,
-      customerName,
-      ...(currentUser.email ? { customerEmail: currentUser.email } : {}),
-      items: [...cart],
-      total: checkoutTotal,
-      status: 'PENDING_CONFIRMATION',
-      timestamp: now,
-      chefId: firstChefId,
-      chefName: chefName,
-      deliveryMode: cart[0]?.deliveryMode || 'pickup',
-      estimatedTime: 'In arrivo...',
-      notificationChannel: 'app',
-      timeline: [
-        {
-          id: `tl-init-${orderId}`,
-          status: 'PENDING_CONFIRMATION',
-          title: 'Ordine inviato',
-          description: 'Ordine inviato! In attesa di conferma dallo chef.',
-          timestamp: now,
-        },
-      ],
-    };
-    prevOrderStatusesRef.current[newOrder.id] = newOrder.status;
-    knownOrderIdsRef.current.add(newOrder.id);
-    setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrder.id)]);
-    await firestoreWrite('orders', newOrder.id, newOrder);
-    setCart([]);
-    setIsPaymentOpen(false);
-    setIsCartOpen(false);
-    setRecentlyPlacedOrderId(newOrder.id);
-    setSelectedOrder(newOrder);
-    setCurrentView(ViewState.ORDERS);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    showNotification('Ordine inviato! In attesa di conferma dallo chef', {
-      title: 'Ordine Confermato',
-      variant: 'success',
-    });
+    await submitCartOrder(currentUser, total);
   };
 
   const handleAuthSuccess = async (user: AppUser, isNewRegistration?: boolean) => {
@@ -1963,8 +1954,7 @@ function App() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
-      setCheckoutTotal(amt);
-      setIsPaymentOpen(true);
+      await submitCartOrder(user, amt);
       return;
     }
 
@@ -2241,20 +2231,6 @@ function App() {
           />
         )}
         <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} onUpdateQuantity={handleUpdateQuantity} onCheckout={handleCheckout} onAddDish={handleInitiateBooking} availableChefs={chefs} />
-        <PaymentModal
-          isOpen={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
-          total={checkoutTotal}
-          onSuccess={handlePaymentSuccess}
-          cart={cart}
-          availableChefs={chefs}
-          onValidateOrder={handleValidateCartOrder}
-          onValidationError={notifyBetaOrderBlocked}
-          onBackToCart={() => {
-            setIsPaymentOpen(false);
-            setIsCartOpen(true);
-          }}
-        />
         <AuthModal 
           isOpen={isAuthOpen} 
           onClose={handleAuthModalClose} 
@@ -2871,20 +2847,6 @@ function App() {
       )}
       
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} onUpdateQuantity={handleUpdateQuantity} onCheckout={handleCheckout} onAddDish={handleInitiateBooking} availableChefs={chefs} />
-      <PaymentModal
-        isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
-        total={checkoutTotal}
-        onSuccess={handlePaymentSuccess}
-        cart={cart}
-        availableChefs={chefs}
-        onValidateOrder={handleValidateCartOrder}
-        onValidationError={notifyBetaOrderBlocked}
-        onBackToCart={() => {
-          setIsPaymentOpen(false);
-          setIsCartOpen(true);
-        }}
-      />
       
       <AuthModal 
         isOpen={isAuthOpen} 

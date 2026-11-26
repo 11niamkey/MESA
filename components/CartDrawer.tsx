@@ -1,14 +1,14 @@
-import React, { useMemo, useEffect } from 'react';
-import { X, Minus, Plus, ShoppingBag, CalendarClock, Truck, Store, Info, Sparkles, ArrowLeft, UtensilsCrossed, Clock, AlertCircle } from 'lucide-react';
+import React, { useMemo, useEffect, useState } from 'react';
+import { X, Minus, Plus, ShoppingBag, CalendarClock, Truck, Store, Info, Sparkles, ArrowLeft, UtensilsCrossed, Clock, AlertCircle, Banknote, CheckCircle } from 'lucide-react';
 import { CartItem, Dish, Chef } from '../types';
-import { isChefBookable, isItemAvailableSoon } from '../utils/chefUtils';
+import { isChefBookable, isItemAvailableSoon, validateBetaOrderSubmission, BetaOrderValidationResult } from '../utils/chefUtils';
 
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   cart: CartItem[];
   onUpdateQuantity: (id: string, delta: number) => void;
-  onCheckout: (total: number) => void;
+  onCheckout: (total: number) => Promise<void> | void;
   onAddDish: (dish: Dish) => void;
   availableChefs: Chef[];
 }
@@ -25,10 +25,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   availableChefs 
 }) => {
   const deliveryFeeBase = 2.50;
-  
+  const [checkoutError, setCheckoutError] = useState<BetaOrderValidationResult | null>(null);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+
   const deliveryTotal = cart.reduce((acc, item) => item.deliveryMode === 'delivery' ? acc + deliveryFeeBase : acc, 0);
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal + deliveryTotal;
+
+  useEffect(() => {
+    setCheckoutError(null);
+  }, [isOpen, cart]);
 
   // Lock body scroll and listen for Escape key when open
   useEffect(() => {
@@ -74,6 +80,22 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     () => cart.some(item => isItemAvailableSoon(item, availableChefs)),
     [cart, availableChefs]
   );
+
+  const handleConfirmOrderClick = async () => {
+    const validation = validateBetaOrderSubmission(cart, availableChefs, 'cart');
+    if (!validation.ok) {
+      setCheckoutError(validation);
+      await onCheckout(total);
+      return;
+    }
+    setCheckoutError(null);
+    setIsSubmittingOrder(true);
+    try {
+      await onCheckout(total);
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -259,18 +281,42 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
               </div>
               {hasAvailableSoonItems && (
-                <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2 text-left">
+                <div className="mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2 text-left">
                   <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                   <p className="text-[11px] font-semibold text-amber-900 leading-snug">
                     Alcuni piatti nel carrello sono contrassegnati come "Disponibile a breve": potrai procedere all'invio definitivo solo per i cuochi verificati e attivi nella public beta.
                   </p>
                 </div>
               )}
+              {checkoutError && !checkoutError.ok && (
+                <div className="mb-3 p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-left">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    {checkoutError.title && (
+                      <p className="text-[11px] font-black uppercase tracking-wider text-red-900">
+                        {checkoutError.title}
+                      </p>
+                    )}
+                    <p className="text-xs font-semibold text-red-950 leading-snug">
+                      {checkoutError.message}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <div className="mb-3 px-3.5 py-2.5 rounded-xl bg-orange-50 border border-orange-200 flex items-center gap-2.5 text-left">
+                <Banknote className="w-4 h-4 text-orange-600 shrink-0" />
+                <p className="text-xs font-bold text-orange-950 leading-snug">
+                  Pagamento diretto al ritiro o alla consegna
+                </p>
+              </div>
               <button 
-                onClick={() => onCheckout(total)}
-                className="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-black text-base uppercase tracking-wider rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center space-x-2 border-b-4 border-orange-800"
+                type="button"
+                disabled={isSubmittingOrder}
+                onClick={() => void handleConfirmOrderClick()}
+                className="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-black text-base uppercase tracking-wider rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center space-x-2 border-b-4 border-orange-800 disabled:opacity-60"
               >
-                <span>Vai al Pagamento</span>
+                <CheckCircle className="w-5 h-5" />
+                <span>{isSubmittingOrder ? 'Invio in corso...' : 'Conferma Ordine'}</span>
               </button>
               
               <button

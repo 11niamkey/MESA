@@ -75,12 +75,10 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
   ]);
   const [statusLogs, setStatusLogs] = useState<string[]>([
     order.status === 'PENDING_CONFIRMATION'
-      ? `Prenotazione registrata: pagamento al ritiro o alla consegna.`
+      ? `Prenotazione registrata: pagamento diretto al ritiro o alla consegna.`
       : `Ordine confermato.`,
     `Ordine contrassegnato con ID #${order.id.split('-')[0]}.`,
-    order.notificationChannel === 'whatsapp' 
-      ? `Canale selezionato: WHATSAPP. Inviato messaggio precompilato allo Chef.`
-      : `Canale selezionato: APP MESA. Inviata notifica automatica al terminale.`
+    `Canale selezionato: APP MESA. Inviata notifica automatica in tempo reale.`
   ]);
 
   const steps: { status: OrderStatus; label: string; icon: any; description: string }[] = [
@@ -437,79 +435,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
               })}
             </div>
           </div>
-
-          {/* WhatsApp Direct Coordination Card */}
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50/50 rounded-[2rem] border border-green-200/50 p-6 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full blur-2xl -mr-12 -mt-12"></div>
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center text-white shadow-md shadow-green-500/20 shrink-0">
-                  <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.733-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.023-5.11-2.884-6.978C16.592 1.9 14.121.875 11.487.875c-5.438 0-9.864 4.421-9.868 9.868-.001 1.714.461 3.39 1.337 4.887L1.93 21.09l5.631-1.477-1.45-.884-.334-.183zm10.748-4.996c-.3-.15-1.77-.875-2.043-.977-.275-.1-.475-.15-.675.15-.2.3-.775.976-.95 1.176-.175.2-.35.225-.65.075-.3-.15-1.267-.467-2.413-1.49-1.01-.9-1.693-2.013-1.893-2.313-.2-.3-.021-.462.129-.612.135-.135.3-.35.45-.525.15-.175.2-.3.3-.5s.05-.375-.025-.525C9.37 9.458 8.81 8.09 8.577 7.54c-.228-.547-.46-.473-.65-.482-.175-.01-.375-.012-.575-.012s-.525.075-.8.375c-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.11 3.22 5.115 4.52.715.31 1.273.496 1.708.635.717.228 1.37.196 1.885.119.575-.085 1.77-.723 2.022-1.42s.252-1.293.177-1.42c-.075-.125-.275-.2-.575-.35z"/>
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-green-900 text-sm leading-tight">Canale WhatsApp Gestione Ordini MESA</h4>
-                  <p className="text-[11px] text-green-700/80 mt-1 font-medium leading-normal">
-                    Condividi subito i dettagli della prenotazione e accordati per il ritiro/consegna su WhatsApp con un click.
-                  </p>
-                </div>
-              </div>
-              <a
-                href={(() => {
-                  const rawManagementNumber = String(
-                    (import.meta as any).env?.VITE_WHATSAPP_MANAGEMENT_NUMBER || '393713179098'
-                  ).replace(/\D/g, '');
-                  const managementNumber =
-                    rawManagementNumber.length === 10 && rawManagementNumber.startsWith('3')
-                      ? `39${rawManagementNumber}`
-                      : rawManagementNumber;
-
-                  const chef = chefs?.find(c => c.id === order.chefId);
-                  const chefName = chef?.name || order.chefName || 'Chef MESA';
-                  const firstItem = order.items[0];
-                  const scheduledDate = firstItem?.scheduledDate || 'Da definire';
-                  const scheduledTime = firstItem?.scheduledTime || 'Da definire';
-                  const deliveryLabel = order.deliveryMode === 'delivery' ? 'Consegna a domicilio' : 'Ritiro in sede';
-
-                  const itemsText = order.items.map(item => {
-                    let specStr = '';
-                    if (item.preferences.spiceLevel > 0) {
-                      specStr += ` (Piccantezza: ${item.preferences.spiceLevel}/3)`;
-                    }
-                    if (item.preferences.notes) {
-                      specStr += ` [Note: ${item.preferences.notes}]`;
-                    }
-                    return `- ${item.name} | Quantità: ${item.quantity} (€${(item.price * item.quantity).toFixed(2)})${specStr}`;
-                  }).join('\n');
-
-                  const text = `Ciao MESA! 🍳
-Vorrei inviare i dettagli della prenotazione *#${order.id.split('-')[0]}*:
-
-*Chef*: ${chefName}
-*Piatti*:
-${itemsText}
-
-*Totale*: €${order.total.toFixed(2)}
-*Modalità*: ${deliveryLabel}
-*Data*: ${scheduledDate}
-*Fascia oraria*: ${scheduledTime}
-
-Attendo conferma, grazie!`;
-
-                  return managementNumber
-                    ? `https://wa.me/${managementNumber}?text=${encodeURIComponent(text)}`
-                    : `https://wa.me/?text=${encodeURIComponent(text)}`;
-                })()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-[#25D366] hover:bg-[#128C7E] text-white px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest text-center shadow-lg hover:shadow-xl active:scale-95 transition-all shrink-0 flex items-center justify-center gap-1.5"
-              >
-                Invia Dettagli su WhatsApp
-              </a>
-            </div>
-          </div>
-        </div>
+      </div>
 
         {/* Right Column: Chat for Client; Terminale Cuoco + Chat for Chef */}
         <div className="lg:col-span-5 space-y-6">
@@ -550,7 +476,7 @@ Attendo conferma, grazie!`;
                   <span className="text-gray-400">CUOCO LIVE</span>
                 </div>
                 <div className="bg-white/5 px-2 py-0.5 rounded text-white text-[8px] uppercase tracking-wider font-sans font-black">
-                  {order.notificationChannel === 'whatsapp' ? 'WhatsApp Bridge' : 'MESA WebSocket'}
+                  MESA Live Sync
                 </div>
                 <div className="flex items-center gap-1 text-gray-400">
                   <Wifi className="w-3 h-3 text-green-500" />
