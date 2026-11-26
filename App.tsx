@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { db, auth, isFirebaseConfigured, OperationType, handleFirestoreError } from './firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, getDoc, arrayUnion, writeBatch } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Header } from './components/Header';
 import { AddressGateModal } from './components/AddressGateModal';
 import { ChefCard } from './components/ChefCard';
@@ -460,12 +460,33 @@ function App() {
   const hasLoadedInitialOrdersRef = useRef(false);
   const currentUserRef = useRef<AppUser | null>(currentUser);
   const chefsRef = useRef<Chef[]>(chefs);
+  const registeredUsersRef = useRef<AppUser[]>(registeredUsers);
   const chefSoundEnabledRef = useRef<boolean>(chefSoundEnabled);
   const announcedChefSessionRef = useRef<string | null>(null);
 
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
+
+  useEffect(() => {
+    registeredUsersRef.current = registeredUsers;
+  }, [registeredUsers]);
+
+  // Restore MESA user profile if Firebase Auth already has an active session
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth) return;
+    const unsubAuth = onAuthStateChanged(auth, (fbUser) => {
+      if (!fbUser?.email || currentUserRef.current) return;
+      const normalized = fbUser.email.trim().toLowerCase();
+      const matched = registeredUsersRef.current.find(
+        u => u.email.trim().toLowerCase() === normalized
+      );
+      if (matched) {
+        setCurrentUser(matched);
+      }
+    });
+    return () => unsubAuth();
+  }, []);
 
   useEffect(() => {
     chefsRef.current = chefs;
@@ -1404,7 +1425,58 @@ function App() {
     }
   }, []);
 
+  const landingAuthOriginRef = useRef(false);
+
+  const getAuthenticatedUserForRole = (targetRole: 'client' | 'chef'): AppUser | null => {
+    const fbEmail = auth?.currentUser?.email?.trim().toLowerCase();
+    if (currentUser && currentUser.role === targetRole) {
+      if (!fbEmail || currentUser.email.trim().toLowerCase() === fbEmail) {
+        return currentUser;
+      }
+    }
+    if (fbEmail) {
+      const matchedUser = registeredUsers.find(
+        u => u.role === targetRole && u.email.trim().toLowerCase() === fbEmail
+      );
+      if (matchedUser) return matchedUser;
+      if (targetRole === 'chef') {
+        const matchedChef = chefs.find(c => (c.email || '').trim().toLowerCase() === fbEmail);
+        if (matchedChef) {
+          const nameParts = matchedChef.name.trim().split(' ');
+          return {
+            id: matchedChef.id.startsWith('chef-') ? matchedChef.id.replace('chef-', '') : `usr-${matchedChef.id}`,
+            name: nameParts[0] || matchedChef.name,
+            lastName: nameParts.slice(1).join(' ') || 'Chef',
+            email: fbEmail,
+            phone: matchedChef.phone,
+            brandName: matchedChef.name,
+            role: 'chef',
+            addresses: [],
+            createdAt: new Date().toLocaleDateString('it-IT'),
+          };
+        }
+      }
+    }
+    return null;
+  };
+
+  const handleLandingRoleEnter = (targetRole: 'client' | 'chef') => {
+    const authenticatedUser = getAuthenticatedUserForRole(targetRole);
+    if (authenticatedUser) {
+      if (!currentUser || currentUser.id !== authenticatedUser.id) {
+        setCurrentUser(authenticatedUser);
+      }
+      navigateTo(targetRole === 'chef' ? ViewState.PROFILE : ViewState.HOME);
+      return;
+    }
+    landingAuthOriginRef.current = true;
+    setPendingPostAuthView(targetRole === 'chef' ? ViewState.PROFILE : ViewState.HOME);
+    setAuthInitialRole(targetRole);
+    setIsAuthOpen(true);
+  };
+
   const promptClientAuth = (message: string) => {
+    landingAuthOriginRef.current = false;
     setAuthInitialRole('client');
     setIsCartOpen(false);
     showNotification(message);
@@ -1413,6 +1485,7 @@ function App() {
 
   const handleAuthModalClose = () => {
     setIsAuthOpen(false);
+    landingAuthOriginRef.current = false;
     setPendingBookingDish(null);
     setPendingBookingPayload(null);
     setPendingPostAuthView(null);
@@ -1959,7 +2032,15 @@ function App() {
     }
 
     if (pendingPostAuthView) {
-      const targetView = pendingPostAuthView;
+      const targetView =
+        user.role === 'admin'
+          ? ViewState.ADMIN_DASHBOARD
+          : user.role === 'chef' && pendingPostAuthView === ViewState.HOME
+            ? ViewState.PROFILE
+            : user.role === 'client' && pendingPostAuthView === ViewState.PROFILE && landingAuthOriginRef.current
+              ? ViewState.HOME
+              : pendingPostAuthView;
+      landingAuthOriginRef.current = false;
       setPendingPostAuthView(null);
       setSelectedOrder(null);
       setCurrentView(targetView);
@@ -1967,6 +2048,8 @@ function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+
+    landingAuthOriginRef.current = false;
 
     if (user.role === 'admin') {
       navigateTo(ViewState.ADMIN_DASHBOARD);
@@ -2182,14 +2265,8 @@ function App() {
     return (
       <>
         <LandingPage 
-          onEnterApp={() => {
-            if (verifiedAddress) {
-              navigateTo(ViewState.HOME);
-            } else {
-              setIsAddressGateOpen(true);
-            }
-          }} 
-          onNavigateToBecomeChef={() => { navigateTo(ViewState.BECOME_CHEF); }} 
+          onEnterApp={() => handleLandingRoleEnter('client')} 
+          onNavigateToBecomeChef={() => handleLandingRoleEnter('chef')} 
           onShareClick={() => setIsShareOpen(true)}
           onAdminAccess={handleQuickAdminAccess}
         />

@@ -407,55 +407,65 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="p-6 sm:p-8 max-h-[82vh] overflow-y-auto">
             {/* Banner di Ruolo Ben Visibile per Evitare Errori di Scelta */}
             {role === 'client' && (
-              <div className="mb-5 p-3.5 rounded-2xl bg-orange-50 border-2 border-orange-300 flex flex-col gap-1.5 text-left">
+              <div className="mb-4 p-3.5 rounded-2xl bg-orange-50 border-2 border-orange-300 flex flex-col gap-1.5 text-left">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-orange-600 text-white flex items-center justify-center shrink-0">
                     <User className="w-4 h-4" />
                   </div>
-                  <p className="text-xs font-black text-orange-950 leading-snug">
-                    Stai accedendo/registrandoti come CLIENTE
-                  </p>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider text-orange-950 leading-snug">
+                      {mode === 'login' ? 'ACCESSO AREA CLIENTE' : 'REGISTRAZIONE AREA CLIENTE'}
+                    </p>
+                    <p className="text-[11px] font-semibold text-orange-800 leading-tight">
+                      {mode === 'login' ? 'Accedi con il tuo account cliente MESA' : 'Crea un nuovo profilo per ordinare'}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
                     setRole('chef');
-                    setMode('register');
+                    setMode('login');
                     setErrorMsg('');
                   }}
                   className="text-[11px] font-bold text-orange-700 hover:text-emerald-700 underline text-left w-fit pl-10 transition-colors"
                 >
-                  Hai sbagliato? Passa a registrazione Cuoco
+                  Hai cliccato per errore? Passa all&apos;Area Cuoco
                 </button>
               </div>
             )}
 
             {role === 'chef' && (
-              <div className="mb-5 p-3.5 rounded-2xl bg-emerald-50 border-2 border-emerald-400 flex flex-col gap-1.5 text-left">
+              <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 border-2 border-emerald-400 flex flex-col gap-1.5 text-left">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
                     <ChefHat className="w-4 h-4" />
                   </div>
-                  <p className="text-xs font-black text-emerald-950 leading-snug">
-                    Stai accedendo/registrandoti come CUOCO
-                  </p>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider text-emerald-950 leading-snug">
+                      {mode === 'login' ? 'ACCESSO AREA CUOCO' : 'REGISTRAZIONE AREA CUOCO'}
+                    </p>
+                    <p className="text-[11px] font-semibold text-emerald-800 leading-tight">
+                      {mode === 'login' ? 'Accedi alla tua cucina con email e password' : 'Apri la tua cucina su MESA come chef'}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
                     setRole('client');
-                    setMode('register');
+                    setMode('login');
                     setErrorMsg('');
                   }}
                   className="text-[11px] font-bold text-emerald-800 hover:text-orange-600 underline text-left w-fit pl-10 transition-colors"
                 >
-                  Hai sbagliato? Passa a registrazione Cliente
+                  Hai cliccato per errore? Passa all&apos;Area Cliente
                 </button>
               </div>
             )}
 
             {role === 'admin' && (
-              <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-violet-950 border-2 border-violet-500/50 text-white flex flex-col gap-2 text-left shadow-lg">
+              <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-violet-950 border-2 border-violet-500/50 text-white flex flex-col gap-2 text-left shadow-lg">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0">
@@ -492,16 +502,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             )}
 
-            <h2 className="text-3xl font-black text-gray-900 italic tracking-tight mb-2">
-              {role === 'admin' ? 'Pannello di Controllo' : mode === 'login' ? 'Bentornato!' : role === 'client' ? 'Unisciti' : 'Registrati come Cuoco'}
+            {/* Schede Accedi / Nuovo su MESA? Registrati ben visibili subito sotto al banner */}
+            {role !== 'admin' && (
+              <div className="mb-4 p-1 rounded-2xl bg-gray-100 grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => { setMode('login'); setErrorMsg(''); }}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
+                    mode === 'login'
+                      ? role === 'chef'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-orange-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Accedi
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMode('register'); setErrorMsg(''); }}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-black tracking-tight transition-all ${
+                    mode === 'register'
+                      ? role === 'chef'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-orange-600 text-white shadow-sm'
+                      : role === 'chef'
+                        ? 'text-emerald-800 hover:bg-emerald-50'
+                        : 'text-orange-700 hover:bg-orange-50'
+                  }`}
+                >
+                  Nuovo su MESA? Registrati
+                </button>
+              </div>
+            )}
+
+            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 italic tracking-tight mb-1.5">
+              {role === 'admin' ? 'Pannello di Controllo' : mode === 'login' ? 'Bentornato!' : role === 'client' ? 'Unisciti a MESA' : 'Registrati come Cuoco'}
             </h2>
-            <p className="text-gray-500 text-sm font-medium mb-5 leading-relaxed">
+            <p className="text-gray-500 text-sm font-medium mb-4 leading-relaxed">
               {role === 'admin' 
                 ? 'Accedi alla visione a 360° per approvare e convalidare utenti, candidature cuochi e indirizzi.'
                 : mode === 'login' 
                   ? (role === 'chef'
-                      ? 'Accedi per gestire i tuoi piatti e le tue prenotazioni'
-                      : 'Accedi per gestire il tuo profilo, i tuoi indirizzi e i tuoi ordini.')
+                      ? 'Accedi per gestire i tuoi piatti e gli ordini della tua cucina.'
+                      : 'Accedi per ordinare dallo storefront, gestire i tuoi indirizzi e i tuoi ordini.')
                   : role === 'client' 
                     ? 'Registrati per ordinare piatti fatti in casa dalle cucine verificate. Il tuo profilo sarà subito visibile nell\'Area Admin.' 
                     : 'Crea il tuo account Cuoco: verrai sincronizzato con l\'Area Admin per la verifica e l\'attivazione nel catalogo MESA.'}
@@ -741,34 +785,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {role !== 'admin' && (
               <div className="mt-5 text-center text-sm font-medium text-gray-500">
                 {mode === 'login' ? (
-                  role === 'chef' ? (
-                    <button
-                      type="button"
-                      onClick={() => { setMode('register'); setErrorMsg(''); }}
-                      className="w-full py-3.5 px-4 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
-                    >
-                      <ChefHat className="w-4 h-4 text-emerald-700 shrink-0" />
-                      <span>Registrati / Candidati come nuovo Cuoco</span>
-                    </button>
-                  ) : (
-                    <>
-                      Non hai un account?{' '}
-                      <button 
-                        type="button"
-                        onClick={() => { setMode('register'); setErrorMsg(''); }}
-                        className="font-black text-orange-600 hover:underline"
-                      >
-                        Registrati
-                      </button>
-                    </>
-                  )
+                  <button
+                    type="button"
+                    onClick={() => { setMode('register'); setErrorMsg(''); }}
+                    className={`w-full py-3 px-4 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all border ${
+                      role === 'chef'
+                        ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-900'
+                        : 'bg-orange-50 hover:bg-orange-100 border-orange-300 text-orange-800'
+                    }`}
+                  >
+                    {role === 'chef' ? <ChefHat className="w-4 h-4 text-emerald-700 shrink-0" /> : <User className="w-4 h-4 text-orange-600 shrink-0" />}
+                    <span>Nuovo su MESA? Registrati</span>
+                  </button>
                 ) : (
                   <>
                     Hai già un account?{' '}
                     <button 
                       type="button"
                       onClick={() => { setMode('login'); setErrorMsg(''); }}
-                      className="font-black text-orange-600 hover:underline"
+                      className={`font-black hover:underline ${role === 'chef' ? 'text-emerald-700' : 'text-orange-600'}`}
                     >
                       Accedi
                     </button>
