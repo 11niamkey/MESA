@@ -405,7 +405,8 @@ const isOrderForChefUser = (order: Order, user: AppUser | null, chefsList: Chef[
 };
 
 function App() {
-  const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
+  // Always start on the welcome/landing screen on every open or page refresh (in-memory session state only)
+  const [currentView, setCurrentView] = useState<ViewState>(ViewState.LANDING);
   const [verifiedAddress, setVerifiedAddress] = useState<string>(() => {
     const saved = localStorage.getItem('mesa_verified_address');
     if (saved && isPordenoneLocation(saved)) return saved;
@@ -1333,6 +1334,10 @@ function App() {
 
   // Gestione parametri URL per link pubblici
   useEffect(() => {
+    try {
+      localStorage.removeItem('mesa_landing_seen');
+    } catch {}
+
     const params = new URLSearchParams(window.location.search);
     const chefId = params.get('chef');
     if (chefId) {
@@ -1341,12 +1346,6 @@ function App() {
         setSelectedChef(chef);
         setCurrentView(ViewState.PUBLIC_STOREFRONT);
       }
-    }
-
-    const hasSeenLanding = localStorage.getItem('mesa_landing_seen');
-    if (hasSeenLanding && !chefId) {
-       // Se ha già visto la landing, carichiamo la home (opzionale, per ora lasciamo landing come default)
-       // setCurrentView(ViewState.HOME);
     }
   }, []);
 
