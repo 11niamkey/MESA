@@ -754,9 +754,13 @@ function App() {
     }
   }, [currentUser]);
 
-  // Load favorites from the signed-in user's profile
+  // Load favorites from the signed-in user's profile (preserving guest selections on login)
   useEffect(() => {
-    setFavorites(currentUser?.favoriteDishIds || []);
+    if (currentUser) {
+      setFavorites(prev => Array.from(new Set([...(currentUser.favoriteDishIds || []), ...prev])));
+    } else {
+      setFavorites([]);
+    }
   }, [currentUser?.id]);
 
   const handleAddressVerified = (addressString: string) => {
@@ -1461,17 +1465,26 @@ function App() {
   };
 
   const handleLandingRoleEnter = (targetRole: 'client' | 'chef') => {
-    const authenticatedUser = getAuthenticatedUserForRole(targetRole);
+    if (targetRole === 'client') {
+      landingAuthOriginRef.current = false;
+      setPendingPostAuthView(null);
+      setCurrentView(ViewState.HOME);
+      setIsCartOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const authenticatedUser = getAuthenticatedUserForRole('chef');
     if (authenticatedUser) {
       if (!currentUser || currentUser.id !== authenticatedUser.id) {
         setCurrentUser(authenticatedUser);
       }
-      navigateTo(targetRole === 'chef' ? ViewState.PROFILE : ViewState.HOME);
+      navigateTo(ViewState.PROFILE);
       return;
     }
     landingAuthOriginRef.current = true;
-    setPendingPostAuthView(targetRole === 'chef' ? ViewState.PROFILE : ViewState.HOME);
-    setAuthInitialRole(targetRole);
+    setPendingPostAuthView(ViewState.PROFILE);
+    setAuthInitialRole('chef');
     setIsAuthOpen(true);
   };
 
@@ -1502,6 +1515,12 @@ function App() {
     if (view === ViewState.ORDERS && !currentUser) {
       setPendingPostAuthView(ViewState.ORDERS);
       promptClientAuth("Accedi o registrati come Cliente per visualizzare o gestire gli ordini.");
+      return;
+    }
+
+    if (view === ViewState.FAVORITES && !currentUser) {
+      setPendingPostAuthView(ViewState.FAVORITES);
+      promptClientAuth("Accedi o registrati come Cliente per visualizzare i tuoi Preferiti.");
       return;
     }
 
@@ -2053,6 +2072,10 @@ function App() {
 
     if (user.role === 'admin') {
       navigateTo(ViewState.ADMIN_DASHBOARD);
+    } else if (user.role === 'client' && cart.length > 0) {
+      setCurrentView(ViewState.HOME);
+      setIsCartOpen(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       navigateTo(ViewState.PROFILE);
     }
