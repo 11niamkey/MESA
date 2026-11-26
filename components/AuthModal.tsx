@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, ChefHat, ShieldCheck, MapPin, Eye, EyeOff, Smartphone, Sparkles } from 'lucide-react';
+import { X, User, ChefHat, ShieldCheck, MapPin, Eye, EyeOff, Smartphone, Sparkles, ShoppingBag, Lock, ArrowLeft } from 'lucide-react';
 import { AppUser, UserAddress, Chef } from '../types';
 import { auth, isFirebaseConfigured } from '../firebase';
 import {
@@ -365,11 +365,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 setRole('client');
                 setErrorMsg('');
               }}
-              className={`flex-1 py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
-                role === 'client' ? 'bg-white text-orange-600 border-b-4 border-orange-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+              className={`flex-1 py-4 sm:py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
+                role === 'client' ? 'bg-orange-50 text-orange-700 border-b-4 border-orange-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
                }`}
             >
-              <User className="w-4 h-4" />
+              <ShoppingBag className="w-4 h-4" />
               <span>Cliente</span>
             </button>
             <button
@@ -379,8 +379,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 setRole('chef');
                 setErrorMsg('');
               }}
-              className={`flex-1 py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
-                role === 'chef' ? 'bg-white text-orange-600 border-b-4 border-orange-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+              className={`flex-1 py-4 sm:py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
+                role === 'chef' ? 'bg-emerald-50 text-emerald-800 border-b-4 border-emerald-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
               }`}
             >
               <ChefHat className="w-4 h-4" />
@@ -395,8 +395,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 setPassword('');
                 setErrorMsg(''); 
               }}
-              className={`flex-1 py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
-                role === 'admin' ? 'bg-black text-orange-500 border-b-4 border-orange-500' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-500'
+              className={`flex-1 py-4 sm:py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
+                role === 'admin' ? 'bg-slate-900 text-violet-300 border-b-4 border-violet-500' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-500'
               }`}
             >
               <ShieldCheck className="w-4 h-4" />
@@ -405,6 +405,93 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
 
           <div className="p-6 sm:p-8 max-h-[82vh] overflow-y-auto">
+            {/* Banner di Ruolo Ben Visibile per Evitare Errori di Scelta */}
+            {role === 'client' && (
+              <div className="mb-5 p-3.5 rounded-2xl bg-orange-50 border-2 border-orange-300 flex flex-col gap-1.5 text-left">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-orange-600 text-white flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <p className="text-xs font-black text-orange-950 leading-snug">
+                    Stai accedendo/registrandoti come CLIENTE
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRole('chef');
+                    setMode('register');
+                    setErrorMsg('');
+                  }}
+                  className="text-[11px] font-bold text-orange-700 hover:text-emerald-700 underline text-left w-fit pl-10 transition-colors"
+                >
+                  Hai sbagliato? Passa a registrazione Cuoco
+                </button>
+              </div>
+            )}
+
+            {role === 'chef' && (
+              <div className="mb-5 p-3.5 rounded-2xl bg-emerald-50 border-2 border-emerald-400 flex flex-col gap-1.5 text-left">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <ChefHat className="w-4 h-4" />
+                  </div>
+                  <p className="text-xs font-black text-emerald-950 leading-snug">
+                    Stai accedendo/registrandoti come CUOCO
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRole('client');
+                    setMode('register');
+                    setErrorMsg('');
+                  }}
+                  className="text-[11px] font-bold text-emerald-800 hover:text-orange-600 underline text-left w-fit pl-10 transition-colors"
+                >
+                  Hai sbagliato? Passa a registrazione Cliente
+                </button>
+              </div>
+            )}
+
+            {role === 'admin' && (
+              <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-violet-950 border-2 border-violet-500/50 text-white flex flex-col gap-2 text-left shadow-lg">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider text-violet-200 leading-snug">
+                        ACCESSO RISERVATO ADMIN
+                      </p>
+                      <p className="text-[10px] font-medium text-gray-300">
+                        Solo login staff autorizzato • Nessuna registrazione pubblica
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (initialRole === 'admin') {
+                      onClose();
+                    } else {
+                      setRole('client');
+                      setMode('login');
+                      setEmail('');
+                      setPassword('');
+                      setErrorMsg('');
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-violet-300 hover:text-white underline w-fit pl-10 transition-colors"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Torna indietro</span>
+                </button>
+              </div>
+            )}
+
             <h2 className="text-3xl font-black text-gray-900 italic tracking-tight mb-2">
               {role === 'admin' ? 'Pannello di Controllo' : mode === 'login' ? 'Bentornato!' : role === 'client' ? 'Unisciti' : 'Registrati come Cuoco'}
             </h2>
@@ -601,7 +688,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button 
                 type="submit" 
                 disabled={isSubmitting}
-                className={`w-full py-4 font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95 text-xs ${role === 'admin' ? 'bg-orange-600 text-black' : 'bg-black text-white hover:bg-orange-600'} disabled:opacity-60 disabled:cursor-not-allowed`}
+                className={`w-full py-4 font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95 text-xs ${
+                  role === 'admin'
+                    ? 'bg-gradient-to-r from-slate-900 to-violet-900 hover:from-violet-950 hover:to-slate-900 text-white border border-violet-400/30'
+                    : role === 'chef'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-orange-600 hover:bg-orange-700 text-white'
+                } disabled:opacity-60 disabled:cursor-not-allowed`}
               >
                 {isSubmitting ? 'Salvataggio in corso...' : role === 'admin' ? 'Entra nella Dashboard' : mode === 'login' ? 'Accedi' : role === 'chef' ? 'Registrati & Invia ad Admin' : 'Registrati'}
               </button>
@@ -652,9 +745,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <button
                       type="button"
                       onClick={() => { setMode('register'); setErrorMsg(''); }}
-                      className="w-full py-3.5 px-4 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-800 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+                      className="w-full py-3.5 px-4 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
                     >
-                      <ChefHat className="w-4 h-4 text-orange-600 shrink-0" />
+                      <ChefHat className="w-4 h-4 text-emerald-700 shrink-0" />
                       <span>Registrati / Candidati come nuovo Cuoco</span>
                     </button>
                   ) : (

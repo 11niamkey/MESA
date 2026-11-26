@@ -2191,8 +2191,19 @@ function App() {
           }} 
           onNavigateToBecomeChef={() => { navigateTo(ViewState.BECOME_CHEF); }} 
           onShareClick={() => setIsShareOpen(true)}
+          onAdminAccess={handleQuickAdminAccess}
         />
         <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
+        <AuthModal 
+          isOpen={isAuthOpen} 
+          onClose={handleAuthModalClose} 
+          registeredUsers={registeredUsers}
+          chefs={chefs}
+          initialRole={authInitialRole}
+          onLoginSuccess={handleAuthSuccess}
+          onRegisterUser={handleRegisterUser}
+          onOpenOnboarding={() => setIsOnboardingOpen(true)}
+        />
         <NotificationToast
           message={toastMessage}
           title={toastTitle}
