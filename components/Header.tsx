@@ -71,6 +71,8 @@ export const Header: React.FC<HeaderProps> = ({
   })();
 
   const RoleIcon = roleTheme.Icon;
+  const isChefMode = currentUser?.role === 'chef' || currentView === ViewState.BECOME_CHEF;
+  const activeNavClass = isChefMode ? 'text-emerald-400' : 'text-orange-500';
 
   return (
     <header className={`sticky top-0 z-50 bg-black text-white border-b shadow-lg transition-all duration-300 ${roleTheme.headerBorderClass}`}>
@@ -141,7 +143,8 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => onNavigate(ViewState.HOME)}
               title="Home"
-              className={`flex items-center gap-1.5 px-1.5 py-1 text-xs font-bold uppercase tracking-wide whitespace-nowrap shrink-0 transition-colors ${currentView === ViewState.HOME ? 'text-orange-500' : 'text-gray-400 hover:text-white'}`}
+              aria-label="Home"
+              className={`flex items-center gap-1.5 px-1.5 py-1 text-xs font-bold uppercase tracking-wide whitespace-nowrap shrink-0 transition-colors ${currentView === ViewState.HOME ? activeNavClass : 'text-gray-400 hover:text-white'}`}
             >
               <Home className="w-4 h-4 shrink-0" />
               <span className="hidden lg:inline whitespace-nowrap">Home</span>
@@ -151,7 +154,8 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => onNavigate(ViewState.CHEFS)}
               title="Cuochi"
-              className={`flex items-center gap-1.5 px-1.5 py-1 text-xs font-bold uppercase tracking-wide whitespace-nowrap shrink-0 transition-colors ${currentView === ViewState.CHEFS ? 'text-orange-500' : 'text-gray-400 hover:text-white'}`}
+              aria-label="Cuochi"
+              className={`flex items-center gap-1.5 px-1.5 py-1 text-xs font-bold uppercase tracking-wide whitespace-nowrap shrink-0 transition-colors ${currentView === ViewState.CHEFS ? activeNavClass : 'text-gray-400 hover:text-white'}`}
             >
               <ChefHat className="w-4 h-4 shrink-0" />
               <span className="hidden lg:inline whitespace-nowrap">Cuochi</span>
@@ -161,7 +165,8 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => onNavigate(ViewState.HERITAGE)}
               title="Radici"
-              className={`flex items-center gap-1.5 px-1.5 py-1 text-xs font-bold uppercase tracking-wide whitespace-nowrap shrink-0 transition-colors ${currentView === ViewState.HERITAGE ? 'text-orange-500' : 'text-gray-400 hover:text-white'}`}
+              aria-label="Radici"
+              className={`flex items-center gap-1.5 px-1.5 py-1 text-xs font-bold uppercase tracking-wide whitespace-nowrap shrink-0 transition-colors ${currentView === ViewState.HERITAGE ? activeNavClass : 'text-gray-400 hover:text-white'}`}
             >
               <Compass className={`w-4 h-4 shrink-0 ${currentView === ViewState.HERITAGE ? 'animate-spin-slow' : ''}`} />
               <span className="hidden lg:inline whitespace-nowrap">Radici</span>
@@ -171,13 +176,14 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => onNavigate(ViewState.ORDERS)}
               title="Ordini"
-              className={`flex items-center gap-1.5 px-1.5 py-1 text-xs font-bold uppercase tracking-wide whitespace-nowrap shrink-0 transition-colors ${currentView === ViewState.ORDERS ? 'text-orange-500' : 'text-gray-400 hover:text-white'}`}
+              aria-label={orderCount > 0 ? `Ordini (${orderCount})` : 'Ordini'}
+              className={`flex items-center gap-1.5 px-1.5 py-1 text-xs font-bold uppercase tracking-wide whitespace-nowrap shrink-0 transition-colors ${currentView === ViewState.ORDERS ? activeNavClass : 'text-gray-400 hover:text-white'}`}
             >
               <ClipboardList className="w-4 h-4 shrink-0" />
               <span className="hidden lg:inline whitespace-nowrap">Ordini</span>
               {orderCount > 0 && (
                 <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[9px] font-black leading-none rounded-full shrink-0 ${
-                  hasUnreadOrders ? 'bg-red-600 text-white animate-pulse' : 'bg-orange-500 text-black'
+                  hasUnreadOrders ? 'bg-red-600 text-white animate-pulse' : isChefMode ? 'bg-emerald-500 text-black' : 'bg-orange-500 text-black'
                 }`}>
                   {orderCount}
                 </span>
@@ -212,15 +218,17 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => onNavigate(ViewState.FAVORITES)}
-              className={`hidden sm:flex items-center justify-center p-2.5 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 shrink-0 ${currentView === ViewState.FAVORITES ? 'text-red-500 bg-white/10 shadow-sm ring-1 ring-white/10' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
-              title="Preferiti"
-              aria-label="Preferiti"
-            >
-              <Heart className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${currentView === ViewState.FAVORITES ? 'fill-current' : ''}`} />
-            </button>
+            {currentUser?.role !== 'chef' && (
+              <button
+                type="button"
+                onClick={() => onNavigate(ViewState.FAVORITES)}
+                className={`hidden sm:flex items-center justify-center p-2.5 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 shrink-0 ${currentView === ViewState.FAVORITES ? 'text-red-500 bg-white/10 shadow-sm ring-1 ring-white/10' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                title="Preferiti"
+                aria-label="Preferiti"
+              >
+                <Heart className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${currentView === ViewState.FAVORITES ? 'fill-current' : ''}`} />
+              </button>
+            )}
 
             {currentUser?.role === 'admin' && (
               <button
@@ -240,7 +248,9 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={currentUser ? () => onNavigate(ViewState.PROFILE) : onAuthClick}
               className={`relative rounded-full transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-1.5 shrink-0 ${
                 currentUser
-                  ? 'text-orange-500 bg-white/5 border border-orange-500/20 hover:bg-white/10 px-2 py-1.5 sm:px-3 sm:py-1.5 max-w-[140px]'
+                  ? isChefMode
+                    ? 'text-emerald-400 bg-white/5 border border-emerald-500/30 hover:bg-white/10 px-2 py-1.5 sm:px-3 sm:py-1.5 max-w-[140px]'
+                    : 'text-orange-500 bg-white/5 border border-orange-500/20 hover:bg-white/10 px-2 py-1.5 sm:px-3 sm:py-1.5 max-w-[140px]'
                   : 'p-2 sm:p-2.5 text-gray-400 hover:text-white hover:bg-white/10'
               }`}
               title={currentUser ? "Area Personale MESA" : "Accedi o Registrati"}
@@ -253,10 +263,12 @@ export const Header: React.FC<HeaderProps> = ({
                       src={currentUser.avatarUrl}
                       alt={currentUser.name}
                       referrerPolicy="no-referrer"
-                      className="w-6 h-6 rounded-lg object-cover shadow-md shrink-0 border border-orange-500/40"
+                      className={`w-6 h-6 rounded-lg object-cover shadow-md shrink-0 border ${isChefMode ? 'border-emerald-500/50' : 'border-orange-500/40'}`}
                     />
                   ) : (
-                    <span className="w-6 h-6 rounded-lg bg-orange-600 text-black text-[10px] font-black flex items-center justify-center uppercase leading-none shadow-md shrink-0">
+                    <span className={`w-6 h-6 rounded-lg text-[10px] font-black flex items-center justify-center uppercase leading-none shadow-md shrink-0 ${
+                      isChefMode ? 'bg-emerald-500 text-black' : 'bg-orange-600 text-black'
+                    }`}>
                       {currentUser.name?.[0] || 'U'}{currentUser.lastName?.[0] || ''}
                     </span>
                   )}
@@ -274,20 +286,22 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            <button
-              type="button"
-              className="hidden md:flex items-center justify-center relative p-2.5 bg-white hover:bg-orange-50 rounded-full text-black transition-all duration-200 shadow-md hover:scale-105 active:scale-95 shrink-0"
-              onClick={onCartClick}
-              title="Carrello"
-              aria-label="Carrello"
-            >
-              <ShoppingBag className="w-5 h-5 shrink-0" />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[9px] font-black leading-none text-white bg-orange-600 rounded-full border-2 border-black">
-                  {cartCount}
-                </span>
-              )}
-            </button>
+            {currentUser?.role !== 'chef' && (
+              <button
+                type="button"
+                className="hidden md:flex items-center justify-center relative p-2.5 bg-white hover:bg-orange-50 rounded-full text-black transition-all duration-200 shadow-md hover:scale-105 active:scale-95 shrink-0"
+                onClick={onCartClick}
+                title="Carrello"
+                aria-label="Carrello"
+              >
+                <ShoppingBag className="w-5 h-5 shrink-0" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[9px] font-black leading-none text-white bg-orange-600 rounded-full border-2 border-black">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

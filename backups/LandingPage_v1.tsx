@@ -1,8 +1,9 @@
+
 import React from 'react';
 import { 
   ShieldCheck, 
-  ChefHat, Utensils, 
-  MapPin, ShoppingBag, Share2 
+  ChefHat, Utensils, UtensilsCrossed,
+  MapPin, ShoppingBag, Share2, Lock, ArrowRight, Smartphone
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -10,11 +11,19 @@ interface LandingPageProps {
   onEnterApp: () => void;
   onNavigateToBecomeChef: () => void;
   onShareClick: () => void;
+  onAdminAccess?: () => void;
+  onPwaInstallClick?: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onNavigateToBecomeChef, onShareClick }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({
+  onEnterApp,
+  onNavigateToBecomeChef,
+  onShareClick,
+  onAdminAccess,
+  onPwaInstallClick
+}) => {
   return (
-    <div className="min-h-screen font-sans selection:bg-orange-100 bg-black text-white flex flex-col items-center justify-center p-6 sm:p-12 relative overflow-hidden">
+    <div className="min-h-screen font-sans selection:bg-orange-100 bg-black text-white flex flex-col items-center justify-center px-4 py-3 sm:px-6 sm:py-5 relative overflow-hidden">
       {/* Sfondo */}
       <motion.div 
         initial={{ opacity: 0, scale: 1.05 }}
@@ -23,85 +32,170 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onNavigate
         className="absolute inset-0 z-0"
       >
         <img 
-          src="https://images.unsplash.com/photo-1556910103-1c02745a30bf?auto=format&fit=crop&w=1920&q=80" 
+          src="/images/mesa_share_banner.jpg" 
           alt="Cucina Autentica" 
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
           className="w-full h-full object-cover opacity-30 object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/30"></div>
       </motion.div>
 
-      <div className="relative z-10 text-center max-w-4xl w-full flex flex-col items-center">
-        {/* Logo */}
+      <div className="relative z-10 text-center max-w-lg md:max-w-2xl mx-auto w-full flex flex-col items-center">
+        {/* Logo MESA con fondo arancione e scritta bianca */}
         <motion.div 
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-          className="mb-8"
+          transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
+          className="mb-2 sm:mb-3"
         >
-          <div className="w-32 h-32 md:w-40 md:h-40 rounded-[2.5rem] overflow-hidden bg-black shadow-2xl transition-transform hover:scale-105 outline outline-2 outline-white/10 mx-auto">
-            <img src="/images/mesa_logo_type.png" alt="MESA Logo" className="w-full h-full object-cover" />
+          <div className="w-[74px] h-[74px] sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 flex flex-col items-center justify-center shadow-2xl shadow-orange-600/50 border-2 border-orange-400/40 p-2 transition-transform hover:scale-105 mx-auto relative group">
+            <div className="absolute -inset-2 bg-orange-600/30 rounded-3xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity -z-10"></div>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-0.5 shadow-inner shrink-0">
+              <UtensilsCrossed className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white drop-shadow-sm shrink-0" />
+            </div>
+            <span className="text-base sm:text-xl font-black tracking-widest text-white font-sans leading-none drop-shadow-md">
+              MESA<span className="text-amber-200 font-extrabold">.</span>
+            </span>
+            <span className="text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-wider bg-white text-orange-600 px-1.5 py-0.5 rounded-full mt-1 shadow-sm whitespace-nowrap">
+              Home Chefs
+            </span>
           </div>
         </motion.div>
 
         <motion.h1 
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
-          className="text-5xl md:text-8xl font-black italic tracking-tighter leading-none mb-6 text-white drop-shadow-xl"
+          transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
+          className="text-2xl sm:text-4xl md:text-5xl font-black italic tracking-tighter leading-tight mb-1.5 text-white drop-shadow-xl"
         >
           Sapori del mondo,<br />
           <span className="text-orange-500">a casa tua.</span>
         </motion.h1>
         
         <motion.p 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut", delay: 0.6 }}
-          className="text-lg md:text-2xl text-gray-300 font-medium max-w-2xl mx-auto mb-12 drop-shadow-md"
+          transition={{ duration: 0.6, ease: "easeOut", delay: 0.3 }}
+          className="text-[11px] sm:text-sm md:text-base text-gray-300 font-medium max-w-xl mx-auto mb-3.5 sm:mb-5 leading-snug drop-shadow-md"
         >
           Sfoglia i menu dei cuochi attorno a te, ordina piatti fatti in casa veri e riscopri i sapori autentici.
         </motion.p>
 
+        {/* Due Card Compatte e Ben Distinte: Area Cliente (Arancione MESA) vs Area Cuoco (Verde Smeraldo) */}
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut", delay: 0.8 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-xl"
+          transition={{ duration: 0.6, ease: "easeOut", delay: 0.45 }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 w-full"
         >
-          <button 
+          {/* Card 1: Area Cliente (Arancione MESA) */}
+          <button
+            type="button"
             onClick={onEnterApp}
-            className="w-full sm:w-auto px-10 py-6 text-black font-black uppercase tracking-widest text-xs rounded-2xl hover:scale-105 active:scale-95 transition-all bg-orange-600 shadow-[0_0_40px_rgba(234,88,12,0.4)] flex items-center justify-center gap-3"
+            className="group text-left px-3.5 py-2.5 sm:px-4 sm:py-3.5 rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 hover:from-orange-400 hover:to-amber-500 border-2 border-orange-300/60 shadow-[0_0_28px_rgba(234,88,12,0.3)] transition-all transform hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-between gap-2.5 sm:gap-3 h-full"
           >
-            <ShoppingBag className="w-5 h-5" /> Entra in Mesa
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-black/20 backdrop-blur-sm border border-white/25 flex items-center justify-center gap-0.5 shrink-0 shadow-inner">
+                <Utensils className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
+                <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-white shrink-0" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h2 className="text-sm sm:text-base font-black uppercase tracking-tight text-white leading-tight truncate">
+                    AREA CLIENTE
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-black text-orange-400 text-[8.5px] font-black uppercase tracking-widest shrink-0">
+                    Cliente
+                  </span>
+                </div>
+                <p className="text-[10.5px] sm:text-xs font-semibold text-orange-50/95 leading-snug">
+                  Accedi o registrati per ordinare piatti fatti in casa
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-black group-hover:translate-x-1 transition-transform shrink-0" />
           </button>
-          
-          <button 
+
+          {/* Card 2: Area Cuoco (Verde Smeraldo ben contrastato) */}
+          <button
+            type="button"
             onClick={onNavigateToBecomeChef}
-            className="w-full sm:w-auto px-10 py-6 bg-white/10 backdrop-blur-md border border-white/20 text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-white hover:text-black active:scale-95 transition-all flex items-center justify-center gap-3"
+            className="group text-left px-3.5 py-2.5 sm:px-4 sm:py-3.5 rounded-2xl bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-950 hover:from-emerald-600 hover:to-emerald-900 border-2 border-emerald-400/60 shadow-[0_0_28px_rgba(16,185,129,0.24)] transition-all transform hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-between gap-2.5 sm:gap-3 h-full"
           >
-            <ChefHat className="w-5 h-5" /> Diventa Cuoco
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-400/20 backdrop-blur-sm border border-emerald-300/40 flex items-center justify-center shrink-0 shadow-inner">
+                <ChefHat className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-200 shrink-0" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h2 className="text-sm sm:text-base font-black uppercase tracking-tight text-white leading-tight truncate">
+                    AREA CUOCO
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-300 text-emerald-950 text-[8.5px] font-black uppercase tracking-widest shrink-0">
+                    Cuoco
+                  </span>
+                </div>
+                <p className="text-[10.5px] sm:text-xs font-semibold text-emerald-100/95 leading-snug">
+                  Accedi alla tua cucina o registrati come chef
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-200 group-hover:translate-x-1 transition-transform shrink-0" />
           </button>
         </motion.div>
 
+        {/* Badge informativi */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 1, ease: "easeOut", delay: 1.2 }}
-          className="mt-16 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-[10px] font-black uppercase tracking-widest text-gray-400 bg-black/40 backdrop-blur-sm px-8 py-4 rounded-full border border-white/10"
+          transition={{ duration: 0.7, ease: "easeOut", delay: 0.6 }}
+          className="mt-3.5 sm:mt-5 flex flex-wrap items-center justify-center gap-3.5 sm:gap-8 text-[9.5px] sm:text-[10px] font-black uppercase tracking-widest text-gray-400 bg-black/40 backdrop-blur-sm px-4 py-2 rounded-full border border-white/10"
         >
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-orange-500" />
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-orange-500 shrink-0" />
             <span className="hidden sm:inline">Cucine</span> Certificate
           </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-orange-500" />
+          <div className="flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0" />
             <span className="hidden sm:inline">Solo Cuochi</span> Locali
           </div>
-          <button onClick={onShareClick} className="flex items-center gap-2 hover:text-orange-500 transition-colors">
-            <Share2 className="w-4 h-4" /> Scopri di più
+          <button type="button" onClick={onShareClick} className="flex items-center gap-1.5 hover:text-orange-500 transition-colors">
+            <Share2 className="w-3.5 h-3.5 shrink-0" /> Scopri di più
           </button>
+          {onPwaInstallClick && (
+            <button
+              type="button"
+              onClick={onPwaInstallClick}
+              className="flex items-center gap-1.5 text-orange-400 hover:text-white transition-colors"
+              aria-label="Salva MESA sulla schermata Home"
+            >
+              <Smartphone className="w-3.5 h-3.5 shrink-0" /> Salva su Home
+            </button>
+          )}
         </motion.div>
+
+        {/* Accesso Admin discreto e separato in fondo */}
+        {onAdminAccess && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.7, ease: "easeOut", delay: 0.7 }}
+            className="mt-2.5 sm:mt-3.5"
+          >
+            <button
+              type="button"
+              onClick={onAdminAccess}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-violet-950/90 border border-violet-500/30 hover:border-violet-400/60 text-violet-200 hover:text-white text-[11px] font-bold tracking-wide transition-all"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+              <Lock className="w-3 h-3 text-violet-300 shrink-0" />
+              <span>Area Admin (Solo Staff)</span>
+            </button>
+          </motion.div>
+        )}
       </div>
     </div>
   );
 };
+
+

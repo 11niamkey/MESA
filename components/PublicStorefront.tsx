@@ -88,7 +88,9 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, review
             </div>
             <div className="flex-1 mb-2">
               <div className="flex items-center gap-3 mb-3">
-                 <span className="bg-black text-white text-[9px] font-black px-3 py-1 rounded-lg uppercase tracking-widest border border-white/20">Chef Verificato</span>
+                 <span className="bg-black text-white text-[9px] font-black px-3 py-1 rounded-lg uppercase tracking-widest border border-white/20">
+                   {chef.verificationStatus === 'approved' ? 'Chef Verificato' : 'In attesa di verifica'}
+                 </span>
                  <div className="flex items-center gap-1 bg-yellow-400 text-black px-2.5 py-0.5 rounded-lg text-[10px] font-black">
                     <Star className="w-3 h-3 fill-current shrink-0" />
                     <span>{ratingSummary.average.toFixed(1)}</span>

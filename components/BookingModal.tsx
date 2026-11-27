@@ -228,14 +228,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   };
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4 text-center">
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
-        <div className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl border-t-8 border-orange-500 animate-fade-in-up">
+      <div className="relative z-10 flex flex-col max-h-[90vh] overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl border-t-8 border-orange-500 animate-fade-in-up">
           
           {/* Header */}
-          <div className="bg-gray-50 px-5 sm:px-6 py-4 flex items-center justify-between border-b border-gray-100">
+          <div className="bg-gray-50 px-5 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between border-b border-gray-100 shrink-0">
             <h3 className="text-lg sm:text-xl font-bold text-orange-600 flex items-center gap-2 min-w-0">
               <Utensils className="w-5 h-5 text-orange-600 shrink-0" />
               <span className="truncate">Dettagli & Prenotazione</span>
@@ -245,7 +244,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
             </button>
           </div>
 
-          <div className="p-5 sm:p-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
+          <div className="p-4 sm:p-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
             {/* Dish Info Expanded */}
             <div className="mb-6 sm:mb-8 bg-white rounded-xl">
               <div className="flex flex-col md:flex-row md:items-start gap-4 sm:gap-5">
@@ -398,56 +397,56 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                 </h4>
 
                 {/* Delivery Mode */}
-                <div className="flex p-1 bg-gray-100 rounded-xl">
+                <div className="flex items-stretch gap-1.5 p-1 bg-gray-100 rounded-xl">
                   <button
                     type="button"
                     onClick={() => setDeliveryMode('pickup')}
-                    className={`flex-1 flex items-center justify-center py-2 text-sm font-bold rounded-lg transition-all ${
-                      deliveryMode === 'pickup' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'
+                    className={`shrink-0 flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all whitespace-nowrap ${
+                      deliveryMode === 'pickup' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
-                    <ShoppingBag className="w-4 h-4 mr-2" />
-                    Ritiro
+                    <ShoppingBag className="w-4 h-4 shrink-0" />
+                    <span>Ritiro</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeliveryMode('delivery')}
-                    className={`flex-1 flex items-center justify-center py-2 text-sm font-bold rounded-lg transition-all ${
-                      deliveryMode === 'delivery' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-400'
+                    className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2.5 py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all whitespace-nowrap overflow-hidden ${
+                      deliveryMode === 'delivery' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
-                    <Truck className="w-4 h-4 mr-2" />
-                    Domicilio (+€2.50)
+                    <Truck className="w-4 h-4 shrink-0" />
+                    <span className="truncate">Domicilio <span className="text-[11px] opacity-85">(+€2.50)</span></span>
                   </button>
                 </div>
 
                 {/* Single Date Selector */}
-                <div className="bg-gray-50 border border-gray-200 p-4 rounded-2xl relative overflow-hidden">
-                  <div className="flex items-center justify-between mb-4">
-                    <label className="text-sm font-bold text-orange-600 flex items-center gap-1.5">
-                      <CalendarDays className="w-4 h-4 text-orange-600" />
-                      Scegli Data
+                <div className="bg-gray-50 border border-gray-200 p-3.5 sm:p-4 rounded-2xl relative overflow-hidden">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3.5">
+                    <label className="text-sm font-bold text-orange-600 flex items-center gap-1.5 whitespace-nowrap">
+                      <CalendarDays className="w-4 h-4 text-orange-600 shrink-0" />
+                      <span>Scegli Data</span>
                     </label>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={handlePrevMonth}
                         type="button"
-                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                         disabled={isAtOrBeforeCurrentMonth}
                         aria-label="Mese precedente"
                       >
-                        <ChevronLeft className="w-4 h-4" />
+                        <ChevronLeft className="w-4 h-4 shrink-0" />
                       </button>
-                      <span className="text-xs font-black uppercase text-gray-800 select-none min-w-[100px] text-center">
+                      <span className="text-xs font-black uppercase text-gray-800 select-none whitespace-nowrap px-1 text-center">
                         {months[currentMonth]} {currentYear}
                       </span>
                       <button
                         onClick={handleNextMonth}
                         type="button"
-                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors shrink-0"
                         aria-label="Mese successivo"
                       >
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="w-4 h-4 shrink-0" />
                       </button>
                     </div>
                   </div>
@@ -566,8 +565,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
             </div>
           </div>
 
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 space-y-3">
-            <div className="bg-orange-50 border border-orange-200 rounded-xl px-3.5 py-2.5 flex items-start gap-2.5 text-left">
+          <div className="bg-gray-50 px-4 sm:px-6 py-3.5 sm:py-4 border-t border-gray-200 space-y-2.5 shrink-0">
+            <div className="bg-orange-50 border border-orange-200 rounded-xl px-3.5 py-2 flex items-start gap-2 text-left">
               <Info className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
               <p className="text-xs font-semibold text-black leading-snug">
                 {canBook
@@ -575,15 +574,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                   : "Profilo in attivazione per la beta: puoi aggiungere liberamente il piatto al carrello, ma l'invio definitivo dell'ordine sarà attivo a breve."}
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
-              <div className="text-sm text-black font-medium hidden sm:block">
-                {deliveryMode === 'delivery' ? 'Consegna a Domicilio (+€2.50)' : 'Ritiro presso Chef'}
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5">
+              <div className="text-xs sm:text-sm text-black font-medium hidden lg:block whitespace-nowrap">
+                {deliveryMode === 'delivery' ? 'Consegna (+€2.50)' : 'Ritiro presso Chef'}
               </div>
-              <div className="flex flex-wrap sm:flex-nowrap gap-2.5 w-full sm:w-auto">
+              <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto sm:ml-auto">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 sm:flex-none px-4 py-2.5 text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition-colors"
+                  className="flex-1 sm:flex-none px-4 py-2.5 text-sm text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition-colors whitespace-nowrap"
                 >
                   Annulla
                 </button>
@@ -592,9 +591,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                     type="button"
                     onClick={handleAddToCartClick}
                     disabled={!isSelectedDateValid || !time}
-                    className="flex-1 sm:flex-none px-5 py-2.5 bg-black hover:bg-gray-800 text-white font-bold rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-2"
+                    className="flex-1 sm:flex-none px-4 py-2.5 bg-black hover:bg-gray-800 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap"
                   >
-                    <ShoppingBag className="w-4 h-4" />
+                    <ShoppingBag className="w-4 h-4 shrink-0" />
                     <span>Aggiungi al carrello</span>
                   </button>
                 )}
@@ -602,14 +601,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                   type="button"
                   onClick={handleConfirm}
                   disabled={!isSelectedDateValid || !time}
-                  className="flex-1 sm:flex-none px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center"
+                  className="flex-1 sm:flex-none px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center whitespace-nowrap"
                 >
                   Invia Prenotazione
                 </button>
               </div>
             </div>
           </div>
-        </div>
       </div>
     </div>
   );

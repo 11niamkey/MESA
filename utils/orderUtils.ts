@@ -61,6 +61,15 @@ export const isConcludedOrder = (order: Order): boolean => {
   return isPastScheduledOrder(order);
 };
 
+export const formatOrderCode = (orderId?: string): string => {
+  const trimmed = (orderId || '').trim();
+  if (!trimmed) return '#MESA';
+  if (/^MESA-/i.test(trimmed) || trimmed.length <= 12) {
+    return `#${trimmed.toUpperCase()}`;
+  }
+  return `#${trimmed.slice(-6).toUpperCase()}`;
+};
+
 export const formatOrderDeleteError = (err: unknown): string => {
   const raw = err instanceof Error ? err.message : String(err);
   if (/permission|insufficient|denied/i.test(raw)) {

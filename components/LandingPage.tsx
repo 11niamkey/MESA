@@ -32,7 +32,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         className="absolute inset-0 z-0"
       >
         <img 
-          src="https://images.unsplash.com/photo-1556910103-1c02745a30bf?auto=format&fit=crop&w=1920&q=80" 
+          src="/images/mesa_share_banner.jpg" 
           alt="Cucina Autentica" 
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
           className="w-full h-full object-cover opacity-30 object-center"

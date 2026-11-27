@@ -38,11 +38,11 @@ import { AllergensRow } from './components/Allergens';
 import { ConfirmDeleteOrdersModal } from './components/ConfirmDeleteOrdersModal';
 import { isPordenoneLocation, normalizeLocationToPordenone, resolvePordenoneZip, findPordenoneComune } from './components/italianTerritoryData';
 import { playNewOrderChime, unlockAudioContext } from './utils/soundAlert';
-import { isConcludedOrder, canClientCancelOrder, formatOrderDeleteError, OrderDeleteResult } from './utils/orderUtils';
+import { isConcludedOrder, canClientCancelOrder, formatOrderCode, formatOrderDeleteError, OrderDeleteResult } from './utils/orderUtils';
 import { isChefBookable, validateBetaOrderSubmission, BetaOrderValidationResult } from './utils/chefUtils';
 import { clampRating, computeOverallRating, getChefRatingSummary, isOrderEligibleForReview, MAX_REVIEW_COMMENT_LENGTH } from './utils/reviewUtils';
 import { MOCK_CHEFS } from './constants';
-import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderReview, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
+import { CartItem, Dish, ViewState, FilterState, Chef, Message, Order, OrderReview, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
 import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock, Volume2, VolumeX, Trash2, BellRing, XCircle } from 'lucide-react';
 
 const formatChefDisplayName = (name?: string) => {
@@ -631,7 +631,7 @@ function App() {
                 const cancelledOrder = cancelledChefOrders[0];
                 setUnreadOrderAlertIds(prev => prev.filter(id => !cancelledChefOrders.some(c => c.id === id)));
                 showNotification(
-                  `Ordine #${cancelledOrder.id.split('-')[0]} annullato dal cliente.`,
+                  `Ordine ${formatOrderCode(cancelledOrder.id)} annullato dal cliente.`,
                   {
                     title: 'Ordine Annullato',
                     variant: 'warning',
@@ -1746,10 +1746,22 @@ function App() {
     setUnreadOrderAlertIds(prev => prev.filter(id => id !== orderId));
     prevOrderStatusesRef.current[orderId] = status;
     await firestoreWrite('orders', orderId, { status, timeline: nextTimeline }, true);
-    showNotification(`Ordine #${orderId.split('-')[0]} aggiornato: ${statusLabel}`, {
+    showNotification(`Ordine ${formatOrderCode(orderId)} aggiornato: ${statusLabel}`, {
       title: 'Stato Aggiornato',
       variant: status === 'REJECTED' || status === 'CANCELLED' ? 'warning' : 'success',
     });
+  };
+
+  const handleSendOrderMessage = async (orderId: string, message: Message) => {
+    const targetOrder = orders.find(o => o.id === orderId);
+    const nextMessages = [...(targetOrder?.messages || []), message];
+    setOrders(prev =>
+      prev.map(o => (o.id === orderId ? { ...o, messages: nextMessages } : o))
+    );
+    setSelectedOrder(prev =>
+      prev && prev.id === orderId ? { ...prev, messages: nextMessages } : prev
+    );
+    await firestoreWrite('orders', orderId, { messages: nextMessages }, true);
   };
 
   const handleCancelOrderByClient = async (orderId: string) => {
@@ -2861,13 +2873,14 @@ function App() {
                 justPlaced={selectedOrder.id === recentlyPlacedOrderId}
                 onUpdateOrderStatus={currentUser.role === 'chef' || currentUser.role === 'admin' ? handleUpdateOrderStatus : undefined}
                 onCancelOrder={currentUser.role === 'client' ? handleCancelOrderByClient : undefined}
+                onSendMessage={handleSendOrderMessage}
                 deliveryAddress={resolvedDeliveryAddress}
               />
             );
           })() : (
             <div className="animate-fade-in space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                <h2 className="text-3xl font-black text-orange-600 tracking-tight">
+                <h2 className={`text-3xl font-black tracking-tight ${currentUser.role === 'chef' ? 'text-emerald-600' : 'text-orange-600'}`}>
                   {currentUser.role === 'chef' ? 'Ordini Ricevuti' : 'I Miei Ordini'}
                 </h2>
                 <div className="flex flex-wrap items-center gap-2">
@@ -2952,8 +2965,8 @@ function App() {
                     className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all cursor-pointer flex flex-col sm:flex-row justify-between sm:items-center gap-4 group"
                   >
                     <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{order.id.split('-')[0]}</p>
-                      <h4 className="font-bold text-xl text-orange-600">{firstItem?.name || order.chefName}</h4>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest font-mono">{formatOrderCode(order.id)}</p>
+                      <h4 className={`font-bold text-xl ${currentUser.role === 'chef' ? 'text-emerald-700' : 'text-orange-600'}`}>{firstItem?.name || order.chefName}</h4>
                       <p className="text-xs text-black font-medium mt-0.5">
                         {currentUser.role === 'chef' ? `Cliente ${order.customerName}` : formatChefDisplayName(order.chefName)} • {order.items.length} {order.items.length === 1 ? 'piatto' : 'piatti'} • €{order.total.toFixed(2)}
                       </p>
@@ -3029,7 +3042,7 @@ function App() {
                             setOrdersViewDeleteConfirm({ mode: 'single', order });
                           }}
                           title={isConcludedOrder(order) ? 'Elimina ordine concluso' : 'Elimina ordine (anche di prova)'}
-                          aria-label={`Elimina ordine ${order.id.split('-')[0]}`}
+                          aria-label={`Elimina ordine ${formatOrderCode(order.id)}`}
                           className="p-2.5 rounded-xl bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 transition-all shrink-0"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -3131,6 +3144,7 @@ function App() {
         hasUnreadOrders={hasUnreadOrderAlerts}
         onCartClick={() => setIsCartOpen(true)}
         isCartOpen={isCartOpen}
+        userRole={currentUser?.role}
       />
 
       {/* Glovo-style Sticky Floating Cart Bar - Non-intrusive, dismissible & non-blocking */}

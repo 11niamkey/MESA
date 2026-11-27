@@ -59,7 +59,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setRole(initialRole);
         setMode('login');
         if (initialRole === 'admin') {
-          setEmail('admin@mesa.com');
+          setEmail('');
         } else {
           setEmail(prev => (prev === 'admin@mesa.com' ? '' : prev));
         }
@@ -391,7 +391,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               onClick={() => { 
                 setRole('admin'); 
                 setMode('login'); 
-                setEmail('admin@mesa.com');
+                setEmail('');
                 setPassword('');
                 setErrorMsg(''); 
               }}
@@ -581,7 +581,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <input 
                         type="text" 
-                        placeholder="Nome Cucina / Brand (opzionale)" 
+                        placeholder="Nome Cucina / Brand" 
                         value={brandName} 
                         onChange={e => setBrandName(e.target.value)} 
                         className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 

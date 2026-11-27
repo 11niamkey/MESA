@@ -448,7 +448,7 @@ export const MOCK_CHEFS: Chef[] = [
     continent: 'Africa',
     bio: 'Autentico Ghana Jollof e Waakye.',
     fullBio: 'Kwame è un purista. Sostiene che il Jollof del Ghana sia superiore a quello nigeriano e sfida chiunque a provarlo.',
-    avatar: 'https://images.unsplash.com/photo-1583336137348-82836e28d6c7?auto=format&fit=crop&w=400&q=80',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
     rating: 4.8,
     location: 'Casarsa della Delizia (PN), Centro',
     distance: 3.5,

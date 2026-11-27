@@ -19,8 +19,8 @@ import {
   Utensils,
   XCircle,
 } from 'lucide-react';
-import { AppUser, Chef, ORDER_STATUS_LABELS, Order, OrderReview, OrderStatus } from '../types';
-import { canClientCancelOrder } from '../utils/orderUtils';
+import { AppUser, Chef, Message, ORDER_STATUS_LABELS, Order, OrderReview, OrderStatus } from '../types';
+import { canClientCancelOrder, formatOrderCode } from '../utils/orderUtils';
 import { isOrderEligibleForReview } from '../utils/reviewUtils';
 
 const formatChefDisplayName = (name?: string) => {
@@ -45,6 +45,7 @@ interface OrderTrackingProps {
   justPlaced?: boolean;
   onUpdateOrderStatus?: (orderId: string, status: OrderStatus) => void;
   onCancelOrder?: (orderId: string) => void;
+  onSendMessage?: (orderId: string, message: Message) => void;
   deliveryAddress?: string;
 }
 
@@ -67,7 +68,7 @@ const DELIVERY_STEPS: StepItem[] = [
   { status: 'CONFIRMED', label: 'Confermato', icon: Check },
   { status: 'PREPARING', label: 'In cucina', icon: Utensils },
   { status: 'READY', label: 'Pronto', icon: PackageCheck },
-  { status: 'DELIVERING', label: 'In consegna', icon: Bike },
+  { status: 'DELIVERING', label: 'Consegna', icon: Bike },
   { status: 'COMPLETED', label: 'Completato', icon: CheckCircle2 },
 ];
 
@@ -144,6 +145,26 @@ const formatOrderMessageTime = (ts?: Date | string) => {
     : parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
+const buildMessagesState = (order: Order): ChatMessage[] => {
+  const orderCode = formatOrderCode(order.id);
+  const welcomeMessage: ChatMessage = {
+    id: 'welcome-msg',
+    sender: 'chef',
+    text: `Ciao ${order.customerName?.split(' ')[0] || ''}! Ho ricevuto il tuo ordine ${orderCode}. Scrivimi pure qui se hai bisogno.`,
+    time: formatOrderMessageTime(order.timestamp || new Date()),
+  };
+  if (order.messages && order.messages.length > 0) {
+    const persisted = order.messages.map((m, idx) => ({
+      id: m.id || `msg-${idx}`,
+      sender: (m.sender === 'chef' ? 'chef' : 'user') as 'user' | 'chef',
+      text: m.text,
+      time: formatOrderMessageTime(m.timestamp),
+    }));
+    return [welcomeMessage, ...persisted];
+  }
+  return [welcomeMessage];
+};
+
 export const OrderTracking: React.FC<OrderTrackingProps> = ({
   order,
   reviews = [],
@@ -154,11 +175,13 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
   justPlaced = false,
   onUpdateOrderStatus,
   onCancelOrder,
+  onSendMessage,
   deliveryAddress,
 }) => {
   const isChefView = userRole === 'chef' || userRole === 'admin';
   const isDelivery = order.deliveryMode === 'delivery';
   const isTerminalCancelled = order.status === 'CANCELLED' || order.status === 'REJECTED';
+  const orderCode = formatOrderCode(order.id);
   const matchingChef = chefs.find(
     (c) => c.id === order.chefId || c.name.toLowerCase() === order.chefName.toLowerCase()
   );
@@ -185,26 +208,13 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [messageInput, setMessageInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    if (order.messages && order.messages.length > 0) {
-      return order.messages.map((m, idx) => ({
-        id: m.id || `msg-${idx}`,
-        sender: m.sender === 'chef' ? 'chef' : 'user',
-        text: m.text,
-        time: formatOrderMessageTime(m.timestamp),
-      }));
-    }
-    return [
-      {
-        id: 'welcome-msg',
-        sender: 'chef',
-        text: `Ciao ${order.customerName?.split(' ')[0] || ''}! Ho ricevuto il tuo ordine #${order.id.slice(-4)}. Scrivimi pure qui se hai bisogno.`,
-        time: formatOrderMessageTime(order.timestamp || new Date()),
-      },
-    ];
-  });
+  const [messages, setMessages] = useState<ChatMessage[]>(() => buildMessagesState(order));
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMessages(buildMessagesState(order));
+  }, [order.id, order.messages]);
 
   useEffect(() => {
     if (isChatOpen) {
@@ -217,16 +227,26 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
     const trimmed = messageInput.trim();
     if (!trimmed) return;
 
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timestamp = new Date();
+    const sender: 'user' | 'chef' = isChefView ? 'chef' : 'user';
+    const messageId = `msg-${Date.now()}`;
+    const persistedMessage: Message = {
+      id: messageId,
+      sender,
+      text: trimmed,
+      timestamp,
+    };
+
     setMessages((prev) => [
       ...prev,
       {
-        id: `msg-${Date.now()}`,
-        sender: isChefView ? 'chef' : 'user',
+        id: messageId,
+        sender,
         text: trimmed,
-        time: now,
+        time: formatOrderMessageTime(timestamp),
       },
     ]);
+    onSendMessage?.(order.id, persistedMessage);
     setMessageInput('');
   };
 
@@ -246,9 +266,9 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
           <span>{isChefView ? 'Torna alla Dashboard' : 'I miei ordini'}</span>
         </button>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-stone-500 bg-stone-100 px-2.5 py-1.5 rounded-lg">
-            Ordine #{order.id.slice(-5).toUpperCase()}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-stone-600 bg-stone-100 px-2.5 py-1.5 rounded-lg">
+            Ordine {orderCode}
           </span>
           <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg">
             Contanti {isDelivery ? 'alla consegna' : 'al ritiro'}
@@ -289,7 +309,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
         {/* Barra progressiva orizzontale compatta */}
         {!isTerminalCancelled ? (
           <div className="pt-1">
-            <div className={`grid ${isDelivery ? 'grid-cols-6 gap-1 sm:gap-2' : 'grid-cols-5 gap-1.5 sm:gap-2'}`}>
+            <div className={`grid ${isDelivery ? 'grid-cols-6 gap-1 sm:gap-2' : 'grid-cols-5 gap-1 sm:gap-2'}`}>
               {steps.map((step, index) => {
                 const StepIcon = step.icon;
                 const isDone = activeStepIndex > index || order.status === 'COMPLETED';
@@ -298,34 +318,40 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
                 return (
                   <div
                     key={step.status}
-                    className="flex flex-col items-center text-center gap-1.5 min-w-0"
+                    className="flex flex-col items-center text-center gap-1.5 min-w-0 px-0.5"
                   >
                     <div
                       className={`w-full h-1.5 rounded-full transition-colors ${
                         isDone
                           ? 'bg-emerald-500'
                           : isCurrent
-                          ? 'bg-orange-500 animate-pulse'
+                          ? isChefView
+                            ? 'bg-emerald-600 animate-pulse'
+                            : 'bg-orange-500 animate-pulse'
                           : 'bg-stone-200'
                       }`}
                     />
                     <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center border transition-colors ${
+                      className={`w-7 h-7 rounded-full flex items-center justify-center border transition-colors shrink-0 ${
                         isDone
                           ? 'bg-emerald-50 border-emerald-500 text-emerald-600'
                           : isCurrent
-                          ? 'bg-orange-50 border-orange-500 text-orange-600'
+                          ? isChefView
+                            ? 'bg-emerald-50 border-emerald-600 text-emerald-700'
+                            : 'bg-orange-50 border-orange-500 text-orange-600'
                           : 'bg-stone-50 border-stone-200 text-stone-400'
                       }`}
                     >
                       <StepIcon className="w-3.5 h-3.5 shrink-0" />
                     </div>
                     <span
-                      className={`text-[10px] sm:text-xs font-semibold leading-tight truncate w-full ${
+                      className={`text-[9px] min-[390px]:text-[10px] sm:text-xs font-semibold leading-tight tracking-tight w-full text-center ${
                         isDone
                           ? 'text-emerald-700'
                           : isCurrent
-                          ? 'text-orange-700'
+                          ? isChefView
+                            ? 'text-emerald-700'
+                            : 'text-orange-700'
                           : 'text-stone-400'
                       }`}
                     >
@@ -412,7 +438,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
               <button
                 type="button"
                 onClick={() => onUpdateOrderStatus(order.id, 'PREPARING')}
-                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
               >
                 <Utensils className="w-4 h-4 shrink-0" />
                 <span>Inizia a preparare</span>
@@ -434,7 +460,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
               <button
                 type="button"
                 onClick={() => onUpdateOrderStatus(order.id, 'DELIVERING')}
-                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
               >
                 <Bike className="w-4 h-4 shrink-0" />
                 <span>In consegna</span>
@@ -528,7 +554,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
       <section className="bg-white border border-stone-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-stone-100">
           <div className="flex items-center gap-2">
-            <ChefHat className="w-4 h-4 text-orange-500 shrink-0" />
+            <ChefHat className={`w-4 h-4 shrink-0 ${isChefView ? 'text-emerald-600' : 'text-orange-500'}`} />
             <span className="font-bold text-stone-900 text-sm sm:text-base">
               {formatChefDisplayName(order.chefName)}
             </span>
@@ -660,7 +686,9 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
                     <div
                       className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs sm:text-sm ${
                         isOwn
-                          ? 'bg-orange-500 text-white rounded-br-sm'
+                          ? isChefView
+                            ? 'bg-emerald-600 text-white rounded-br-sm'
+                            : 'bg-orange-500 text-white rounded-br-sm'
                           : 'bg-white border border-stone-200 text-stone-800 rounded-bl-sm'
                       }`}
                     >
@@ -692,7 +720,9 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
                 type="submit"
                 disabled={!messageInput.trim()}
                 aria-label="Invia messaggio"
-                className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-stone-200 disabled:text-stone-400 text-white shrink-0 transition-colors"
+                className={`inline-flex items-center justify-center w-9 h-9 rounded-xl disabled:bg-stone-200 disabled:text-stone-400 text-white shrink-0 transition-colors ${
+                  isChefView ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-500 hover:bg-orange-600'
+                }`}
               >
                 <Send className="w-4 h-4 shrink-0" />
               </button>

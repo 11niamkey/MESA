@@ -3,6 +3,7 @@ import { Chef, OrderReview } from '../types';
 import { MapPin, ArrowRight, ShieldCheck, Award, Users, Star } from 'lucide-react';
 import { CountryFlag } from './CountryFlag';
 import { getChefRatingSummary } from '../utils/reviewUtils';
+import { isChefBookable } from '../utils/chefUtils';
 
 interface MesaChefsProps {
   chefs: Chef[];
@@ -81,7 +82,11 @@ export const MesaChefs: React.FC<MesaChefsProps> = ({ chefs, reviews = [], onVie
                 <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-2">
                       <CountryFlag flag={chef.nationality} title={chef.countryName} size="md" />
-                      <span className="px-2 py-0.5 bg-orange-600 text-[10px] font-bold uppercase rounded text-white tracking-wider">Verificato</span>
+                      {isChefBookable(chef) && !/in attesa di verifica/i.test(chef.bio || '') ? (
+                        <span className="px-2 py-0.5 bg-orange-600 text-[10px] font-bold uppercase rounded text-white tracking-wider">Verificato</span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-amber-600 text-[10px] font-bold uppercase rounded text-white tracking-wider">In arrivo</span>
+                      )}
                     </div>
                     {(() => {
                       const summary = getChefRatingSummary(chef, reviews);

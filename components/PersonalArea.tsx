@@ -11,7 +11,7 @@ import { AdminDishesPanel } from './AdminDishesPanel';
 import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, normalizeLocationToPordenone } from './italianTerritoryData';
 import { ConfirmDeleteOrdersModal } from './ConfirmDeleteOrdersModal';
 import { ReviewList } from './ReviewList';
-import { canClientCancelOrder, isConcludedOrder, OrderDeleteResult } from '../utils/orderUtils';
+import { canClientCancelOrder, formatOrderCode, isConcludedOrder, OrderDeleteResult } from '../utils/orderUtils';
 import { formatChefDisplayReviews, getChefRatingSummary, isOrderEligibleForReview } from '../utils/reviewUtils';
 
 const formatChefDisplayName = (name?: string) => {
@@ -221,7 +221,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           setOrderDeleteError(res.error || 'Impossibile eliminare questo ordine.');
           return;
         }
-        setFeedbackMsg({ type: 'success', text: `Ordine #${orderDeleteConfirm.order.id.split('-')[0]} eliminato definitivamente.` });
+        setFeedbackMsg({ type: 'success', text: `Ordine ${formatOrderCode(orderDeleteConfirm.order.id)} eliminato definitivamente.` });
       } else if (orderDeleteConfirm.mode === 'bulk' && onDeleteConcludedOrders) {
         const idsToDelete = concludedUserOrders.map(o => o.id);
         const res = await onDeleteConcludedOrders(idsToDelete);
@@ -411,12 +411,19 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
     setFeedbackMsg({ type: 'success', text: 'Tutte le informazioni, la foto e le credenziali sono state salvate e sincronizzate!' });
   };
 
+  const isChefRole = currentUser.role === 'chef';
+  const roleAccentBorderText = isChefRole ? 'border-emerald-600 text-emerald-600' : 'border-orange-600 text-orange-600';
+
   return (
-    <div className="animate-fade-in max-w-5xl mx-auto space-y-8 pb-16">
+    <div className="animate-fade-in max-w-5xl mx-auto space-y-6 sm:space-y-8 pt-2 sm:pt-3 pb-16">
       
       {/* Profilo Header Card */}
-      <div className="bg-black text-white rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 md:p-10 shadow-2xl relative overflow-hidden border-b-8 border-orange-600">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-orange-600/10 rounded-full blur-3xl"></div>
+      <div className={`bg-black text-white rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 md:p-10 shadow-2xl relative overflow-hidden border-b-8 ${
+        isChefRole ? 'border-emerald-600' : 'border-orange-600'
+      }`}>
+        <div className={`absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl ${
+          isChefRole ? 'bg-emerald-600/10' : 'bg-orange-600/10'
+        }`}></div>
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-6">
@@ -425,10 +432,14 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                 src={matchingChef?.avatar || matchingApplication?.avatarUrl || currentUser.avatarUrl}
                 alt={`${currentUser.name} ${currentUser.lastName}`}
                 referrerPolicy="no-referrer"
-                className="w-20 h-20 rounded-3xl object-cover shadow-xl border-2 border-orange-500 shrink-0"
+                className={`w-20 h-20 rounded-3xl object-cover shadow-xl border-2 shrink-0 ${
+                  isChefRole ? 'border-emerald-500' : 'border-orange-500'
+                }`}
               />
             ) : (
-              <div className="w-20 h-20 bg-orange-600 text-black rounded-3xl flex items-center justify-center shadow-xl shrink-0">
+              <div className={`w-20 h-20 text-black rounded-3xl flex items-center justify-center shadow-xl shrink-0 ${
+                isChefRole ? 'bg-emerald-500' : 'bg-orange-600'
+              }`}>
                 {currentUser.role === 'chef' ? (
                   <ChefHat className="w-10 h-10 stroke-2" />
                 ) : currentUser.role === 'admin' ? (
@@ -443,7 +454,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                 <span className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border ${
                   currentUser.role === 'chef' 
                     ? matchingChef
-                      ? 'bg-orange-500/10 text-orange-500 border-orange-500/20'
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                       : 'bg-amber-500/15 text-amber-300 border-amber-400/30'
                     : currentUser.role === 'admin'
                       ? 'bg-red-500/10 text-red-500 border-red-500/20'
@@ -561,11 +572,11 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
       )}
 
       {/* Tabs di Navigazione Area Personale */}
-      <div className="flex border-b border-gray-100 overflow-x-auto pb-px">
+      <div className="flex flex-nowrap sm:flex-wrap border-b border-gray-100 overflow-x-auto sm:overflow-visible scrollbar-hide pb-px gap-1">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
-            activeTab === 'profile' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+          className={`py-3.5 px-3.5 sm:px-4 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 border-b-4 transition-colors shrink-0 whitespace-nowrap ${
+            activeTab === 'profile' ? roleAccentBorderText : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
           <User className="w-4 h-4 shrink-0" /> Info Personali
@@ -573,13 +584,15 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
 
         <button
           onClick={() => setActiveTab('addresses')}
-          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 relative ${
-            activeTab === 'addresses' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+          className={`py-3.5 px-3.5 sm:px-4 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 border-b-4 transition-colors shrink-0 relative whitespace-nowrap ${
+            activeTab === 'addresses' ? roleAccentBorderText : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
           <MapPin className="w-4 h-4 shrink-0" /> Indirizzi Verificati
           {currentUser.addresses.length > 0 && (
-            <span className="ml-1 px-1.5 py-0.5 text-[9px] bg-orange-100 text-orange-700 rounded-full">
+            <span className={`ml-1 px-1.5 py-0.5 text-[9px] rounded-full ${
+              isChefRole ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-700'
+            }`}>
               {currentUser.addresses.length}
             </span>
           )}
@@ -589,7 +602,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           <>
             <button
               onClick={() => setActiveTab('orders')}
-              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+              className={`py-3.5 px-3.5 sm:px-4 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 border-b-4 transition-colors shrink-0 whitespace-nowrap ${
                 activeTab === 'orders' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
@@ -597,7 +610,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('client-payments')}
-              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+              className={`py-3.5 px-3.5 sm:px-4 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 border-b-4 transition-colors shrink-0 whitespace-nowrap ${
                 activeTab === 'client-payments' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
@@ -610,16 +623,16 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           <>
             <button
               onClick={() => setActiveTab('kitchen')}
-              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
-                activeTab === 'kitchen' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+              className={`py-3.5 px-3.5 sm:px-4 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 border-b-4 transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'kitchen' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
               <ChefHat className="w-4 h-4 shrink-0" /> La Mia Cucina
             </button>
             <button
               onClick={() => setActiveTab('chef-orders')}
-              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
-                activeTab === 'chef-orders' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+              className={`py-3.5 px-3.5 sm:px-4 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 border-b-4 transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'chef-orders' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
               <ClipboardList className="w-4 h-4 shrink-0" /> Gestione Ordini
@@ -631,16 +644,16 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('chef-menu')}
-              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
-                activeTab === 'chef-menu' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+              className={`py-3.5 px-3.5 sm:px-4 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 border-b-4 transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'chef-menu' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
               <ClipboardList className="w-4 h-4 shrink-0" /> Il Mio Menu
             </button>
             <button
               onClick={() => setActiveTab('chef-reviews')}
-              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
-                activeTab === 'chef-reviews' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+              className={`py-3.5 px-3.5 sm:px-4 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 border-b-4 transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'chef-reviews' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
               <CheckCircle className="w-4 h-4 shrink-0" /> Recensioni
@@ -652,8 +665,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('chef-wallet')}
-              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
-                activeTab === 'chef-wallet' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+              className={`py-3.5 px-3.5 sm:px-4 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 border-b-4 transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'chef-wallet' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
               <User className="w-4 h-4 shrink-0" /> Guadagni & Wallet
@@ -669,7 +682,9 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         {activeTab === 'profile' && (
           <form onSubmit={handleSaveProfile} className="space-y-8 animate-fade-in text-left">
             <div>
-              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Modifica Profilo e Credenziali</h3>
+              <h3 className={`text-xl sm:text-2xl font-black italic tracking-tight mb-2 ${
+                isChefRole ? 'text-emerald-700' : 'text-orange-600'
+              }`}>Modifica Profilo e Credenziali</h3>
               <p className="text-black text-sm leading-relaxed">Ottimizza le tue informazioni di anagrafica personali, la foto profilo e le credenziali di accesso. Modifica i dettagli e salva per aggiornarli su tutta la piattaforma.</p>
             </div>
 
@@ -1049,7 +1064,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                               setOrderDeleteConfirm({ mode: 'single', order });
                             }}
                             title="Elimina ordine concluso"
-                            aria-label={`Elimina ordine ${order.id.split('-')[0]}`}
+                            aria-label={`Elimina ordine ${formatOrderCode(order.id)}`}
                             className="p-2.5 rounded-xl bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 transition-all shrink-0"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1094,31 +1109,65 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         )}
 
         {/* TAB 4: KITCHEN MANAGE (FOR CHEFS) */}
-        {activeTab === 'kitchen' && currentUser.role === 'chef' && (
+        {activeTab === 'kitchen' && currentUser.role === 'chef' && (() => {
+          const uploadedDocsCount =
+            (matchingChef?.documents?.length || 0) + (matchingApplication?.documents?.length || 0);
+          const isChefApproved = Boolean(matchingChef && matchingChef.verificationStatus === 'approved');
+          return (
           <div className="space-y-8 animate-fade-in">
             <div>
-              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-orange-600">Pannello Direzionale Cuoco</h3>
+              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight mb-2 text-emerald-700">Pannello Direzionale Cuoco</h3>
               <p className="text-black text-sm leading-relaxed">Gestisci le informazioni sul tuo profilo pubblico di Chef partner MESA, visualizza recensioni o modifica le tue impostazioni casalinghe.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-6">
-              <div className="p-6 bg-green-50 rounded-3xl border border-green-100 flex items-center gap-4">
-                <div className="p-3 bg-green-100 text-green-700 rounded-2xl">
-                  <ShieldCheck className="w-6 h-6" />
+              <div className={`p-6 rounded-3xl border flex items-center gap-4 ${
+                isChefApproved && uploadedDocsCount > 0
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}>
+                <div className={`p-3 rounded-2xl ${
+                  isChefApproved && uploadedDocsCount > 0
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {isChefApproved && uploadedDocsCount > 0 ? (
+                    <ShieldCheck className="w-6 h-6 shrink-0" />
+                  ) : (
+                    <Clock className="w-6 h-6 shrink-0" />
+                  )}
                 </div>
                 <div>
-                  <p className="text-[10px] text-green-700 font-black uppercase tracking-widest">HACCP Certificato</p>
-                  <p className="font-bold text-gray-900">Documento Verificato</p>
+                  <p className={`text-[10px] font-black uppercase tracking-widest ${
+                    isChefApproved && uploadedDocsCount > 0 ? 'text-emerald-700' : 'text-amber-700'
+                  }`}>Documenti & HACCP</p>
+                  <p className="font-bold text-gray-900">
+                    {isChefApproved && uploadedDocsCount > 0
+                      ? 'Documentazione Verificata'
+                      : uploadedDocsCount > 0
+                        ? `${uploadedDocsCount} doc. in verifica Admin`
+                        : 'Documenti non ancora caricati'}
+                  </p>
                 </div>
               </div>
 
-              <div className="p-6 bg-orange-50 rounded-3xl border border-orange-100 flex items-center gap-4">
-                <div className="p-3 bg-orange-100 text-orange-700 rounded-2xl">
-                  <Globe className="w-6 h-6" />
+              <div className={`p-6 rounded-3xl border flex items-center gap-4 ${
+                isChefApproved
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}>
+                <div className={`p-3 rounded-2xl ${
+                  isChefApproved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  <Globe className="w-6 h-6 shrink-0" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-orange-700 font-black uppercase tracking-widest">Vetrina Condivisa</p>
-                  <p className="font-bold text-gray-900">Vetrina Pubblica Attiva</p>
+                  <p className={`text-[10px] font-black uppercase tracking-widest ${
+                    isChefApproved ? 'text-emerald-700' : 'text-amber-700'
+                  }`}>Vetrina Condivisa</p>
+                  <p className="font-bold text-gray-900">
+                    {isChefApproved ? 'Vetrina Pubblica Attiva' : 'In Attesa di Approvazione'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1144,28 +1193,10 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                       const capitalized = val.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                       setChefName(capitalized);
                     }}
-                    className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold"
+                    className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-gray-50 text-sm font-bold"
                     placeholder="es. Nonna Maria"
                     required
                   />
-                  {chefName && currentUser.name && !chefName.toLowerCase().includes(currentUser.name.trim().toLowerCase()) && (
-                    <div className="mt-2.5 p-3.5 bg-amber-50 rounded-2xl border border-amber-100 text-amber-800 text-[11px] font-medium leading-relaxed">
-                      <div className="flex gap-2 items-start">
-                        <span className="text-sm">⚠️</span>
-                        <div>
-                          <p className="font-extrabold text-amber-900 mb-0.5">Controllo Coerenza Nome</p>
-                          <p className="text-amber-800 font-semibold mb-1">Il nome pubblico di presentazione ("{chefName}") non corrisponde al tuo nome utente di accesso ("{currentUser.name}").</p>
-                          <button 
-                            type="button"
-                            onClick={() => setChefName(currentUser.name)}
-                            className="mt-1 px-3 py-1 bg-amber-600 text-white font-extrabold rounded-lg text-[10px] uppercase tracking-wider hover:bg-black transition-colors"
-                          >
-                            Allinea e Correggi Ora
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
@@ -1377,14 +1408,15 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* TAB 5: CHEF ORDERS */}
         {activeTab === 'chef-orders' && currentUser.role === 'chef' && (
           <div className="space-y-6 animate-fade-in relative text-left">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-orange-600">
+                <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-emerald-700">
                   Ordini in Arrivo {matchingChef ? `— ${matchingChef.name}` : ''}
                 </h3>
                 <p className="text-black text-sm mt-1 leading-relaxed">
@@ -1511,9 +1543,9 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                               </span>
                             )}
                             <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono">
-                              #{order.id.split('-')[0]}
+                              {formatOrderCode(order.id)}
                             </span>
-                            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-orange-50 text-orange-700 border border-orange-200">
+                            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
                               {order.deliveryMode === 'delivery' ? 'Consegna a domicilio' : 'Ritiro in sede'}
                             </span>
                             {order.customerName && (
@@ -1645,7 +1677,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                                   setOrderDeleteConfirm({ mode: 'single', order });
                                 }}
                                 title="Elimina ordine concluso"
-                                aria-label={`Elimina ordine ${order.id.split('-')[0]}`}
+                                aria-label={`Elimina ordine ${formatOrderCode(order.id)}`}
                                 className="px-3 py-1.5 bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1 transition-all"
                               >
                                 <Trash2 className="w-3.5 h-3.5 shrink-0" />
@@ -1761,31 +1793,49 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         )}
 
         {/* TAB 7: CHEF WALLET */}
-        {activeTab === 'chef-wallet' && currentUser.role === 'chef' && (
+        {activeTab === 'chef-wallet' && currentUser.role === 'chef' && (() => {
+          const completedChefOrders = chefOrders.filter(o => o.status === 'COMPLETED');
+          const grossRevenue = completedChefOrders.reduce((acc, o) => acc + o.total, 0);
+          const netRevenue = grossRevenue * 0.88;
+          const isChefApproved = Boolean(matchingChef && matchingChef.verificationStatus === 'approved');
+          return (
           <div className="space-y-6 animate-fade-in relative text-left">
-            <h3 className="text-2xl font-black italic tracking-tight mb-2">Guadagni e Statistiche</h3>
+            <h3 className="text-2xl font-black italic tracking-tight mb-2 text-emerald-700">Guadagni e Statistiche</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-               <div className="p-6 bg-gradient-to-br from-gray-900 to-black text-white rounded-[2rem] border border-gray-800">
-                  <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Saldo Corrente</p>
-                  <p className="text-3xl font-black">€ {userOrders.reduce((acc, o) => acc + (o.status === 'COMPLETED' ? o.total : 0), 0).toFixed(2)}</p>
+               <div className="p-6 bg-gradient-to-br from-emerald-950 to-slate-900 text-white rounded-[2rem] border border-emerald-800">
+                  <p className="text-[10px] text-emerald-300 font-black uppercase tracking-widest mb-1">Netto Stimato (88%)</p>
+                  <p className="text-3xl font-black">€ {netRevenue.toFixed(2)}</p>
                </div>
-               <div className="p-6 bg-orange-50 rounded-[2rem] border border-orange-100 text-orange-900">
-                  <p className="text-[10px] text-orange-600/80 font-black uppercase tracking-widest mb-1">Ordini Completati</p>
-                  <p className="text-3xl font-black">{userOrders.filter(o => o.status === 'COMPLETED').length}</p>
+               <div className="p-6 bg-emerald-50 rounded-[2rem] border border-emerald-100 text-emerald-900">
+                  <p className="text-[10px] text-emerald-700/80 font-black uppercase tracking-widest mb-1">Ordini Completati</p>
+                  <p className="text-3xl font-black">{completedChefOrders.length}</p>
                </div>
-               <div className="p-6 bg-green-50 rounded-[2rem] border border-green-100 text-green-900">
-                  <p className="text-[10px] text-green-600/80 font-black uppercase tracking-widest mb-1">Totale Incassato (All-time)</p>
-                  <p className="text-3xl font-black">€ {(userOrders.reduce((acc, o) => acc + o.total, 0) + 124.50).toFixed(2)}</p>
+               <div className="p-6 bg-stone-50 rounded-[2rem] border border-stone-200 text-stone-900">
+                  <p className="text-[10px] text-stone-500 font-black uppercase tracking-widest mb-1">Incasso Lordo Totale</p>
+                  <p className="text-3xl font-black">€ {grossRevenue.toFixed(2)}</p>
                </div>
             </div>
             
-            <div className="mt-8 bg-gray-50 border border-gray-100 rounded-3xl p-6 text-center">
-              <ShieldCheck className="w-8 h-8 text-green-500 mx-auto mb-2" />
-              <p className="text-sm font-bold text-gray-900">Il tuo conto è verificato.</p>
-              <p className="text-xs text-gray-500 mt-1">I bonifici vengono emessi ogni lunedì automaticamente sul tuo IBAN IT99...</p>
+            <div className={`mt-6 border rounded-3xl p-6 text-center ${
+              isChefApproved ? 'bg-emerald-50/70 border-emerald-200' : 'bg-amber-50/70 border-amber-200'
+            }`}>
+              {isChefApproved ? (
+                <ShieldCheck className="w-8 h-8 text-emerald-600 mx-auto mb-2 shrink-0" />
+              ) : (
+                <Clock className="w-8 h-8 text-amber-600 mx-auto mb-2 shrink-0" />
+              )}
+              <p className="text-sm font-bold text-gray-900">
+                {isChefApproved
+                  ? 'Profilo Cuoco attivo per incassi in contanti'
+                  : 'Profilo in attesa di attivazione Admin'}
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                I clienti pagano direttamente in contanti al ritiro o alla consegna. Il 12% di commissione MESA viene calcolato automaticamente sugli ordini completati.
+              </p>
             </div>
           </div>
-        )}
+          );
+        })()}
       </div>
 
       <ConfirmDeleteOrdersModal

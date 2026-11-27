@@ -342,14 +342,14 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
       <div className="relative bg-white w-full max-w-3xl rounded-[2.5rem] sm:rounded-[3.5rem] shadow-2xl overflow-hidden my-auto border border-gray-100 z-10">
         
         {/* Header Branding */}
-        <div className="bg-black p-6 sm:p-8 text-white flex items-center justify-between border-b-8 border-orange-600">
+        <div className="bg-black p-6 sm:p-8 text-white flex items-center justify-between border-b-8 border-emerald-600">
            <div className="flex items-center gap-4 sm:gap-6">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl sm:rounded-[1.5rem] flex items-center justify-center shadow-xl shrink-0">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl sm:rounded-[1.5rem] flex items-center justify-center shadow-xl shrink-0">
                  <ChefHat className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </div>
               <div>
                  <div className="flex items-center gap-2 mb-1">
-                   <span className="text-[9px] font-black bg-orange-600 text-black px-2 py-0.5 rounded-full uppercase tracking-widest">
+                   <span className="text-[9px] font-black bg-emerald-500 text-black px-2 py-0.5 rounded-full uppercase tracking-widest">
                      MESA Partner Program
                    </span>
                  </div>
@@ -403,16 +403,16 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
             <>
               {/* Step Progress Bar */}
               <div className="mb-8">
-                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 overflow-x-auto gap-1">
-                  <span className={step >= 1 ? 'text-orange-600 font-extrabold whitespace-nowrap' : 'whitespace-nowrap'}>1. Profilo</span>
-                  <span className={step >= 2 ? 'text-orange-600 font-extrabold whitespace-nowrap' : 'whitespace-nowrap'}>2. Foto</span>
-                  <span className={step >= 3 ? 'text-orange-600 font-extrabold whitespace-nowrap' : 'whitespace-nowrap'}>3. HACCP</span>
-                  <span className={step >= 4 ? 'text-orange-600 font-extrabold whitespace-nowrap' : 'whitespace-nowrap'}>4. Calendario & Orari</span>
-                  <span className={step >= 5 ? 'text-orange-600 font-extrabold whitespace-nowrap' : 'whitespace-nowrap'}>5. Primo Piatto</span>
+                <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2 overflow-x-auto scrollbar-hide gap-2">
+                  <span className={step >= 1 ? 'text-emerald-600 font-extrabold whitespace-nowrap' : 'whitespace-nowrap'}>1. Profilo</span>
+                  <span className={step >= 2 ? 'text-emerald-600 font-extrabold whitespace-nowrap' : 'whitespace-nowrap'}>2. Foto</span>
+                  <span className={step >= 3 ? 'text-emerald-600 font-extrabold whitespace-nowrap' : 'whitespace-nowrap'}>3. HACCP</span>
+                  <span className={step >= 4 ? 'text-emerald-600 font-extrabold whitespace-nowrap' : 'whitespace-nowrap'}>4. Orari</span>
+                  <span className={step >= 5 ? 'text-emerald-600 font-extrabold whitespace-nowrap' : 'whitespace-nowrap'}>5. Piatto</span>
                 </div>
                 <div className="flex gap-1.5">
                    {[1, 2, 3, 4, 5].map(i => (
-                     <div key={i} className={`h-2 flex-1 rounded-full transition-all duration-300 ${step >= i ? 'bg-orange-600' : 'bg-gray-100'}`} />
+                     <div key={i} className={`h-2 flex-1 rounded-full transition-all duration-300 ${step >= i ? 'bg-emerald-600' : 'bg-gray-100'}`} />
                    ))}
                 </div>
               </div>
@@ -495,10 +495,10 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                         </div>
                       )}
 
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                         <div>
-                          <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Bandiera Paese</label>
-                          <div className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-2xl focus-within:ring-2 focus-within:ring-orange-500">
+                          <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5 whitespace-nowrap">Bandiera</label>
+                          <div className="flex items-center gap-2 p-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus-within:ring-2 focus-within:ring-emerald-500">
                             <CountryFlag flag={nationality} title={countryName} size="sm" />
                             <input 
                               type="text" 
@@ -510,21 +510,21 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                           </div>
                         </div>
                         <div>
-                          <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Nome Paese</label>
+                          <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5 whitespace-nowrap">Nome Paese</label>
                           <input 
                             type="text" 
                             value={countryName} 
                             onChange={(e) => setCountryName(e.target.value)} 
                             placeholder="es. Costa d'Avorio" 
-                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 font-bold text-sm" 
+                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-sm" 
                           />
                         </div>
                         <div>
-                          <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Continente</label>
+                          <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5 whitespace-nowrap">Continente</label>
                           <select
                             value={continent}
                             onChange={(e) => setContinent(e.target.value as Continent)}
-                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 font-bold text-xs"
+                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-xs"
                           >
                             <option value="Europa">Europa</option>
                             <option value="Africa">Africa</option>
