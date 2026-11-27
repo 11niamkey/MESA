@@ -10,6 +10,7 @@ import { CountryFlag } from './CountryFlag';
 import { ImagePickerBox } from './ImagePickerBox';
 import { AllergensPicker } from './Allergens';
 import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, normalizeLocationToPordenone } from './italianTerritoryData';
+import { sanitizeInputLive, sanitizeText, TEXT_LIMITS } from '../utils/sanitize';
 
 interface ChefOnboardingProps {
   isOpen: boolean;
@@ -298,21 +299,22 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
     const newApplication: ChefApplication = {
       id: appId,
       ...(currentUser?.id ? { userId: currentUser.id } : {}),
-      fullName: fullName.trim(),
-      brandName: brandName.trim(),
+      ...(currentUser?.authUid ? { authUid: currentUser.authUid } : {}),
+      fullName: sanitizeText(fullName, TEXT_LIMITS.USER_NAME),
+      brandName: sanitizeText(brandName, TEXT_LIMITS.BRAND_NAME),
       email: email.trim().toLowerCase(),
-      phone: phone.trim(),
-      nationality: nationality || '🇮🇹',
-      countryName: countryName.trim() || 'Italia',
+      phone: sanitizeText(phone, TEXT_LIMITS.PHONE),
+      nationality: sanitizeText(nationality, 16) || '🇮🇹',
+      countryName: sanitizeText(countryName, TEXT_LIMITS.ADDRESS_CITY) || 'Italia',
       continent: continent || 'Europa',
-      location: location.trim(),
-      bio: bio.trim() || 'Appassionato/a di cucina autentica casalinga.',
-      specialties: specialties.length > 0 ? specialties : ['Cucina Casalinga'],
+      location: sanitizeText(location, TEXT_LIMITS.ADDRESS_STREET),
+      bio: sanitizeText(bio, TEXT_LIMITS.CHEF_BIO) || 'Appassionato/a di cucina autentica casalinga.',
+      specialties: specialties.length > 0 ? specialties.map(s => sanitizeText(s, 40)).filter(Boolean) : ['Cucina Casalinga'],
       avatarUrl: avatarUrl || 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=400&q=80',
       kitchenPhotos: kitchenPhotos,
       documents: documents,
-      proposedDishName: proposedDishName.trim(),
-      proposedDishDesc: proposedDishDesc.trim() || 'Piatto preparato fresco su ordinazione.',
+      proposedDishName: sanitizeText(proposedDishName, TEXT_LIMITS.DISH_NAME),
+      proposedDishDesc: sanitizeText(proposedDishDesc, TEXT_LIMITS.DISH_DESC) || 'Piatto preparato fresco su ordinazione.',
       proposedDishPrice: proposedDishPrice || 14.50,
       ...(proposedDishImage.trim() ? { proposedDishImage: proposedDishImage.trim() } : {}),
       proposedDishAllergens,
@@ -999,8 +1001,9 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                         <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Nome del Piatto Forte *</label>
                         <input 
                           type="text" 
+                          maxLength={TEXT_LIMITS.DISH_NAME}
                           value={proposedDishName} 
-                          onChange={(e) => setProposedDishName(e.target.value)} 
+                          onChange={(e) => setProposedDishName(sanitizeInputLive(e.target.value, TEXT_LIMITS.DISH_NAME))} 
                           placeholder="es. Attiéké con Pesce Fritto (Garba Ivoriano)" 
                           className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 font-bold text-sm" 
                           required 
@@ -1033,8 +1036,9 @@ export const ChefOnboarding: React.FC<ChefOnboardingProps> = ({
                       <div>
                         <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Descrizione & Ingredienti Chiave *</label>
                         <textarea 
+                          maxLength={TEXT_LIMITS.DISH_DESC}
                           value={proposedDishDesc} 
-                          onChange={(e) => setProposedDishDesc(e.target.value)} 
+                          onChange={(e) => setProposedDishDesc(sanitizeInputLive(e.target.value, TEXT_LIMITS.DISH_DESC))} 
                           placeholder="Descrivi la preparazione, la provenienza degli ingredienti e le particolarità del gusto..." 
                           rows={3} 
                           className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 font-medium text-sm resize-none" 

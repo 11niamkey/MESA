@@ -50,6 +50,7 @@ import {
 } from './utils/orderUtils';
 import { isChefBookable, validateBetaOrderSubmission, BetaOrderValidationResult } from './utils/chefUtils';
 import { clampRating, computeOverallRating, getChefRatingSummary, isOrderEligibleForReview, MAX_REVIEW_COMMENT_LENGTH } from './utils/reviewUtils';
+import { sanitizeText, stripSensitiveChefFields, TEXT_LIMITS } from './utils/sanitize';
 import { MOCK_CHEFS } from './constants';
 import { CartItem, Dish, ViewState, FilterState, Chef, Message, Order, OrderReview, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
 import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock, Volume2, VolumeX, Trash2, BellRing, XCircle } from 'lucide-react';
@@ -541,21 +542,35 @@ function App() {
       // Seed demo data once, then attach realtime listeners
       await seedFirestoreDefaults();
 
-      // Listen to Firebase users
+      // Listen to Firebase users (privacy: redact non-self PII/addresses unless Admin)
       unsubUsers = onSnapshot(
         collection(db, 'users'),
         (snapshot) => {
-          const users: AppUser[] = snapshot.docs.map(d => d.data() as AppUser);
+          const activeUser = currentUserRef.current;
+          const isAdminSession = activeUser?.role === 'admin';
+          const users: AppUser[] = snapshot.docs.map(d => {
+            const u = d.data() as AppUser;
+            if (isAdminSession || (activeUser && u.id === activeUser.id)) {
+              return u;
+            }
+            return {
+              ...u,
+              phone: undefined,
+              addresses: [],
+            };
+          });
           setRegisteredUsers(users);
         },
         (error) => handleFirestoreError(error, OperationType.GET, 'users')
       );
 
-      // Listen to Firebase chefs (catalogo)
+      // Listen to Firebase chefs (public catalog: always strip private credentials)
       unsubChefs = onSnapshot(
         collection(db, 'chefs'),
         (snapshot) => {
-          const chefsData: Chef[] = snapshot.docs.map(d => normalizeChef(d.data() as Chef));
+          const chefsData: Chef[] = snapshot.docs.map(d =>
+            stripSensitiveChefFields(normalizeChef(d.data() as Chef))
+          );
           setChefs(chefsData);
         },
         (error) => handleFirestoreError(error, OperationType.GET, 'chefs')
@@ -722,7 +737,14 @@ function App() {
           prevOrderStatusesRef.current = nextMap;
           knownOrderIdsRef.current = nextIds;
 
-          setOrders(ordersData);
+          const scopedOrders = !activeUser
+            ? []
+            : activeUser.role === 'admin'
+              ? ordersData
+              : activeUser.role === 'chef'
+                ? ordersData.filter(o => o.userId === activeUser.id || isOrderForChefUser(o, activeUser, activeChefs))
+                : ordersData.filter(o => o.userId === activeUser.id || o.customerId === activeUser.id);
+          setOrders(scopedOrders);
         },
         (error) => handleFirestoreError(error, OperationType.GET, 'orders')
       );
@@ -838,10 +860,18 @@ function App() {
 
   const handleSaveChefDishes = async (chefId: string, dishes: Dish[]): Promise<boolean> => {
     try {
-      await firestoreWrite('chefs', chefId, { dishes }, true, true);
-      setChefs(prev => prev.map(c => (c.id === chefId ? { ...c, dishes } : c)));
+      const sanitizedDishes: Dish[] = dishes.map((d) => ({
+        ...d,
+        name: sanitizeText(d.name, TEXT_LIMITS.DISH_NAME),
+        description: sanitizeText(d.description, TEXT_LIMITS.DISH_DESC),
+        ...(d.preparation ? { preparation: sanitizeText(d.preparation, TEXT_LIMITS.DISH_PREP) } : {}),
+        ...(Array.isArray(d.tags) ? { tags: d.tags.map(t => sanitizeText(t, 40)).filter(Boolean) } : {}),
+        ...(Array.isArray(d.ingredients) ? { ingredients: d.ingredients.map(i => sanitizeText(i, 60)).filter(Boolean) } : {}),
+      }));
+      await firestoreWrite('chefs', chefId, { dishes: sanitizedDishes }, true, true);
+      setChefs(prev => prev.map(c => (c.id === chefId ? { ...c, dishes: sanitizedDishes } : c)));
       if (selectedChef && selectedChef.id === chefId) {
-        setSelectedChef(prev => (prev ? { ...prev, dishes } : prev));
+        setSelectedChef(prev => (prev ? { ...prev, dishes: sanitizedDishes } : prev));
       }
       showNotification('Piatto e foto salvati e sincronizzati con il catalogo MESA! 🍽️');
       return true;
@@ -860,7 +890,13 @@ function App() {
 
     try {
       const normalizedLocation = normalizeLocationToPordenone(updatedChef.location);
-      const chefToSave: Chef = { ...updatedChef, location: normalizedLocation };
+      const chefToSave: Chef = stripSensitiveChefFields({
+        ...updatedChef,
+        name: sanitizeText(updatedChef.name, TEXT_LIMITS.BRAND_NAME),
+        bio: sanitizeText(updatedChef.bio, TEXT_LIMITS.CHEF_BIO),
+        location: sanitizeText(normalizedLocation, TEXT_LIMITS.ADDRESS_STREET),
+        ...(updatedChef.phone ? { phone: sanitizeText(updatedChef.phone, TEXT_LIMITS.PHONE) } : {}),
+      });
       await firestoreWrite('chefs', chefToSave.id, chefToSave, true, true);
       setChefs(prev => prev.map(c => c.id === chefToSave.id ? chefToSave : c));
       if (selectedChef && selectedChef.id === chefToSave.id) {
@@ -1152,9 +1188,10 @@ function App() {
       avatar: app.avatarUrl || 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=400&q=80',
       rating: existingChef?.rating || 5.0,
       location: safeAppLocation,
-      phone: app.phone || existingUser?.phone || '',
+      phone: sanitizeText(app.phone || existingUser?.phone || '', TEXT_LIMITS.PHONE),
       email: normalizedEmail,
-      password: resolvedPassword,
+      ...(existingUser?.authUid ? { authUid: existingUser.authUid } : {}),
+      ...(existingUser?.id ? { userId: existingUser.id } : {}),
       specialties: app.specialties && app.specialties.length > 0 ? app.specialties : ['Cucina Casalinga'],
       bio: app.bio || 'Ricette artigianali e sapori autentici di casa.',
       availability: app.availabilitySlots && app.availabilitySlots.length > 0 ? app.availabilitySlots : ['12:00 - 15:00', '19:00 - 22:00'],
@@ -1313,8 +1350,22 @@ function App() {
   };
 
   const handleUpdateUser = async (updatedUser: AppUser) => {
+    const existingRecord = registeredUsers.find(u => u.id === updatedUser.id) || currentUser;
+    const isAdminActor = currentUser?.role === 'admin';
     const normalizedUser: AppUser = {
       ...updatedUser,
+      name: sanitizeText(updatedUser.name, TEXT_LIMITS.USER_NAME),
+      lastName: sanitizeText(updatedUser.lastName, TEXT_LIMITS.USER_NAME),
+      ...(updatedUser.brandName ? { brandName: sanitizeText(updatedUser.brandName, TEXT_LIMITS.BRAND_NAME) } : {}),
+      ...(updatedUser.phone ? { phone: sanitizeText(updatedUser.phone, TEXT_LIMITS.PHONE) } : {}),
+      addresses: (updatedUser.addresses || []).map(a => ({
+        ...a,
+        street: sanitizeText(a.street, TEXT_LIMITS.ADDRESS_STREET),
+        city: sanitizeText(a.city, TEXT_LIMITS.ADDRESS_CITY),
+        zip: sanitizeText(a.zip, TEXT_LIMITS.ADDRESS_ZIP).replace(/[^0-9]/g, ''),
+        isVerified: isAdminActor ? Boolean(a.isVerified) : Boolean(existingRecord?.addresses.find(prev => prev.id === a.id)?.isVerified),
+      })),
+      role: isAdminActor ? updatedUser.role : (existingRecord?.role || updatedUser.role),
       email: updatedUser.email.trim().toLowerCase()
     };
     await firestoreWrite('users', normalizedUser.id, normalizedUser, true);
@@ -1331,15 +1382,14 @@ function App() {
                         c.name.trim().toLowerCase() === `${normalizedUser.name} ${normalizedUser.lastName}`.trim().toLowerCase() ||
                         c.name.trim().toLowerCase() === normalizedUser.name.trim().toLowerCase();
         if (isMatch) {
-          const updatedChef = {
+          const updatedChef = stripSensitiveChefFields({
             ...c,
             name: normalizedUser.brandName || `${normalizedUser.name} ${normalizedUser.lastName}`.trim(),
             email: normalizedUser.email,
             phone: normalizedUser.phone || c.phone,
-            password: normalizedUser.password || c.password,
             location: normalizedUser.addresses[0]?.street || c.location,
             ...(normalizedUser.avatarUrl ? { avatar: normalizedUser.avatarUrl } : {})
-          };
+          });
           firestoreWrite('chefs', updatedChef.id, updatedChef, true);
           return updatedChef;
         }
@@ -1886,8 +1936,14 @@ function App() {
   };
 
   const handleSendOrderMessage = async (orderId: string, message: Message) => {
+    const safeText = sanitizeText(message.text, TEXT_LIMITS.CHAT_MESSAGE);
+    if (!safeText) return;
+    const safeMessage: Message = {
+      ...message,
+      text: safeText,
+    };
     const targetOrder = orders.find(o => o.id === orderId);
-    const nextMessages = [...(targetOrder?.messages || []), message];
+    const nextMessages = [...(targetOrder?.messages || []), safeMessage];
     setOrders(prev =>
       prev.map(o => (o.id === orderId ? { ...o, messages: nextMessages } : o))
     );
@@ -2024,7 +2080,11 @@ function App() {
       scheduledDate: date,
       scheduledTime: time,
       deliveryMode,
-      preferences
+      preferences: {
+        spiceLevel: typeof preferences?.spiceLevel === 'number' ? preferences.spiceLevel : 1,
+        saltLevel: preferences?.saltLevel || 'Normal',
+        notes: sanitizeText(preferences?.notes || '', TEXT_LIMITS.ORDER_NOTE),
+      },
     };
     const validation = validateBetaOrderSubmission([bookedItem], chefs, 'direct');
     if (!validation.ok) {
@@ -2032,20 +2092,33 @@ function App() {
       setBookingDish(null);
       return;
     }
-    const chefName = chefs.find(c => c.id === dishToBook.chefId)?.name || 'Chef MESA';
-    const customerName = `${authenticatedUser.name} ${authenticatedUser.lastName}`.trim() || authenticatedUser.email;
+    const targetChef = chefs.find(c => c.id === dishToBook.chefId);
+    const chefName = targetChef?.name || 'Chef MESA';
+    const customerName = sanitizeText(`${authenticatedUser.name} ${authenticatedUser.lastName}`, TEXT_LIMITS.USER_NAME * 2) || authenticatedUser.email;
+    const verifiedClientAddr = authenticatedUser.addresses.find(a => a.isVerified);
+    const resolvedDeliverySnapshot = deliveryMode === 'delivery'
+      ? sanitizeText(
+          (verifiedClientAddr ? `${verifiedClientAddr.street}, ${verifiedClientAddr.zip} ${verifiedClientAddr.city}` : '') || verifiedAddress,
+          200
+        )
+      : undefined;
     const now = new Date();
     const orderId = `MESA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const customerAuthId = auth?.currentUser?.uid || authenticatedUser.authUid || authenticatedUser.id;
     const newOrder: Order = {
       id: orderId,
       userId: authenticatedUser.id,
+      customerId: customerAuthId,
+      authUid: customerAuthId,
       customerName,
       ...(authenticatedUser.email ? { customerEmail: authenticatedUser.email } : {}),
+      ...(resolvedDeliverySnapshot ? { deliveryAddress: resolvedDeliverySnapshot } : {}),
       items: [bookedItem],
       total: dishToBook.price + deliveryFee,
       status: 'PENDING_CONFIRMATION',
       timestamp: now,
       chefId: dishToBook.chefId,
+      ...(targetChef?.authUid || targetChef?.userId ? { chefAuthUid: targetChef.authUid || targetChef.userId } : {}),
       chefName,
       deliveryMode,
       estimatedTime: `${date} ore ${time}`,
@@ -2139,22 +2212,44 @@ function App() {
       return;
     }
     const firstChefId = cart[0]?.chefId || 'c1';
-    const chefName = chefs.find(c => c.id === firstChefId)?.name || 'Chef MESA';
-    const customerName = `${authenticatedUser.name} ${authenticatedUser.lastName}`.trim() || authenticatedUser.email;
+    const targetChef = chefs.find(c => c.id === firstChefId);
+    const chefName = targetChef?.name || 'Chef MESA';
+    const customerName = sanitizeText(`${authenticatedUser.name} ${authenticatedUser.lastName}`, TEXT_LIMITS.USER_NAME * 2) || authenticatedUser.email;
+    const deliveryMode = cart[0]?.deliveryMode || 'pickup';
+    const verifiedClientAddr = authenticatedUser.addresses.find(a => a.isVerified);
+    const resolvedDeliverySnapshot = deliveryMode === 'delivery'
+      ? sanitizeText(
+          (verifiedClientAddr ? `${verifiedClientAddr.street}, ${verifiedClientAddr.zip} ${verifiedClientAddr.city}` : '') || verifiedAddress,
+          200
+        )
+      : undefined;
+    const sanitizedCartItems: CartItem[] = cart.map(item => ({
+      ...item,
+      preferences: {
+        spiceLevel: typeof item.preferences?.spiceLevel === 'number' ? item.preferences.spiceLevel : 1,
+        saltLevel: item.preferences?.saltLevel || 'Normal',
+        notes: sanitizeText(item.preferences?.notes || '', TEXT_LIMITS.ORDER_NOTE),
+      },
+    }));
     const now = new Date();
     const orderId = `MESA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const customerAuthId = auth?.currentUser?.uid || authenticatedUser.authUid || authenticatedUser.id;
     const newOrder: Order = {
       id: orderId,
       userId: authenticatedUser.id,
+      customerId: customerAuthId,
+      authUid: customerAuthId,
       customerName,
       ...(authenticatedUser.email ? { customerEmail: authenticatedUser.email } : {}),
-      items: [...cart],
+      ...(resolvedDeliverySnapshot ? { deliveryAddress: resolvedDeliverySnapshot } : {}),
+      items: sanitizedCartItems,
       total: totalAmount,
       status: 'PENDING_CONFIRMATION',
       timestamp: now,
       chefId: firstChefId,
+      ...(targetChef?.authUid || targetChef?.userId ? { chefAuthUid: targetChef.authUid || targetChef.userId } : {}),
       chefName: chefName,
-      deliveryMode: cart[0]?.deliveryMode || 'pickup',
+      deliveryMode,
       estimatedTime: 'In arrivo...',
       notificationChannel: 'app',
       timeline: [
@@ -2312,14 +2407,15 @@ function App() {
     const ratingService = clampRating(payload.ratingService);
     const ratingPackaging = clampRating(payload.ratingPackaging);
     const ratingOverall = computeOverallRating(ratingDishes, ratingService, ratingPackaging);
-    const cleanComment = (payload.comment || '').trim().slice(0, MAX_REVIEW_COMMENT_LENGTH);
-    const customerName = `${currentUser.name} ${currentUser.lastName}`.trim() || currentUser.email;
+    const cleanComment = sanitizeText(payload.comment, MAX_REVIEW_COMMENT_LENGTH);
+    const customerName = sanitizeText(`${currentUser.name} ${currentUser.lastName}`, TEXT_LIMITS.USER_NAME * 2) || currentUser.email;
     const dishIds = Array.from(new Set(reviewOrder.items.map(i => i.id).filter(Boolean)));
+    const reviewerAuthId = auth?.currentUser?.uid || currentUser.authUid || currentUser.id;
 
     const newReview: OrderReview = {
       id: reviewOrder.id,
       orderId: reviewOrder.id,
-      customerId: currentUser.id,
+      customerId: reviewerAuthId,
       customerName,
       chefId: reviewOrder.chefId,
       dishIds,
@@ -2986,12 +3082,20 @@ function App() {
             </div>
           ) : selectedOrder ? (() => {
             const activeOrder = orders.find(o => o.id === selectedOrder.id) || selectedOrder;
-            const orderCustomer = registeredUsers.find(u => u.id === activeOrder.userId);
+            const canViewCustomerAddress =
+              currentUser.role === 'admin' ||
+              activeOrder.userId === currentUser.id ||
+              isOrderForChefUser(activeOrder, currentUser, chefs);
+            const orderCustomer = canViewCustomerAddress
+              ? registeredUsers.find(u => u.id === activeOrder.userId)
+              : undefined;
             const customerAddr = orderCustomer?.addresses.find(a => a.isVerified) || orderCustomer?.addresses[0];
-            const resolvedDeliveryAddress =
-              (customerAddr ? `${customerAddr.street}, ${customerAddr.zip} ${customerAddr.city}` : '') ||
-              (activeOrder.userId === currentUser.id ? verifiedAddress : '') ||
-              undefined;
+            const resolvedDeliveryAddress = canViewCustomerAddress
+              ? activeOrder.deliveryAddress ||
+                (customerAddr ? `${customerAddr.street}, ${customerAddr.zip} ${customerAddr.city}` : '') ||
+                (activeOrder.userId === currentUser.id ? verifiedAddress : '') ||
+                undefined
+              : undefined;
             return (
               <OrderTracking 
                 order={activeOrder} 

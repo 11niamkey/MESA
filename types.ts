@@ -117,6 +117,8 @@ export interface Chef {
   password?: string;
   verificationStatus?: 'pending' | 'approved' | 'rejected';
   documents?: ChefDocument[];
+  authUid?: string;
+  userId?: string;
 }
 
 export type OrderStatus =
@@ -160,13 +162,17 @@ export interface OrderTimelineEntry {
 export interface Order {
   id: string;
   userId?: string;
+  customerId?: string;
+  authUid?: string;
   customerName?: string;
   customerEmail?: string;
+  deliveryAddress?: string;
   items: CartItem[];
   total: number;
   status: OrderStatus;
   timestamp: Date;
   chefId: string;
+  chefAuthUid?: string;
   chefName: string;
   deliveryMode: 'delivery' | 'pickup';
   estimatedTime: string;
@@ -242,6 +248,9 @@ export interface AppUser {
   createdAt: string;
   password?: string;
   favoriteDishIds?: string[];
+  authUid?: string;
+  isVerifiedChef?: boolean;
+  commissionRate?: number;
 }
 
 

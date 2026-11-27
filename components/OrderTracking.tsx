@@ -22,6 +22,7 @@ import {
 import { AppUser, Chef, Message, ORDER_STATUS_LABELS, Order, OrderReview, OrderStatus } from '../types';
 import { canClientCancelOrder, formatOrderCode } from '../utils/orderUtils';
 import { isOrderEligibleForReview } from '../utils/reviewUtils';
+import { sanitizeInputLive, sanitizeText, TEXT_LIMITS } from '../utils/sanitize';
 
 const formatChefDisplayName = (name?: string) => {
   const trimmed = (name || 'MESA').trim();
@@ -224,7 +225,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = messageInput.trim();
+    const trimmed = sanitizeText(messageInput, TEXT_LIMITS.CHAT_MESSAGE);
     if (!trimmed) return;
 
     const timestamp = new Date();
@@ -709,8 +710,9 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
             >
               <input
                 type="text"
+                maxLength={TEXT_LIMITS.CHAT_MESSAGE}
                 value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
+                onChange={(e) => setMessageInput(sanitizeInputLive(e.target.value, TEXT_LIMITS.CHAT_MESSAGE))}
                 placeholder={
                   isChefView ? 'Scrivi un messaggio al cliente...' : 'Scrivi un messaggio allo chef...'
                 }

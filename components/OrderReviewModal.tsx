@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Star, MessageSquare, Utensils, Clock, PackageCheck } from 'lucide-react';
 import { Order } from '../types';
 import { computeOverallRating, MAX_REVIEW_COMMENT_LENGTH } from '../utils/reviewUtils';
+import { sanitizeInputLive, sanitizeText } from '../utils/sanitize';
 
 export interface ReviewSubmissionPayload {
   ratingDishes: number;
@@ -93,7 +94,7 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({
         ratingDishes,
         ratingService,
         ratingPackaging,
-        comment: comment.trim().slice(0, MAX_REVIEW_COMMENT_LENGTH),
+        comment: sanitizeText(comment, MAX_REVIEW_COMMENT_LENGTH),
       });
     } finally {
       setIsSubmitting(false);
@@ -183,7 +184,7 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({
             <textarea
               value={comment}
               maxLength={MAX_REVIEW_COMMENT_LENGTH}
-              onChange={(e) => setComment(e.target.value.slice(0, MAX_REVIEW_COMMENT_LENGTH))}
+              onChange={(e) => setComment(sanitizeInputLive(e.target.value, MAX_REVIEW_COMMENT_LENGTH))}
               placeholder="Sapore, freschezza, imballaggio, puntualità..."
               className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none text-xs sm:text-sm resize-none"
               rows={3}

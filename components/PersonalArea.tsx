@@ -21,6 +21,7 @@ import {
   ProfileDeleteResult,
 } from '../utils/orderUtils';
 import { formatChefDisplayReviews, getChefRatingSummary, isOrderEligibleForReview } from '../utils/reviewUtils';
+import { sanitizeInputLive, sanitizeText, TEXT_LIMITS } from '../utils/sanitize';
 
 const formatChefDisplayName = (name?: string) => {
   const trimmed = (name || 'MESA').trim();
@@ -281,16 +282,19 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
 
   const handleAddAddress = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!street.trim() || !city.trim() || !zip.trim()) {
+    const cleanStreet = sanitizeText(street, TEXT_LIMITS.ADDRESS_STREET);
+    const cleanCity = sanitizeText(city, TEXT_LIMITS.ADDRESS_CITY);
+    const cleanZip = sanitizeText(zip, TEXT_LIMITS.ADDRESS_ZIP).replace(/[^0-9]/g, '');
+    if (!cleanStreet || !cleanCity || !cleanZip) {
       setAddressError('Tutti i campi sono obbligatori.');
       return;
     }
 
     const newAddress: UserAddress = {
       id: `addr-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      street: street.trim(),
-      city: city.trim(),
-      zip: zip.trim(),
+      street: cleanStreet,
+      city: cleanCity,
+      zip: cleanZip,
       isVerified: false // Admin must verify it
     };
 
@@ -375,8 +379,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
 
     const updatedUser: AppUser = {
       ...currentUser,
-      name: profileName.trim(),
-      lastName: profileLastName.trim(),
+      name: sanitizeText(profileName, TEXT_LIMITS.USER_NAME),
+      lastName: sanitizeText(profileLastName, TEXT_LIMITS.USER_NAME),
       email: profileEmail.trim().toLowerCase(),
       password: profilePassword.trim(),
       avatarUrl: profileAvatar.trim() || undefined
@@ -388,11 +392,15 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
 
   const handleSaveChefSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chefName.trim() || !chefPhone.trim() || !chefLocation.trim() || !chefEmail.trim() || !chefPassword.trim()) {
+    const cleanChefName = sanitizeText(chefName, TEXT_LIMITS.BRAND_NAME);
+    const cleanChefPhone = sanitizeText(chefPhone, TEXT_LIMITS.PHONE);
+    const cleanChefLocation = sanitizeText(chefLocation, TEXT_LIMITS.ADDRESS_STREET);
+    const cleanChefBio = sanitizeText(chefBio, TEXT_LIMITS.CHEF_BIO);
+    if (!cleanChefName || !cleanChefPhone || !cleanChefLocation || !chefEmail.trim() || !chefPassword.trim()) {
       setFeedbackMsg({ type: 'error', text: 'I campi principali sono obbligatori.' });
       return;
     }
-    if (!isPordenoneLocation(chefLocation)) {
+    if (!isPordenoneLocation(cleanChefLocation)) {
       setFeedbackMsg({ type: 'error', text: 'La sede della cucina deve trovarsi nella Provincia di Pordenone (PN).' });
       return;
     }
@@ -407,17 +415,17 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
     }
 
     const activeChefId = matchingChef?.id || `chef-${currentUser.id}`;
-    const nameParts = chefName.trim().split(' ');
+    const nameParts = cleanChefName.split(' ');
     const first = nameParts[0] || currentUser.name;
     const last = nameParts.slice(1).join(' ');
     const resolvedAvatar = chefAvatar.trim() || matchingChef?.avatar || currentUser.avatarUrl;
 
     const updatedUser: AppUser = {
       ...currentUser,
-      name: first,
-      lastName: last,
-      phone: chefPhone.trim(),
-      brandName: chefName.trim(),
+      name: sanitizeText(first, TEXT_LIMITS.USER_NAME),
+      lastName: sanitizeText(last, TEXT_LIMITS.USER_NAME),
+      phone: cleanChefPhone,
+      brandName: cleanChefName,
       email: chefEmail.trim().toLowerCase(),
       password: chefPassword.trim(),
       ...(resolvedAvatar ? { avatarUrl: resolvedAvatar } : { avatarUrl: undefined })
@@ -428,16 +436,15 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
       onUpdateChef({
         ...matchingChef,
         id: activeChefId,
-        name: chefName.trim(),
+        name: cleanChefName,
         avatar: resolvedAvatar || matchingChef.avatar,
         nationality: chefNationality.trim(),
-        countryName: chefCountryName.trim(),
+        countryName: sanitizeText(chefCountryName, TEXT_LIMITS.ADDRESS_CITY),
         email: chefEmail.trim().toLowerCase(),
-        password: chefPassword.trim(),
-        location: chefLocation.trim(),
-        phone: chefPhone.trim(),
-        specialties: chefSpecialties.split(',').map(s => s.trim()).filter(Boolean),
-        bio: chefBio.trim(),
+        location: cleanChefLocation,
+        phone: cleanChefPhone,
+        specialties: chefSpecialties.split(',').map(s => sanitizeText(s, 40)).filter(Boolean),
+        bio: cleanChefBio,
       });
     }
     setFeedbackMsg({ type: 'success', text: 'Tutte le informazioni, la foto e le credenziali sono state salvate e sincronizzate!' });
@@ -734,8 +741,9 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Nome</label>
                 <input 
                   type="text" 
+                  maxLength={TEXT_LIMITS.USER_NAME}
                   value={profileName}
-                  onChange={(e) => setProfileName(e.target.value)}
+                  onChange={(e) => setProfileName(sanitizeInputLive(e.target.value, TEXT_LIMITS.USER_NAME))}
                   className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold"
                   placeholder="Nome..."
                   required
@@ -746,8 +754,9 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Cognome</label>
                 <input 
                   type="text" 
+                  maxLength={TEXT_LIMITS.USER_NAME}
                   value={profileLastName}
-                  onChange={(e) => setProfileLastName(e.target.value)}
+                  onChange={(e) => setProfileLastName(sanitizeInputLive(e.target.value, TEXT_LIMITS.USER_NAME))}
                   className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold"
                   placeholder="Cognome..."
                   required
@@ -960,9 +969,10 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Via e Numero Civico</label>
                     <input 
                       type="text" 
+                      maxLength={TEXT_LIMITS.ADDRESS_STREET}
                       placeholder="es. Via dei Prati, 12"
                       value={street}
-                      onChange={(e) => setStreet(e.target.value)}
+                      onChange={(e) => setStreet(sanitizeInputLive(e.target.value, TEXT_LIMITS.ADDRESS_STREET))}
                       className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold"
                       required
                     />
@@ -974,9 +984,9 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                       type="text" 
                       placeholder="es. 33170"
                       value={zip}
-                      onChange={(e) => setZip(e.target.value)}
+                      onChange={(e) => setZip(e.target.value.replace(/[^0-9]/g, '').slice(0, TEXT_LIMITS.ADDRESS_ZIP))}
                       className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold"
-                      maxLength={5}
+                      maxLength={TEXT_LIMITS.ADDRESS_ZIP}
                       required
                     />
                   </div>
@@ -986,9 +996,10 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Città</label>
                   <input 
                     type="text" 
+                    maxLength={TEXT_LIMITS.ADDRESS_CITY}
                     placeholder="es. Pordenone (PN)"
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
+                    onChange={(e) => setCity(sanitizeInputLive(e.target.value, TEXT_LIMITS.ADDRESS_CITY))}
                     className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold"
                     required
                   />

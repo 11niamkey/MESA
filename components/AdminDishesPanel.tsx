@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Plus, X, ImagePlus, Trash2, Loader2, Link2, Pencil, UtensilsCrossed } from 'lucide-react';
 import { Chef, Dish } from '../types';
 import { AllergensPicker, AllergensRow } from './Allergens';
+import { sanitizeInputLive, sanitizeText, TEXT_LIMITS } from '../utils/sanitize';
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 
@@ -289,14 +290,20 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, singleC
 
   const handleSave = () => {
     if (!chef || !canSave) return;
-    const tags = draft.tags.split(',').map(t => t.trim()).filter(Boolean);
-    const ingredients = draft.ingredients.split(',').map(i => i.trim()).filter(Boolean);
-    const preparation = draft.preparation.trim();
+    const tags = draft.tags
+      .split(',')
+      .map(t => sanitizeText(t, 40))
+      .filter(Boolean);
+    const ingredients = draft.ingredients
+      .split(',')
+      .map(i => sanitizeText(i, 60))
+      .filter(Boolean);
+    const preparation = sanitizeText(draft.preparation, TEXT_LIMITS.DISH_PREP);
     const dish: Dish = {
       ...(draft.original ?? { id: `d-${Date.now().toString(36)}`, chefId: chef.id }),
       chefId: chef.id,
-      name: draft.name.trim(),
-      description: draft.description.trim(),
+      name: sanitizeText(draft.name, TEXT_LIMITS.DISH_NAME),
+      description: sanitizeText(draft.description, TEXT_LIMITS.DISH_DESC),
       price: Math.round(priceValue * 100) / 100,
       image: draft.image.trim(),
       tags,
@@ -429,11 +436,12 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, singleC
                 </p>
               )}
 
-              <Field label="Nome del piatto">
+              <Field label="Nome del piatto" hint={`${draft.name.length}/${TEXT_LIMITS.DISH_NAME}`}>
                 <input
                   type="text"
+                  maxLength={TEXT_LIMITS.DISH_NAME}
                   value={draft.name}
-                  onChange={(e) => set({ name: e.target.value })}
+                  onChange={(e) => set({ name: sanitizeInputLive(e.target.value, TEXT_LIMITS.DISH_NAME) })}
                   placeholder="Es. Jollof Rice della Nonna"
                   autoFocus={isNew}
                   className="w-full p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-sm font-extrabold focus:ring-2 focus:ring-orange-500 outline-none"
@@ -442,8 +450,9 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, singleC
 
               <Field label="Descrizione" hint={`${draft.description.length}/${DESCRIPTION_MAX}`}>
                 <textarea
+                  maxLength={DESCRIPTION_MAX}
                   value={draft.description}
-                  onChange={(e) => set({ description: e.target.value.slice(0, DESCRIPTION_MAX) })}
+                  onChange={(e) => set({ description: sanitizeInputLive(e.target.value, DESCRIPTION_MAX) })}
                   rows={5}
                   placeholder="Ingredienti, storia, come viene preparato…"
                   className="w-full p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-sm font-medium leading-relaxed resize-none focus:ring-2 focus:ring-orange-500 outline-none"
@@ -464,8 +473,9 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, singleC
                 <Field label="Tag" hint="separati da virgola">
                   <input
                     type="text"
+                    maxLength={TEXT_LIMITS.DISH_TAGS}
                     value={draft.tags}
-                    onChange={(e) => set({ tags: e.target.value })}
+                    onChange={(e) => set({ tags: sanitizeInputLive(e.target.value, TEXT_LIMITS.DISH_TAGS) })}
                     placeholder="Piccante, Vegano"
                     className="w-full p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-sm font-bold focus:ring-2 focus:ring-orange-500 outline-none"
                   />
@@ -476,8 +486,9 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, singleC
                 <Field label="Ingredienti" hint="separati da virgola">
                   <input
                     type="text"
+                    maxLength={TEXT_LIMITS.DISH_INGREDIENTS}
                     value={draft.ingredients}
-                    onChange={(e) => set({ ingredients: e.target.value })}
+                    onChange={(e) => set({ ingredients: sanitizeInputLive(e.target.value, TEXT_LIMITS.DISH_INGREDIENTS) })}
                     placeholder="Pomodoro, Basilico, Olio EVO"
                     className="w-full p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-xs font-bold focus:ring-2 focus:ring-orange-500 outline-none"
                   />
@@ -485,8 +496,9 @@ const DishEditorModal: React.FC<DishEditorModalProps> = ({ draft, chefs, singleC
                 <Field label="Preparazione">
                   <input
                     type="text"
+                    maxLength={TEXT_LIMITS.DISH_PREP}
                     value={draft.preparation}
-                    onChange={(e) => set({ preparation: e.target.value })}
+                    onChange={(e) => set({ preparation: sanitizeInputLive(e.target.value, TEXT_LIMITS.DISH_PREP) })}
                     placeholder="Cottura lenta per 3 ore..."
                     className="w-full p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-xs font-bold focus:ring-2 focus:ring-orange-500 outline-none"
                   />

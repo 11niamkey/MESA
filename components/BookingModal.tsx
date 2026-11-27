@@ -4,6 +4,7 @@ import { Dish, Chef } from '../types';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
 import { isChefBookable } from '../utils/chefUtils';
+import { sanitizeInputLive, sanitizeText, TEXT_LIMITS } from '../utils/sanitize';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -215,14 +216,22 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
 
   const handleConfirm = () => {
     if (isSelectedDateValid && time) {
-      onConfirm(date, time, deliveryMode, { spiceLevel, saltLevel, notes });
+      onConfirm(date, time, deliveryMode, {
+        spiceLevel,
+        saltLevel,
+        notes: sanitizeText(notes, TEXT_LIMITS.ORDER_NOTE),
+      });
       resetBookingFields();
     }
   };
 
   const handleAddToCartClick = () => {
     if (isSelectedDateValid && time && onAddToCart) {
-      onAddToCart(date, time, deliveryMode, { spiceLevel, saltLevel, notes });
+      onAddToCart(date, time, deliveryMode, {
+        spiceLevel,
+        saltLevel,
+        notes: sanitizeText(notes, TEXT_LIMITS.ORDER_NOTE),
+      });
       resetBookingFields();
     }
   };
@@ -375,16 +384,22 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
 
                 {/* Notes */}
                 <div>
-                  <label className="flex items-center text-sm font-semibold text-gray-700 mb-2">
-                    <MessageSquare className="w-4 h-4 mr-1 text-gray-400" />
-                    Note per lo Chef
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center text-sm font-semibold text-gray-700">
+                      <MessageSquare className="w-4 h-4 mr-1 text-gray-400 shrink-0" />
+                      Note per lo Chef
+                    </label>
+                    <span className="text-[10px] font-bold text-gray-400">
+                      {notes.length}/{TEXT_LIMITS.ORDER_NOTE}
+                    </span>
+                  </div>
                   <textarea 
                     className="w-full text-sm p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-gray-50 resize-none text-black"
                     placeholder="Allergie, intolleranze o richieste speciali..."
+                    maxLength={TEXT_LIMITS.ORDER_NOTE}
                     rows={3}
                     value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
+                    onChange={(e) => setNotes(sanitizeInputLive(e.target.value, TEXT_LIMITS.ORDER_NOTE))}
                   />
                 </div>
               </div>

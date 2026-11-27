@@ -10,6 +10,7 @@ import {
 } from 'firebase/auth';
 import { ImagePickerBox } from './ImagePickerBox';
 import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, resolvePordenoneZip } from './italianTerritoryData';
+import { sanitizeInputLive, sanitizeText, TEXT_LIMITS } from '../utils/sanitize';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -110,11 +111,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const [fbName, ...fbLastNameParts] = displayName.split(' ');
     return {
       id: `usr-${fbUser.uid.slice(0, 6).toUpperCase()}`,
-      name: fbName.trim() || 'Utente',
-      lastName: fbLastNameParts.join(' ').trim() || 'Mesa',
+      authUid: fbUser.uid,
+      name: sanitizeText(fbName.trim() || 'Utente', TEXT_LIMITS.USER_NAME),
+      lastName: sanitizeText(fbLastNameParts.join(' ').trim() || 'Mesa', TEXT_LIMITS.USER_NAME),
       email: (fbUser.email || email).trim().toLowerCase(),
       ...(fbUser.photoURL ? { avatarUrl: fbUser.photoURL } : {}),
-      role: targetRole,
+      role: targetRole === 'admin' ? 'client' : targetRole,
       addresses: [],
       createdAt: new Date().toLocaleDateString('it-IT'),
       password: password || undefined
@@ -272,25 +274,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           : `usr-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
         const addresses: UserAddress[] = [];
-        if (street.trim() && city.trim() && zip.trim()) {
+        const cleanStreet = sanitizeText(street, TEXT_LIMITS.ADDRESS_STREET);
+        const cleanCity = sanitizeText(city, TEXT_LIMITS.ADDRESS_CITY);
+        const cleanZip = sanitizeText(zip, TEXT_LIMITS.ADDRESS_ZIP).replace(/[^0-9]/g, '');
+        if (cleanStreet && cleanCity && cleanZip) {
           addresses.push({
             id: `addr-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
-            street: street.trim(),
-            city: city.trim(),
-            zip: zip.trim(),
+            street: cleanStreet,
+            city: cleanCity,
+            zip: cleanZip,
             isVerified: false // Admin must verify it
           });
         }
 
+        const cleanPhone = sanitizeText(phone, TEXT_LIMITS.PHONE);
+        const cleanBrand = sanitizeText(brandName, TEXT_LIMITS.BRAND_NAME);
         const newUser: AppUser = {
           id: generatedId,
-          name: name.trim() || 'Utente',
-          lastName: lastName.trim() || 'Mesa',
+          ...(firebaseUid ? { authUid: firebaseUid } : {}),
+          name: sanitizeText(name, TEXT_LIMITS.USER_NAME) || 'Utente',
+          lastName: sanitizeText(lastName, TEXT_LIMITS.USER_NAME) || 'Mesa',
           email: normalizedInputEmail,
-          ...(phone.trim() ? { phone: phone.trim() } : {}),
-          ...(role === 'chef' && brandName.trim() ? { brandName: brandName.trim() } : {}),
+          ...(cleanPhone ? { phone: cleanPhone } : {}),
+          ...(role === 'chef' && cleanBrand ? { brandName: cleanBrand } : {}),
           ...(avatarUrl.trim() ? { avatarUrl: avatarUrl.trim() } : {}),
-          role: role,
+          role: role === 'admin' ? 'client' : role,
           addresses: addresses,
           createdAt: new Date().toLocaleDateString('it-IT'),
           password: password
@@ -559,8 +567,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <input 
                         type="text" 
                         placeholder="Nome" 
+                        maxLength={TEXT_LIMITS.USER_NAME}
                         value={name} 
-                        onChange={e => setName(e.target.value)} 
+                        onChange={e => setName(sanitizeInputLive(e.target.value, TEXT_LIMITS.USER_NAME))} 
                         className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
                         required 
                       />
@@ -569,8 +578,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <input 
                         type="text" 
                         placeholder="Cognome" 
+                        maxLength={TEXT_LIMITS.USER_NAME}
                         value={lastName} 
-                        onChange={e => setLastName(e.target.value)} 
+                        onChange={e => setLastName(sanitizeInputLive(e.target.value, TEXT_LIMITS.USER_NAME))} 
                         className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
                         required 
                       />
@@ -582,8 +592,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <input 
                         type="text" 
                         placeholder="Nome Cucina / Brand" 
+                        maxLength={TEXT_LIMITS.BRAND_NAME}
                         value={brandName} 
-                        onChange={e => setBrandName(e.target.value)} 
+                        onChange={e => setBrandName(sanitizeInputLive(e.target.value, TEXT_LIMITS.BRAND_NAME))} 
                         className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
                       />
                       <div className="relative">
@@ -591,8 +602,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         <input 
                           type="tel" 
                           placeholder="Telefono / WhatsApp *" 
+                          maxLength={TEXT_LIMITS.PHONE}
                           value={phone} 
-                          onChange={e => setPhone(e.target.value)} 
+                          onChange={e => setPhone(sanitizeInputLive(e.target.value, TEXT_LIMITS.PHONE))} 
                           className="w-full pl-11 pr-4 py-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-gray-50 text-sm font-bold placeholder-gray-400" 
                           required 
                         />
@@ -690,8 +702,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <input 
                     type="text" 
                     placeholder="Via e Numero Civico" 
+                    maxLength={TEXT_LIMITS.ADDRESS_STREET}
                     value={street}
-                    onChange={e => setStreet(e.target.value)}
+                    onChange={e => setStreet(sanitizeInputLive(e.target.value, TEXT_LIMITS.ADDRESS_STREET))}
                     className="w-full p-3 border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-white text-xs font-bold"
                     required
                   />
@@ -700,8 +713,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <input 
                       type="text" 
                       placeholder={role === 'chef' ? 'Comune es. Pordenone (PN)' : 'Città (es. Pordenone)'} 
+                      maxLength={TEXT_LIMITS.ADDRESS_CITY}
                       value={city}
-                      onChange={e => setCity(e.target.value)}
+                      onChange={e => setCity(sanitizeInputLive(e.target.value, TEXT_LIMITS.ADDRESS_CITY))}
                       className="w-full p-3 border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-white text-xs font-bold"
                       required
                     />
@@ -709,9 +723,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       type="text" 
                       placeholder="CAP es. 33170" 
                       value={zip}
-                      onChange={e => setZip(e.target.value)}
+                      onChange={e => setZip(e.target.value.replace(/[^0-9]/g, '').slice(0, TEXT_LIMITS.ADDRESS_ZIP))}
                       className="w-full p-3 border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-white text-xs font-bold"
-                      maxLength={5}
+                      maxLength={TEXT_LIMITS.ADDRESS_ZIP}
                       required
                     />
                   </div>
