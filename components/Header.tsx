@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ShoppingBag, UtensilsCrossed, Home, User, ChefHat, Heart, ClipboardList, Share2, Compass, ShieldCheck, MapPin } from 'lucide-react';
+import { ShoppingBag, UtensilsCrossed, Home, User, ChefHat, Heart, ClipboardList, Share2, Compass, ShieldCheck, MapPin, Smartphone } from 'lucide-react';
 import { ViewState, AppUser } from '../types';
 
 interface HeaderProps {
@@ -13,6 +13,7 @@ interface HeaderProps {
   onNavigate: (view: ViewState) => void;
   onAuthClick: () => void;
   onShareClick?: () => void;
+  onPwaInstallClick?: () => void;
   onOnboardingClick?: () => void;
   currentUser?: AppUser | null;
   onQuickAdminAccess?: () => void;
@@ -30,6 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigate, 
   onAuthClick, 
   onShareClick,
+  onPwaInstallClick,
   currentUser,
   activeAddress,
   onChangeAddress
@@ -185,6 +187,19 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-2.5 shrink-0">
+            {onPwaInstallClick && (
+              <button
+                type="button"
+                onClick={onPwaInstallClick}
+                className="flex items-center justify-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-2 rounded-full bg-neutral-900 hover:bg-orange-600 border border-white/10 hover:border-orange-500 text-gray-200 hover:text-black text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 shrink-0"
+                title="Salva MESA sulla schermata Home"
+                aria-label="Salva su Home"
+              >
+                <Smartphone className="w-4 h-4 shrink-0" />
+                <span className="hidden xl:inline whitespace-nowrap">Salva su Home</span>
+              </button>
+            )}
+
             {onShareClick && (
               <button
                 type="button"

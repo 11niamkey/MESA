@@ -3,7 +3,7 @@ import React from 'react';
 import { 
   ShieldCheck, 
   ChefHat, Utensils, UtensilsCrossed,
-  MapPin, ShoppingBag, Share2, Lock, ArrowRight
+  MapPin, ShoppingBag, Share2, Lock, ArrowRight, Smartphone
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -12,13 +12,15 @@ interface LandingPageProps {
   onNavigateToBecomeChef: () => void;
   onShareClick: () => void;
   onAdminAccess?: () => void;
+  onPwaInstallClick?: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onEnterApp,
   onNavigateToBecomeChef,
   onShareClick,
-  onAdminAccess
+  onAdminAccess,
+  onPwaInstallClick
 }) => {
   return (
     <div className="min-h-screen font-sans selection:bg-orange-100 bg-black text-white flex flex-col items-center justify-center px-4 py-3 sm:px-6 sm:py-5 relative overflow-hidden">
@@ -160,6 +162,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <button type="button" onClick={onShareClick} className="flex items-center gap-1.5 hover:text-orange-500 transition-colors">
             <Share2 className="w-3.5 h-3.5 shrink-0" /> Scopri di più
           </button>
+          {onPwaInstallClick && (
+            <button
+              type="button"
+              onClick={onPwaInstallClick}
+              className="flex items-center gap-1.5 text-orange-400 hover:text-white transition-colors"
+              aria-label="Salva MESA sulla schermata Home"
+            >
+              <Smartphone className="w-3.5 h-3.5 shrink-0" /> Salva su Home
+            </button>
+          )}
         </motion.div>
 
         {/* Accesso Admin discreto e separato in fondo */}

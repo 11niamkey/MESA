@@ -109,7 +109,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, initial
         {/* Lato Sinistro: QR Code & Diagnostica */}
         <div className="bg-black p-8 text-white flex flex-col items-center justify-center text-center md:w-64 shrink-0 border-b md:border-b-0 md:border-r border-white/10">
           <div className="w-14 h-14 bg-orange-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-orange-900/20 overflow-hidden p-0.5">
-             <img src="/images/mesa_app_icon.jpg" alt="MESA Logo" className="w-full h-full object-cover rounded-xl" />
+             <img src="/icons/icon-192.png" alt="MESA Logo" className="w-full h-full object-cover rounded-xl" />
           </div>
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-500 mb-6">MESA Access</p>
           <div className="relative bg-white p-4 rounded-[2.5rem] shadow-[0_0_50px_rgba(249,115,22,0.4)] group aspect-square flex items-center justify-center w-full max-w-[180px]">
@@ -122,7 +122,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, initial
              />
              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                <div className="w-8 h-8 bg-white p-1 rounded-xl shadow-md border border-orange-100 flex items-center justify-center">
-                 <img src="/images/mesa_app_icon.jpg" alt="MESA" className="w-full h-full object-cover rounded-lg" />
+                 <img src="/icons/icon-192.png" alt="MESA" className="w-full h-full object-cover rounded-lg" />
                </div>
              </div>
           </div>

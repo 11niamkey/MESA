@@ -10,11 +10,18 @@ document.addEventListener(
     const target = event.target as HTMLElement | null;
     if (target && target.tagName === 'IMG' && !target.dataset.fallbackApplied) {
       target.dataset.fallbackApplied = 'true';
-      (target as HTMLImageElement).src = '/images/mesa_logo_plate.png';
+      (target as HTMLImageElement).src = '/icons/icon-512.png';
     }
   },
   true
 );
+
+// Register minimal PWA Service Worker so mobile browsers expose beforeinstallprompt
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
 
 interface ErrorBoundaryState {
   hasError: boolean;

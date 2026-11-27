@@ -32,6 +32,7 @@ import { HeritageMenu } from './components/HeritageMenu';
 import { LandingPage } from './components/LandingPage';
 import { PersonalArea } from './components/PersonalArea';
 import { DishCatalogByOrigin } from './components/DishCatalogByOrigin';
+import { PwaInstallModal, BeforeInstallPromptEvent } from './components/PwaInstallModal';
 import { CountryFlag } from './components/CountryFlag';
 import { AllergensRow } from './components/Allergens';
 import { ConfirmDeleteOrdersModal } from './components/ConfirmDeleteOrdersModal';
@@ -1395,8 +1396,36 @@ function App() {
   const [authInitialRole, setAuthInitialRole] = useState<'client' | 'chef' | 'admin'>('client');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
+  const [deferredPwaPrompt, setDeferredPwaPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isPwaStandalone, setIsPwaStandalone] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [showTour, setShowTour] = useState(false);
+
+  // Capture PWA beforeinstallprompt and standalone state cleanly across the session
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const standaloneCheck =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as { standalone?: boolean }).standalone === true;
+    setIsPwaStandalone(standaloneCheck);
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPwaPrompt(e as BeforeInstallPromptEvent);
+    };
+    const handleAppInstalled = () => {
+      setDeferredPwaPrompt(null);
+      setIsPwaStandalone(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
 
   const [toastMessage, setToastMessage] = useState('');
   const [toastTitle, setToastTitle] = useState<string | undefined>(undefined);
@@ -2292,8 +2321,16 @@ function App() {
           onNavigateToBecomeChef={() => handleLandingRoleEnter('chef')} 
           onShareClick={() => setIsShareOpen(true)}
           onAdminAccess={handleQuickAdminAccess}
+          onPwaInstallClick={() => setIsPwaModalOpen(true)}
         />
         <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
+        <PwaInstallModal
+          isOpen={isPwaModalOpen}
+          onClose={() => setIsPwaModalOpen(false)}
+          deferredPrompt={deferredPwaPrompt}
+          onClearDeferredPrompt={() => setDeferredPwaPrompt(null)}
+          isStandaloneInstalled={isPwaStandalone}
+        />
         <AuthModal 
           isOpen={isAuthOpen} 
           onClose={handleAuthModalClose} 
@@ -2394,6 +2431,7 @@ function App() {
         onNavigate={navigateTo} 
         onAuthClick={() => { setAuthInitialRole('client'); setIsAuthOpen(true); }}
         onShareClick={() => setIsShareOpen(true)}
+        onPwaInstallClick={() => setIsPwaModalOpen(true)}
         onOnboardingClick={() => setIsOnboardingOpen(true)}
         currentUser={currentUser}
         onQuickAdminAccess={handleQuickAdminAccess}
@@ -2972,6 +3010,13 @@ function App() {
 
       <OrderReviewModal isOpen={!!reviewOrder} onClose={() => setReviewOrder(null)} order={reviewOrder!} onSubmit={handleReviewSubmit} />
       <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} contextChefId={selectedChef?.id} />
+      <PwaInstallModal
+        isOpen={isPwaModalOpen}
+        onClose={() => setIsPwaModalOpen(false)}
+        deferredPrompt={deferredPwaPrompt}
+        onClearDeferredPrompt={() => setDeferredPwaPrompt(null)}
+        isStandaloneInstalled={isPwaStandalone}
+      />
       <ChefOnboarding 
         isOpen={isOnboardingOpen} 
         onClose={() => setIsOnboardingOpen(false)} 
