@@ -22,8 +22,9 @@ const formatChefDisplayName = (name?: string) => {
 interface PersonalAreaProps {
   currentUser: AppUser;
   onLogout: () => void;
-  onUpdateUser: (updatedUser: AppUser) => void;
+  onUpdateUser: (updatedUser: AppUser) => Promise<void> | void;
   orders: Order[];
+  activeAddress?: string;
   reviews?: OrderReview[];
   onRateOrder?: (order: Order) => void;
   onNavigate: (view: ViewState) => void;
@@ -51,6 +52,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   onLogout, 
   onUpdateUser, 
   orders,
+  activeAddress = '',
   reviews = [],
   onRateOrder,
   onNavigate,
@@ -87,11 +89,13 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
     }
   }, [currentUser.id, currentUser.role]);
   
-  // States for adding address
+  // States for adding/deleting addresses
   const [street, setStreet] = useState('');
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
   const [addressError, setAddressError] = useState('');
+  const [confirmDeleteAddressId, setConfirmDeleteAddressId] = useState<string | null>(null);
+  const [addressActionMsg, setAddressActionMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
   // General Profile Edit States
   const [profileName, setProfileName] = useState(currentUser.name);
@@ -268,14 +272,57 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
     setCity('');
     setZip('');
     setAddressError('');
+    setAddressActionMsg({ type: 'success', text: 'Indirizzo aggiunto e inviato all\'Area Admin per la verifica.' });
   };
 
-  const handleDeleteAddress = (addressId: string) => {
+  const isAddressLockedByActiveOrder = (address: UserAddress): boolean => {
+    const activeDeliveryOrders = orders.filter(
+      o => o.userId === currentUser.id && o.deliveryMode === 'delivery' && !isConcludedOrder(o)
+    );
+    if (activeDeliveryOrders.length === 0) return false;
+
+    const formatted = `${address.street}, ${address.city}, ${address.zip}`.trim();
+    const verifiedCount = currentUser.addresses.filter(a => a.isVerified).length;
+    const isCurrentlyActive = Boolean(activeAddress && activeAddress.trim() === formatted);
+    const isLastVerified = address.isVerified && verifiedCount <= 1;
+    return isCurrentlyActive || isLastVerified;
+  };
+
+  const handleRequestDeleteAddress = (address: UserAddress) => {
+    setAddressActionMsg(null);
+    if (isAddressLockedByActiveOrder(address)) {
+      setConfirmDeleteAddressId(null);
+      setAddressActionMsg({
+        type: 'error',
+        text: 'Impossibile eliminare questo indirizzo: è collegato a un ordine a domicilio ancora attivo.',
+      });
+      return;
+    }
+    setConfirmDeleteAddressId(prev => (prev === address.id ? null : address.id));
+  };
+
+  const handleDeleteAddress = async (addressId: string) => {
+    const target = currentUser.addresses.find(a => a.id === addressId);
+    if (!target) return;
+    if (isAddressLockedByActiveOrder(target)) {
+      setConfirmDeleteAddressId(null);
+      setAddressActionMsg({
+        type: 'error',
+        text: 'Impossibile eliminare questo indirizzo: è collegato a un ordine a domicilio ancora attivo.',
+      });
+      return;
+    }
+
     const updatedUser: AppUser = {
       ...currentUser,
       addresses: currentUser.addresses.filter(addr => addr.id !== addressId)
     };
-    onUpdateUser(updatedUser);
+    setConfirmDeleteAddressId(null);
+    await onUpdateUser(updatedUser);
+    setAddressActionMsg({
+      type: 'success',
+      text: 'Indirizzo eliminato correttamente dal tuo profilo.',
+    });
   };
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -719,49 +766,105 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
               </div>
             </div>
 
+            {addressActionMsg && (
+              <div className={`p-3.5 rounded-2xl border text-xs font-bold flex items-center justify-between gap-3 ${
+                addressActionMsg.type === 'error'
+                  ? 'bg-red-50 border-red-200 text-red-800'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              }`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{addressActionMsg.text}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAddressActionMsg(null)}
+                  className="text-[10px] font-black uppercase underline shrink-0"
+                >
+                  Chiudi
+                </button>
+              </div>
+            )}
+
             {/* List of Addresses */}
             {currentUser.addresses.length === 0 ? (
               <div className="py-12 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-                <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3 shrink-0" />
                 <p className="font-bold text-gray-400 text-sm">Nessun indirizzo registrato al momento.</p>
                 <p className="text-xs text-gray-500 mt-1">Aggiungine uno qui sotto per abilitare gli ordini su MESA.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {currentUser.addresses.map((address) => (
-                  <div key={address.id} className="bg-white border border-gray-100 hover:border-orange-500/20 rounded-3xl p-6 shadow-sm relative group transition-all">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                {currentUser.addresses.map((address) => {
+                  const isConfirming = confirmDeleteAddressId === address.id;
+                  const formatted = `${address.street}, ${address.city}, ${address.zip}`.trim();
+                  const isActiveSelected = Boolean(activeAddress && activeAddress.trim() === formatted);
+                  return (
+                  <div key={address.id} className="bg-white border border-gray-100 hover:border-orange-500/20 rounded-3xl p-5 sm:p-6 shadow-sm relative transition-all flex flex-col justify-between gap-3">
                     
                     <button 
-                      onClick={() => handleDeleteAddress(address.id)}
-                      className="absolute top-6 right-6 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                      type="button"
+                      onClick={() => handleRequestDeleteAddress(address)}
+                      className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors shrink-0"
                       title="Elimina Indirizzo"
+                      aria-label={`Elimina indirizzo ${address.street}`}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4 shrink-0" />
                     </button>
 
-                    <div className="flex items-start gap-4 pr-8">
-                      <div className={`p-3 rounded-2xl ${address.isVerified ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700 animate-pulse'}`}>
-                        <MapPin className="w-5 h-5" />
+                    <div className="flex items-start gap-3.5 pr-10">
+                      <div className={`p-3 rounded-2xl shrink-0 ${address.isVerified ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700 animate-pulse'}`}>
+                        <MapPin className="w-5 h-5 shrink-0" />
                       </div>
-                      <div>
-                        <p className="font-black text-gray-950 text-base">{address.street}</p>
-                        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">{address.city}, {address.zip}</p>
+                      <div className="min-w-0">
+                        <p className="font-black text-gray-950 text-base break-words">{address.street}</p>
+                        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-0.5">{address.city}, {address.zip}</p>
                         
-                        {address.isVerified ? (
-                          <div className="inline-flex items-center gap-1.5 mt-4 text-[10px] font-black text-green-700 uppercase tracking-widest bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            Indirizzo Verificato
-                          </div>
-                        ) : (
-                          <div className="inline-flex items-center gap-1.5 mt-4 text-[10px] font-black text-amber-700 uppercase tracking-widest bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                            <ShieldAlert className="w-3.5 h-3.5" />
-                            In attesa di convalida Admin
-                          </div>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                          {address.isVerified ? (
+                            <div className="inline-flex items-center gap-1.5 text-[10px] font-black text-green-700 uppercase tracking-widest bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                              <span>Indirizzo Verificato</span>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 text-[10px] font-black text-amber-700 uppercase tracking-widest bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                              <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                              <span>In attesa di convalida Admin</span>
+                            </div>
+                          )}
+                          {isActiveSelected && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200 text-[9px] font-black uppercase tracking-wider">
+                              Attivo
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+
+                    {isConfirming && (
+                      <div className="mt-1 pt-3 border-t border-red-100 bg-red-50/70 -mx-1 px-3 py-2.5 rounded-2xl flex items-center justify-between gap-2 animate-fade-in">
+                        <span className="text-xs font-black text-red-900">Eliminare questo indirizzo?</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteAddressId(null)}
+                            className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 text-[10px] font-black uppercase tracking-wider transition-colors"
+                          >
+                            Annulla
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteAddress(address.id)}
+                            className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider shadow-sm transition-colors"
+                          >
+                            Elimina
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

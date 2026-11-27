@@ -766,14 +766,25 @@ function App() {
     }
   }, [currentUser]);
 
-  // Derive the verified address from the (Firestore-backed) user record
+  // Keep active verifiedAddress synced with the user's verified addresses (reset/fallback on deletion)
   useEffect(() => {
-    if (currentUser) {
-      const verified = currentUser.addresses.find(a => a.isVerified);
-      if (verified) {
-        setVerifiedAddress(`${verified.street}, ${verified.city}, ${verified.zip}`);
+    if (!currentUser) return;
+    const formattedList = currentUser.addresses
+      .filter(a => a.isVerified)
+      .map(a => `${a.street}, ${a.city}, ${a.zip}`);
+
+    setVerifiedAddress(prev => {
+      if (prev && formattedList.includes(prev)) {
+        return prev;
       }
-    }
+      const nextAddr = formattedList[0] || '';
+      if (nextAddr) {
+        localStorage.setItem('mesa_verified_address', nextAddr);
+      } else {
+        localStorage.removeItem('mesa_verified_address');
+      }
+      return nextAddr;
+    });
   }, [currentUser]);
 
   // Load favorites from the signed-in user's profile (preserving guest selections on login)
@@ -3044,6 +3055,7 @@ function App() {
             }}
             onUpdateUser={handleUpdateUser}
             orders={orders}
+            activeAddress={verifiedAddress}
             reviews={reviews}
             onRateOrder={currentUser.role === 'client' ? setReviewOrder : undefined}
             onNavigate={navigateTo}
