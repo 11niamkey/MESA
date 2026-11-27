@@ -70,7 +70,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 sm:left-6 sm:translate-x-0 z-[130] w-[94%] max-w-md animate-fade-in-up pointer-events-none"
+      className="fixed top-3 sm:top-20 left-1/2 -translate-x-1/2 z-[130] w-[94%] max-w-lg animate-fade-in-down pointer-events-none"
     >
       <div
         className={`pointer-events-auto px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl shadow-2xl border-2 backdrop-blur-md flex items-center justify-between gap-3 ${style.container}`}

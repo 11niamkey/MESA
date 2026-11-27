@@ -1,9 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Clock, ChefHat, Truck, ShoppingBag, Flame, Utensils, MessageSquare, Leaf, Info, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Calendar, Clock, ChefHat, Truck, ShoppingBag, Flame, Utensils, MessageSquare, Leaf, Info, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { Dish, Chef } from '../types';
-import { CountryFlag } from './CountryFlag';
-import { AllergensRow } from './Allergens';
-import { isChefBookable } from '../utils/chefUtils';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -11,39 +8,9 @@ interface BookingModalProps {
   dish: Dish;
   chef: Chef | undefined;
   onConfirm: (date: string, time: string, deliveryMode: 'delivery' | 'pickup', preferences: any) => void;
-  onAddToCart?: (date: string, time: string, deliveryMode: 'delivery' | 'pickup', preferences: any) => void;
 }
 
-const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
-const MONDAY_FIRST_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
-const ITALIAN_DAY_NAMES = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'] as const;
-
-const parseLocalDate = (dateStr: string): Date | null => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]) - 1;
-  const day = Number(match[3]);
-  const parsed = new Date(year, month, day);
-  if (
-    parsed.getFullYear() !== year ||
-    parsed.getMonth() !== month ||
-    parsed.getDate() !== day
-  ) {
-    return null;
-  }
-  parsed.setHours(0, 0, 0, 0);
-  return parsed;
-};
-
-const getTodayStart = (): Date => {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return now;
-};
-
-export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dish, chef, onConfirm, onAddToCart }) => {
-  const canBook = isChefBookable(chef) && !dish.isAvailableSoon;
+export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dish, chef, onConfirm }) => {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [deliveryMode, setDeliveryMode] = useState<'delivery' | 'pickup'>('pickup');
@@ -54,25 +21,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   const [notes, setNotes] = useState('');
 
   // Custom Calendar State
-  const [currentCalendarDate, setCurrentCalendarDate] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
   const currentMonth = currentCalendarDate.getMonth();
   const currentYear = currentCalendarDate.getFullYear();
-
-  useEffect(() => {
-    if (isOpen) {
-      const now = new Date();
-      setDate('');
-      setTime('');
-      setDeliveryMode('pickup');
-      setSpiceLevel(1);
-      setSaltLevel('Normal');
-      setNotes('');
-      setCurrentCalendarDate(new Date(now.getFullYear(), now.getMonth(), 1));
-    }
-  }, [isOpen, dish?.id, chef?.id]);
 
   const months = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -80,25 +31,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   ];
   const weekdays = ['Lu', 'Ma', 'Me', 'Gi', 'Ve', 'Sa', 'Do'];
 
-  const normalizedAvailableDays = useMemo<number[]>(() => {
-    if (!chef || !Array.isArray(chef.availableDays) || chef.availableDays.length === 0) {
-      return [...MONDAY_FIRST_ORDER];
-    }
-    const validSet = new Set(
-      chef.availableDays
-        .map((d) => Number(d))
-        .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
-    );
-    return validSet.size > 0 ? MONDAY_FIRST_ORDER.filter((d) => validSet.has(d)) : [...MONDAY_FIRST_ORDER];
-  }, [chef]);
-
-  const todayNow = new Date();
-  const isAtOrBeforeCurrentMonth =
-    currentYear < todayNow.getFullYear() ||
-    (currentYear === todayNow.getFullYear() && currentMonth <= todayNow.getMonth());
-
   const handlePrevMonth = () => {
-    if (!isAtOrBeforeCurrentMonth) {
+    const now = new Date();
+    if (currentYear > now.getFullYear() || (currentYear === now.getFullYear() && currentMonth > now.getMonth())) {
       setCurrentCalendarDate(new Date(currentYear, currentMonth - 1, 1));
     }
   };
@@ -109,19 +44,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
 
   const isDayInPast = (dayNum: number) => {
     const targetDate = new Date(currentYear, currentMonth, dayNum);
+    const today = new Date();
     targetDate.setHours(0, 0, 0, 0);
-    return targetDate < getTodayStart();
-  };
-
-  const isToday = (dayNum: number) => {
-    const targetDate = new Date(currentYear, currentMonth, dayNum);
-    targetDate.setHours(0, 0, 0, 0);
-    return targetDate.getTime() === getTodayStart().getTime();
+    today.setHours(0, 0, 0, 0);
+    return targetDate < today;
   };
 
   const isChefAvailableOnDay = (dayNum: number) => {
-    const dayOfWeek = new Date(currentYear, currentMonth, dayNum).getDay();
-    return normalizedAvailableDays.includes(dayOfWeek);
+    if (!chef || !chef.availableDays) return true;
+    const dateObj = new Date(currentYear, currentMonth, dayNum);
+    const dayOfWeek = dateObj.getDay();
+    return chef.availableDays.includes(dayOfWeek);
   };
 
   const formatDateStr = (y: number, m: number, d: number) => {
@@ -131,21 +64,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   };
 
   const handleSelectDay = (dayNum: number) => {
-    if (isDayInPast(dayNum) || !isChefAvailableOnDay(dayNum)) return;
-    const nextDate = formatDateStr(currentYear, currentMonth, dayNum);
-    if (nextDate !== date) {
-      setDate(nextDate);
-      setTime('');
-    }
+    setDate(formatDateStr(currentYear, currentMonth, dayNum));
   };
-
-  const selectedDateObj = useMemo(() => parseLocalDate(date), [date]);
-
-  const isSelectedDateValid = useMemo(() => {
-    if (!selectedDateObj) return false;
-    if (selectedDateObj < getTodayStart()) return false;
-    return normalizedAvailableDays.includes(selectedDateObj.getDay());
-  }, [selectedDateObj, normalizedAvailableDays]);
 
   const getChefTimeSlots = () => {
     const defaultSlots = [
@@ -196,103 +116,66 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
   };
 
   const getItalianAvailableDays = () => {
-    if (normalizedAvailableDays.length === 0) return 'Nessun giorno disponibile';
-    return normalizedAvailableDays.map(d => ITALIAN_DAY_NAMES[d]).join(', ');
+    if (!chef || !chef.availableDays) return '';
+    const dayNames = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+    return chef.availableDays.map(d => dayNames[d]).join(', ');
   };
 
   const timeSlots = getChefTimeSlots();
 
   if (!isOpen) return null;
 
-  const resetBookingFields = () => {
-    setSpiceLevel(1);
-    setSaltLevel('Normal');
-    setNotes('');
-    setDeliveryMode('pickup');
-    setDate('');
-    setTime('');
-  };
-
   const handleConfirm = () => {
-    if (isSelectedDateValid && time) {
+    if (date && time) {
       onConfirm(date, time, deliveryMode, { spiceLevel, saltLevel, notes });
-      resetBookingFields();
-    }
-  };
-
-  const handleAddToCartClick = () => {
-    if (isSelectedDateValid && time && onAddToCart) {
-      onAddToCart(date, time, deliveryMode, { spiceLevel, saltLevel, notes });
-      resetBookingFields();
+      // Reset
+      setSpiceLevel(1);
+      setSaltLevel('Normal');
+      setNotes('');
+      setDeliveryMode('pickup');
+      setDate('');
+      setTime('');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4">
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
+    <div className="fixed inset-0 z-[60] overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4 text-center">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
-      <div className="relative z-10 flex flex-col max-h-[90vh] overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl border-t-8 border-orange-500 animate-fade-in-up">
+        <div className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl border-t-8 border-orange-500 animate-fade-in-up">
           
           {/* Header */}
-          <div className="bg-gray-50 px-5 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between border-b border-gray-100 shrink-0">
-            <h3 className="text-lg sm:text-xl font-bold text-orange-600 flex items-center gap-2 min-w-0">
-              <Utensils className="w-5 h-5 text-orange-600 shrink-0" />
-              <span className="truncate">Dettagli & Prenotazione</span>
+          <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-b border-gray-100">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center">
+              <Utensils className="w-5 h-5 mr-2 text-orange-600" />
+              Dettagli & Prenotazione
             </h3>
-            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm hover:shadow-md transition-all shrink-0">
-              <X className="w-5 h-5 shrink-0" />
+            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm hover:shadow-md transition-all">
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="p-4 sm:p-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+          <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
             {/* Dish Info Expanded */}
-            <div className="mb-6 sm:mb-8 bg-white rounded-xl">
-              <div className="flex flex-col md:flex-row md:items-start gap-4 sm:gap-5">
-                <img 
-                  src={dish.image || DEFAULT_FOOD_IMAGE} 
-                  alt={dish.name} 
-                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_FOOD_IMAGE; }}
-                  className="w-full aspect-[16/10] md:aspect-auto md:w-32 md:h-32 rounded-xl object-cover shadow-md shrink-0" 
-                />
+            <div className="mb-8 bg-white rounded-xl">
+              <div className="flex flex-col md:flex-row md:items-start gap-5">
+                <img src={dish.image} alt={dish.name} className="w-full md:w-32 md:h-32 rounded-xl object-cover shadow-md" />
                 <div className="flex-1">
                   <div className="flex justify-between items-start">
-                    <h4 className="font-bold text-orange-600 text-xl mb-1">{dish.name}</h4>
+                    <h4 className="font-bold text-gray-900 text-xl mb-1">{dish.name}</h4>
                     <div className="text-orange-600 font-extrabold text-lg">€ {dish.price.toFixed(2)}</div>
                   </div>
                   
-                  <div className="flex items-center text-sm text-black mb-3 gap-1.5">
-                    <ChefHat className="w-4 h-4 text-orange-500 shrink-0" />
-                    <span>Cucinato da <span className="font-semibold">{chef?.name}</span></span>
-                    {chef?.nationality && <CountryFlag flag={chef.nationality} title={chef.countryName} size="sm" />}
+                  <div className="flex items-center text-sm text-gray-600 mb-3">
+                    <ChefHat className="w-4 h-4 mr-1 text-orange-500" />
+                    <span>Cucinato da <span className="font-semibold">{chef?.name}</span> {chef?.nationality}</span>
                   </div>
                   
                   {/* Full Description */}
-                  <p className="text-black text-sm leading-relaxed mb-3">
+                  <p className="text-gray-600 text-sm leading-relaxed mb-4">
                     {dish.description}
                   </p>
-
-                  {/* Badges: Prep time, Portion, Tags */}
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {!canBook && (
-                      <span className="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-amber-700" /> Disponibile a breve
-                      </span>
-                    )}
-                    <span className="px-2.5 py-1 bg-orange-50 text-orange-800 rounded-lg text-[10px] font-bold flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-orange-600" /> Preavviso: 25-35 min
-                    </span>
-                    <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-[10px] font-bold flex items-center gap-1">
-                      <Utensils className="w-3 h-3 text-gray-600" /> Porzione: ~350g
-                    </span>
-                    {dish.tags.map(tag => (
-                      <span key={tag} className="px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-[10px] font-semibold text-gray-500">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Allergens Row */}
-                  <AllergensRow allergens={dish.allergens} className="mb-3" />
 
                   {/* Ingredients & Preparation Details */}
                   {(dish.ingredients || dish.preparation) && (
@@ -302,7 +185,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                           <span className="font-bold text-orange-800 flex items-center text-xs uppercase tracking-wide mb-1">
                             <Leaf className="w-3 h-3 mr-1" /> Ingredienti
                           </span>
-                          <p className="text-black">{dish.ingredients.join(', ')}</p>
+                          <p className="text-gray-700">{dish.ingredients.join(', ')}</p>
                         </div>
                       )}
                       {dish.preparation && (
@@ -310,7 +193,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                           <span className="font-bold text-orange-800 flex items-center text-xs uppercase tracking-wide mb-1">
                             <Info className="w-3 h-3 mr-1" /> Preparazione
                           </span>
-                          <p className="text-black italic">"{dish.preparation}"</p>
+                          <p className="text-gray-700 italic">"{dish.preparation}"</p>
                         </div>
                       )}
                     </div>
@@ -323,7 +206,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
               
               {/* Left Col: Customization */}
               <div className="space-y-6">
-                <h4 className="font-bold text-orange-600 border-b pb-2 flex items-center">
+                <h4 className="font-bold text-gray-900 border-b pb-2 flex items-center">
                   <span className="bg-black text-white w-5 h-5 rounded-full flex items-center justify-center text-xs mr-2">1</span>
                   Personalizza il Piatto
                 </h4>
@@ -338,7 +221,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                       {[0, 1, 2, 3].map((level) => (
                         <button
                           key={level}
-                          type="button"
                           onClick={() => setSpiceLevel(level)}
                           className={`flex-1 py-1 text-xs font-bold rounded-md transition-colors ${
                             spiceLevel === level ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
@@ -359,7 +241,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                       {(['Low', 'Normal', 'High'] as const).map((level) => (
                         <button
                           key={level}
-                          type="button"
                           onClick={() => setSaltLevel(level)}
                           className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg border transition-all ${
                             saltLevel === level 
@@ -380,7 +261,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                     Note per lo Chef
                   </label>
                   <textarea 
-                    className="w-full text-sm p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-gray-50 resize-none text-black"
+                    className="w-full text-sm p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-gray-50 resize-none"
                     placeholder="Allergie, intolleranze o richieste speciali..."
                     rows={3}
                     value={notes}
@@ -391,115 +272,117 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
 
               {/* Right Col: Logistics */}
               <div className="space-y-6">
-                <h4 className="font-bold text-orange-600 border-b pb-2 flex items-center">
+                <h4 className="font-bold text-gray-900 border-b pb-2 flex items-center">
                   <span className="bg-black text-white w-5 h-5 rounded-full flex items-center justify-center text-xs mr-2">2</span>
                   Consegna e Data
                 </h4>
 
                 {/* Delivery Mode */}
-                <div className="flex items-stretch gap-1.5 p-1 bg-gray-100 rounded-xl">
+                <div className="flex p-1 bg-gray-100 rounded-xl">
                   <button
-                    type="button"
                     onClick={() => setDeliveryMode('pickup')}
-                    className={`shrink-0 flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all whitespace-nowrap ${
-                      deliveryMode === 'pickup' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    className={`flex-1 flex items-center justify-center py-2 text-sm font-bold rounded-lg transition-all ${
+                      deliveryMode === 'pickup' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'
                     }`}
                   >
-                    <ShoppingBag className="w-4 h-4 shrink-0" />
-                    <span>Ritiro</span>
+                    <ShoppingBag className="w-4 h-4 mr-2" />
+                    Ritiro
                   </button>
                   <button
-                    type="button"
                     onClick={() => setDeliveryMode('delivery')}
-                    className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2.5 py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all whitespace-nowrap overflow-hidden ${
-                      deliveryMode === 'delivery' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    className={`flex-1 flex items-center justify-center py-2 text-sm font-bold rounded-lg transition-all ${
+                      deliveryMode === 'delivery' ? (chef?.continent === 'Africa' ? 'bg-white text-[#2d5a27] shadow-sm' : 'bg-white text-orange-600 shadow-sm') : 'text-gray-400'
                     }`}
                   >
-                    <Truck className="w-4 h-4 shrink-0" />
-                    <span className="truncate">Domicilio <span className="text-[11px] opacity-85">(+€2.50)</span></span>
+                    <Truck className="w-4 h-4 mr-2" />
+                    Domicilio (+€2.50)
                   </button>
                 </div>
 
-                {/* Single Date Selector */}
-                <div className="bg-gray-50 border border-gray-200 p-3.5 sm:p-4 rounded-2xl relative overflow-hidden">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3.5">
-                    <label className="text-sm font-bold text-orange-600 flex items-center gap-1.5 whitespace-nowrap">
-                      <CalendarDays className="w-4 h-4 text-orange-600 shrink-0" />
-                      <span>Scegli Data</span>
+                {/* Date Selection */}
+                <div className="bg-gray-50 border border-gray-150 p-4 rounded-2xl relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                      <CalendarDays className={`w-4 h-4 ${chef?.continent === 'Africa' ? 'text-[#2d5a27]' : 'text-orange-500'}`} />
+                      Scegli Data
                     </label>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center space-x-2">
                       <button
                         onClick={handlePrevMonth}
                         type="button"
-                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-                        disabled={isAtOrBeforeCurrentMonth}
-                        aria-label="Mese precedente"
+                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-100 text-gray-650 hover:bg-gray-50 transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
+                        disabled={
+                          currentYear <= new Date().getFullYear() &&
+                          currentMonth <= new Date().getMonth()
+                        }
                       >
-                        <ChevronLeft className="w-4 h-4 shrink-0" />
+                        <ChevronLeft className="w-4 h-4" />
                       </button>
-                      <span className="text-xs font-black uppercase text-gray-800 select-none whitespace-nowrap px-1 text-center">
+                      <span className="text-xs font-black uppercase text-gray-700 select-none min-w-[95px] text-center">
                         {months[currentMonth]} {currentYear}
                       </span>
                       <button
                         onClick={handleNextMonth}
                         type="button"
-                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors shrink-0"
-                        aria-label="Mese successivo"
+                        className="p-1.5 rounded-lg bg-white shadow-sm border border-gray-100 text-gray-650 hover:bg-gray-50 transition-colors"
                       >
-                        <ChevronRight className="w-4 h-4 shrink-0" />
+                        <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Calendar Grid: Monday (LU) to Sunday (DO) */}
+                  {/* Calendar Grid */}
                   <div className="grid grid-cols-7 gap-1 text-center mb-3">
                     {weekdays.map(day => (
-                      <span key={day} className="text-[10px] font-black uppercase text-gray-400 pb-1">
+                      <span key={day} className="text-[10px] font-black uppercase text-gray-400">
                         {day}
                       </span>
                     ))}
                     {(() => {
                       const daysInMonthVal = new Date(currentYear, currentMonth + 1, 0).getDate();
-                      const firstDayIndexVal = new Date(currentYear, currentMonth, 1).getDay(); // 0=Dom..6=Sab
-                      const startOffsetVal = (firstDayIndexVal + 6) % 7; // 0=Lu..6=Do
+                      const firstDayIndexVal = new Date(currentYear, currentMonth, 1).getDay(); // Sunday=0
+                      const startOffsetVal = (firstDayIndexVal + 6) % 7; // Monday first
                       
                       const dayCells = [];
                       for (let i = 0; i < startOffsetVal; i++) {
-                        dayCells.push(<div key={`empty-${i}`} className="h-8 w-8 mx-auto" />);
+                        dayCells.push(<div key={`empty-${i}`} className="h-8 w-8" />);
                       }
 
                       for (let d = 1; d <= daysInMonthVal; d++) {
                         const inPast = isDayInPast(d);
-                        const todayCell = isToday(d);
                         const isAvailable = isChefAvailableOnDay(d);
-                        const isClickable = !inPast && isAvailable;
                         const dateStr = formatDateStr(currentYear, currentMonth, d);
-                        const isSelected = isSelectedDateValid && date === dateStr;
+                        const isSelected = date === dateStr;
+                        const isAfricanChef = chef?.continent === 'Africa';
 
                         let btnClass = "h-8 w-8 text-xs font-bold rounded-lg flex items-center justify-center transition-all relative mx-auto ";
                         
                         if (inPast) {
-                          btnClass += "text-gray-300 bg-gray-100/70 cursor-not-allowed line-through opacity-50";
+                          btnClass += "text-gray-200 cursor-not-allowed line-through";
                         } else if (!isAvailable) {
-                          btnClass += `text-gray-300 cursor-not-allowed ${todayCell ? 'ring-1 ring-gray-300' : ''}`;
+                          btnClass += "text-gray-300 hover:bg-gray-100/50 cursor-not-allowed";
                         } else if (isSelected) {
-                          btnClass += "bg-orange-600 text-white border border-orange-600 shadow-md scale-105 cursor-pointer";
+                          btnClass += isAfricanChef
+                            ? "bg-[#2d5a27] text-[#e5c158] shadow-md scale-105"
+                            : "bg-orange-600 text-white shadow-md scale-105";
                         } else {
-                          btnClass += `bg-orange-50 text-orange-600 hover:bg-orange-100 cursor-pointer border border-orange-200 ${todayCell ? 'ring-2 ring-orange-300' : ''}`;
+                          btnClass += isAfricanChef
+                            ? "bg-[#2d5a27]/10 text-[#2d5a27] hover:bg-[#2d5a27]/25 cursor-pointer border border-[#2d5a27]/20"
+                            : "bg-orange-50 text-orange-600 hover:bg-orange-100 cursor-pointer border border-orange-100";
                         }
 
                         dayCells.push(
                           <button
                             key={`day-${d}`}
-                            onClick={() => isClickable && handleSelectDay(d)}
-                            disabled={!isClickable}
+                            onClick={() => !inPast && isAvailable && handleSelectDay(d)}
+                            disabled={inPast || !isAvailable}
                             className={btnClass}
-                            title={inPast ? 'Data passata non selezionabile' : !isAvailable ? 'Chef non disponibile in questo giorno' : 'Seleziona data'}
+                            title={inPast ? 'Data passata' : !isAvailable ? 'Chef non disponibile' : 'Seleziona per ordinare'}
                             type="button"
                           >
                             <span>{d}</span>
-                            {isClickable && !isSelected && (
-                              <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-orange-600" />
+                            {isAvailable && !inPast && !isSelected && (
+                              <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${isAfricanChef ? 'bg-[#e5c158]' : 'bg-orange-600'}`} />
                             )}
                           </button>
                         );
@@ -509,105 +392,71 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, dis
                   </div>
 
                   {/* Informational Footer in Italian */}
-                  <div className="border-t border-gray-200/70 pt-2.5 flex flex-col gap-1.5">
-                    <div className="flex items-center text-[11px] text-black font-semibold gap-1.5">
-                      <span className="inline-block w-2 h-2 rounded-full bg-orange-500 shrink-0" />
-                      <span>
-                        Disponibile: <span className="font-bold text-orange-600">{getItalianAvailableDays()}</span>
-                      </span>
-                    </div>
-                    {isSelectedDateValid && selectedDateObj && (
-                      <div className="text-xs font-extrabold flex items-center justify-between mt-1 rounded-xl p-2 bg-orange-50 text-orange-700 border border-orange-100">
+                  <div className="border-t border-gray-200/60 pt-2 flex flex-col gap-1">
+                    {chef?.availableDays && (
+                      <div className="flex items-center text-[10px] text-gray-500 font-bold gap-1 mt-1">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        <span>Disponibile: <span className="text-gray-700">{getItalianAvailableDays()}</span></span>
+                      </div>
+                    )}
+                    {date && (
+                      <div className={`text-xs font-extrabold flex items-center justify-between mt-1 rounded-xl p-2 ${chef?.continent === 'Africa' ? 'bg-[#2d5a27]/10 text-[#2d5a27]' : 'bg-orange-50 text-orange-700'}`}>
                         <span>Data Selezionata:</span>
-                        <span className="capitalize tracking-wide font-black bg-white px-2.5 py-1 rounded-lg shadow-sm border border-orange-100 text-orange-600">
-                          {selectedDateObj.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                        <span className="uppercase tracking-wide font-black bg-white px-2 py-1 rounded-lg shadow-sm border border-gray-100">
+                          {new Date(date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
                         </span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Time Selection: shown ONLY after user selects a valid date */}
-                {isSelectedDateValid ? (
-                  <div className="animate-fade-in">
-                    <label className="block text-xs font-bold text-orange-600 uppercase mb-2">
-                      Orario di consegna/ritiro
-                    </label>
-                    <div className="grid grid-cols-4 gap-2 max-h-[140px] overflow-y-auto custom-scrollbar pr-1">
-                      {timeSlots.map(slot => (
-                        <button
-                          key={slot}
-                          type="button"
-                          onClick={() => setTime(slot)}
-                          className={`py-1.5 px-1 text-xs font-bold rounded-lg border transition-all ${
-                            time === slot
-                              ? 'bg-orange-600 text-white border-orange-600 shadow-sm'
-                              : 'bg-white text-gray-700 border-gray-200 hover:bg-orange-50 hover:border-orange-200'
-                          }`}
-                        >
-                          {slot}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-black/70 mt-2 font-medium italic">
-                      * Orari elaborati in base alla disponibilità indicata dello chef ({chef?.availability?.join(', ') || 'standard'})
-                    </p>
+                {/* Time Selection */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-550 uppercase mb-2">Orario di consegna/ritiro</label>
+                  <div className="grid grid-cols-4 gap-2 max-h-[140px] overflow-y-auto custom-scrollbar pr-1">
+                    {timeSlots.map(slot => (
+                      <button
+                        key={slot}
+                        onClick={() => setTime(slot)}
+                        className={`py-1.5 px-1 text-xs font-bold rounded-lg border transition-all ${
+                          time === slot
+                            ? (chef?.continent === 'Africa' ? 'bg-[#2d5a27] text-[#e5c158] border-[#2d5a27]' : 'bg-orange-600 text-white border-orange-600')
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-orange-50/50'
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-orange-200 bg-orange-50/40 p-4 text-center">
-                    <Clock className="w-5 h-5 text-orange-500 mx-auto mb-1.5" />
-                    <p className="text-xs font-semibold text-black">
-                      Seleziona prima una data valida dal calendario per visualizzare gli orari di consegna/ritiro.
-                    </p>
-                  </div>
-                )}
+                  <p className="text-[10px] text-gray-400 mt-2 font-medium italic">
+                    * Orari elaborati in base alla disponibilità indicata dello chef ({chef?.availability?.join(', ') || 'reali'})
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-50 px-4 sm:px-6 py-3.5 sm:py-4 border-t border-gray-200 space-y-2.5 shrink-0">
-            <div className="bg-orange-50 border border-orange-200 rounded-xl px-3.5 py-2 flex items-start gap-2 text-left">
-              <Info className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-              <p className="text-xs font-semibold text-black leading-snug">
-                {canBook
-                  ? "Nessun addebito online ora: il pagamento avviene al ritiro o alla consegna secondo le indicazioni dell'ordine."
-                  : "Profilo in attivazione per la beta: puoi aggiungere liberamente il piatto al carrello, ma l'invio definitivo dell'ordine sarà attivo a breve."}
-              </p>
+          <div className="bg-gray-50 px-6 py-4 flex justify-between items-center border-t border-gray-200">
+            <div className="text-sm text-gray-500 hidden sm:block">
+              {deliveryMode === 'delivery' ? 'Consegna a Domicilio inclusa' : 'Ritiro presso Chef'}
             </div>
-            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5">
-              <div className="text-xs sm:text-sm text-black font-medium hidden lg:block whitespace-nowrap">
-                {deliveryMode === 'delivery' ? 'Consegna (+€2.50)' : 'Ritiro presso Chef'}
-              </div>
-              <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto sm:ml-auto">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 sm:flex-none px-4 py-2.5 text-sm text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition-colors whitespace-nowrap"
-                >
-                  Annulla
-                </button>
-                {onAddToCart && (
-                  <button
-                    type="button"
-                    onClick={handleAddToCartClick}
-                    disabled={!isSelectedDateValid || !time}
-                    className="flex-1 sm:flex-none px-4 py-2.5 bg-black hover:bg-gray-800 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap"
-                  >
-                    <ShoppingBag className="w-4 h-4 shrink-0" />
-                    <span>Aggiungi al carrello</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleConfirm}
-                  disabled={!isSelectedDateValid || !time}
-                  className="flex-1 sm:flex-none px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center whitespace-nowrap"
-                >
-                  Invia Prenotazione
-                </button>
-              </div>
+            <div className="flex space-x-3 w-full sm:w-auto">
+              <button
+                onClick={onClose}
+                className="flex-1 sm:flex-none px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={!date || !time}
+                className="flex-1 sm:flex-none px-6 py-2.5 bg-black text-white font-bold rounded-xl shadow-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center"
+              >
+                Conferma
+              </button>
             </div>
           </div>
+        </div>
       </div>
     </div>
   );

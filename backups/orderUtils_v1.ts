@@ -47,27 +47,12 @@ export const isPastScheduledOrder = (order: Order): boolean => {
   return datedItems.every(d => d.getTime() < todayStart.getTime());
 };
 
-export const canClientCancelOrder = (order?: Pick<Order, 'status'> | null): boolean => {
-  if (!order) return false;
-  const normalizedStatus = String(order.status || '').trim().toUpperCase();
-  return normalizedStatus === 'PENDING_CONFIRMATION' || normalizedStatus === 'PENDING';
-};
-
 export const isConcludedOrder = (order: Order): boolean => {
   const normalizedStatus = String(order.status || '').trim().toUpperCase();
   if (CONCLUDED_STATUSES.has(normalizedStatus)) {
     return true;
   }
   return isPastScheduledOrder(order);
-};
-
-export const formatOrderCode = (orderId?: string): string => {
-  const trimmed = (orderId || '').trim();
-  if (!trimmed) return '#MESA';
-  if (/^MESA-/i.test(trimmed) || trimmed.length <= 12) {
-    return `#${trimmed.toUpperCase()}`;
-  }
-  return `#${trimmed.slice(-6).toUpperCase()}`;
 };
 
 export const formatOrderDeleteError = (err: unknown): string => {
