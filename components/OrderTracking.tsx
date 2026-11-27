@@ -1,29 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  PackageCheck, 
-  Utensils, 
-  Bike, 
-  CheckCircle, 
-  Clock, 
-  MapPin, 
-  MessageSquare, 
-  ChevronRight, 
-  Heart, 
-  Send, 
-  User, 
-  Navigation, 
-  Wifi, 
-  BellRing, 
-  DollarSign, 
-  Smartphone, 
-  Activity, 
-  Smartphone as PhoneIcon, 
-  Share2, 
-  AlertCircle,
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Bike,
+  Calendar,
+  Check,
+  CheckCircle2,
+  ChefHat,
+  ChevronDown,
+  ChevronLeft,
+  ChevronUp,
+  Clock,
+  MapPin,
+  MessageSquare,
+  PackageCheck,
+  Send,
+  Star,
+  Store,
+  User,
+  Utensils,
   XCircle,
-  Star
 } from 'lucide-react';
-import { Order, OrderReview, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Chef, AppUser } from '../types';
+import { AppUser, Chef, ORDER_STATUS_LABELS, Order, OrderReview, OrderStatus } from '../types';
 import { canClientCancelOrder } from '../utils/orderUtils';
 import { isOrderEligibleForReview } from '../utils/reviewUtils';
 
@@ -31,6 +27,13 @@ const formatChefDisplayName = (name?: string) => {
   const trimmed = (name || 'MESA').trim();
   return /^chef\b/i.test(trimmed) ? trimmed : `Chef ${trimmed}`;
 };
+
+interface ChatMessage {
+  id: string;
+  sender: 'user' | 'chef';
+  text: string;
+  time: string;
+}
 
 interface OrderTrackingProps {
   order: Order;
@@ -42,326 +45,290 @@ interface OrderTrackingProps {
   justPlaced?: boolean;
   onUpdateOrderStatus?: (orderId: string, status: OrderStatus) => void;
   onCancelOrder?: (orderId: string) => void;
+  deliveryAddress?: string;
 }
 
-const STATUS_CHAT_UPDATES: Partial<Record<OrderStatus, string>> = {
-  CONFIRMED: '✅ Ho confermato il tuo ordine! Lo stiamo inserendo subito in preparazione.',
-  PLACED: '✅ Ordine confermato e preso in carico!',
-  PREPARING: '🍳 Sto preparando il tuo piatto con ingredienti freschi!',
-  READY: '🍱 Il tuo ordine è pronto per il ritiro o la consegna!',
-  DELIVERING: '🛵 Il rider è partito con il tuo ordine!',
-  COMPLETED: '🎉 Ordine completato! Buon appetito da Chef e da MESA!',
-  REJECTED: '❌ Mi dispiace, non posso accettare questa prenotazione per la data richiesta.',
-  CANCELLED: '🚫 Ordine annullato dal cliente prima della conferma.',
+interface StepItem {
+  status: OrderStatus;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const PICKUP_STEPS: StepItem[] = [
+  { status: 'PENDING_CONFIRMATION', label: 'Inviato', icon: Clock },
+  { status: 'CONFIRMED', label: 'Confermato', icon: Check },
+  { status: 'PREPARING', label: 'In cucina', icon: Utensils },
+  { status: 'READY', label: 'Pronto', icon: PackageCheck },
+  { status: 'COMPLETED', label: 'Completato', icon: CheckCircle2 },
+];
+
+const DELIVERY_STEPS: StepItem[] = [
+  { status: 'PENDING_CONFIRMATION', label: 'Inviato', icon: Clock },
+  { status: 'CONFIRMED', label: 'Confermato', icon: Check },
+  { status: 'PREPARING', label: 'In cucina', icon: Utensils },
+  { status: 'READY', label: 'Pronto', icon: PackageCheck },
+  { status: 'DELIVERING', label: 'In consegna', icon: Bike },
+  { status: 'COMPLETED', label: 'Completato', icon: CheckCircle2 },
+];
+
+const getStatusSummary = (
+  status: OrderStatus,
+  isDelivery: boolean
+): { title: string; subtitle: string; badgeClass: string } => {
+  switch (status) {
+    case 'PENDING_CONFIRMATION':
+      return {
+        title: 'In attesa di conferma',
+        subtitle: 'Lo chef ha ricevuto la richiesta e confermerà a breve.',
+        badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+      };
+    case 'CONFIRMED':
+    case 'PLACED':
+      return {
+        title: 'Ordine confermato',
+        subtitle: 'Prenotazione accettata dallo chef per l’orario concordato.',
+        badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
+      };
+    case 'PREPARING':
+      return {
+        title: 'In cucina',
+        subtitle: 'I piatti sono in preparazione con ingredienti freschi.',
+        badgeClass: 'bg-orange-50 text-orange-800 border-orange-200',
+      };
+    case 'READY':
+      return {
+        title: isDelivery ? 'Pronto per la consegna' : 'Pronto per il ritiro',
+        subtitle: isDelivery
+          ? 'Il pacco è pronto e partirà verso il tuo indirizzo.'
+          : 'Puoi passare al punto di ritiro indicato dallo chef.',
+        badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      };
+    case 'DELIVERING':
+      return {
+        title: 'In consegna',
+        subtitle: 'L’ordine è in viaggio verso l’indirizzo di consegna.',
+        badgeClass: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+      };
+    case 'COMPLETED':
+      return {
+        title: isDelivery ? 'Ordine consegnato' : 'Ordine ritirato',
+        subtitle: 'Ordine completato con successo. Buon appetito!',
+        badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      };
+    case 'REJECTED':
+      return {
+        title: 'Ordine rifiutato',
+        subtitle: 'Lo chef non ha potuto accettare questo ordine.',
+        badgeClass: 'bg-red-50 text-red-700 border-red-200',
+      };
+    case 'CANCELLED':
+      return {
+        title: 'Ordine annullato',
+        subtitle: 'Questo ordine è stato annullato e non verrà preparato.',
+        badgeClass: 'bg-red-50 text-red-700 border-red-200',
+      };
+    default:
+      return {
+        title: ORDER_STATUS_LABELS[status] || 'Aggiornamento ordine',
+        subtitle: '',
+        badgeClass: 'bg-stone-100 text-stone-700 border-stone-200',
+      };
+  }
 };
 
-export const OrderTracking: React.FC<OrderTrackingProps> = ({ 
-  order, 
+const formatOrderMessageTime = (ts?: Date | string) => {
+  if (!ts) return '';
+  const parsed = ts instanceof Date ? ts : new Date(ts);
+  return Number.isNaN(parsed.getTime())
+    ? ''
+    : parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+export const OrderTracking: React.FC<OrderTrackingProps> = ({
+  order,
   reviews = [],
   onRateOrder,
-  onBack, 
-  chefs,
-  userRole,
+  onBack,
+  chefs = [],
+  userRole = 'client',
   justPlaced = false,
   onUpdateOrderStatus,
-  onCancelOrder
+  onCancelOrder,
+  deliveryAddress,
 }) => {
-  const isChefView = userRole === 'chef';
-  const [activeTab, setActiveTab] = useState<'chat' | 'chef-sim'>(isChefView ? 'chef-sim' : 'chat');
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState(order.messages || [
-    {
-      id: '1',
-      sender: 'chef',
-      text: order.status === 'PENDING_CONFIRMATION'
-        ? `Ciao! Ho ricevuto la tua prenotazione su MESA ed è in attesa di conferma. Ti aggiorno subito! 🍳`
-        : `Ciao! Ho visto il tuo ordine su MESA. Sto curando ogni dettaglio! 🍳`,
-      timestamp: new Date()
-    }
-  ]);
-  const [statusLogs, setStatusLogs] = useState<string[]>([
-    order.status === 'PENDING_CONFIRMATION'
-      ? `Prenotazione registrata: pagamento diretto al ritiro o alla consegna.`
-      : `Ordine confermato.`,
-    `Ordine contrassegnato con ID #${order.id.split('-')[0]}.`,
-    `Canale selezionato: APP MESA. Inviata notifica automatica in tempo reale.`
-  ]);
+  const isChefView = userRole === 'chef' || userRole === 'admin';
+  const isDelivery = order.deliveryMode === 'delivery';
+  const isTerminalCancelled = order.status === 'CANCELLED' || order.status === 'REJECTED';
+  const matchingChef = chefs.find(
+    (c) => c.id === order.chefId || c.name.toLowerCase() === order.chefName.toLowerCase()
+  );
 
-  const steps: { status: OrderStatus; label: string; icon: any; description: string }[] = [
-    { status: 'PENDING_CONFIRMATION', label: 'In attesa di conferma', icon: Clock, description: 'Prenotazione inviata, in attesa di conferma dallo chef' },
-    { status: 'CONFIRMED', label: 'Confermato', icon: PackageCheck, description: 'Lo chef ha confermato la tua prenotazione' },
-    { status: 'PREPARING', label: 'In Cucina', icon: Utensils, description: 'Ingredienti freschi in preparazione' },
-    { status: 'READY', label: 'Pronto', icon: CheckCircle, description: 'Il tuo piatto è pronto!' },
-    { status: 'DELIVERING', label: 'In Consegna', icon: Bike, description: 'Il rider è per strada' },
-    { status: 'COMPLETED', label: 'Consegnato', icon: Heart, description: 'Buon appetito!' }
-  ];
+  const steps = isDelivery ? DELIVERY_STEPS : PICKUP_STEPS;
+  const normalizedStatus: OrderStatus = order.status === 'PLACED' ? 'CONFIRMED' : order.status;
+  const activeStepIndex = steps.findIndex((step) => step.status === normalizedStatus);
+  const statusSummary = getStatusSummary(order.status, isDelivery);
 
-  const activeSteps = order.deliveryMode === 'pickup' 
-    ? steps.filter(s => s.status !== 'DELIVERING')
-    : steps;
+  const firstScheduledItem = order.items.find((item) => item.scheduledDate || item.scheduledTime);
+  const scheduleLabel = [
+    firstScheduledItem?.scheduledDate,
+    firstScheduledItem?.scheduledTime || order.estimatedTime,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
-  const normalizedStepStatus: OrderStatus = order.status === 'PLACED' ? 'CONFIRMED' : order.status;
-  const rawStepIndex = activeSteps.findIndex(s => s.status === normalizedStepStatus);
-  const currentStepIndex = rawStepIndex >= 0 ? rawStepIndex : 0;
-  const isRejected = order.status === 'REJECTED';
-  const isCancelled = order.status === 'CANCELLED';
-  const isTerminated = isRejected || isCancelled;
-  const allowClientCancel = !isChefView && Boolean(onCancelOrder) && canClientCancelOrder(order);
-  const lastTrackedStatusRef = React.useRef<OrderStatus>(order.status);
+  const existingReview = reviews.find((r) => r.orderId === order.id);
+  const alreadyReviewed = Boolean(existingReview || order.hasReview || order.isReviewed);
+  const reviewedScore = existingReview?.ratingOverall ?? order.reviewRating;
+  const canRate = !isChefView && isOrderEligibleForReview(order, reviews) && Boolean(onRateOrder);
+  const canCancel = !isChefView && Boolean(onCancelOrder) && canClientCancelOrder(order);
 
-  // Sync messages from Firestore
-  useEffect(() => {
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [messageInput, setMessageInput] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (order.messages && order.messages.length > 0) {
-      setMessages(order.messages);
-    }
-  }, [order.messages]);
-
-  // Append live timeline status update message in ORDINI chat when Firestore updates order status
-  useEffect(() => {
-    if (lastTrackedStatusRef.current !== order.status) {
-      lastTrackedStatusRef.current = order.status;
-      const updateText = STATUS_CHAT_UPDATES[order.status];
-      if (updateText) {
-        setMessages(prev => {
-          if (prev.some(m => m.text === updateText)) return prev;
-          return [
-            ...prev,
-            {
-              id: `status-${order.id}-${order.status}`,
-              sender: 'chef',
-              text: updateText,
-              timestamp: new Date(),
-            },
-          ];
-        });
-      }
-      const timeNow = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-      const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status;
-      setStatusLogs(prev => [`[${timeNow}] Stato aggiornato: ${statusLabel}`, ...prev]);
-    }
-  }, [order.id, order.status]);
-
-  // Enforce separation: clients must never enter chef-sim tab
-  useEffect(() => {
-    setActiveTab(isChefView ? 'chef-sim' : 'chat');
-  }, [isChefView]);
-
-  const handleSendMessage = () => {
-    if (!chatInput.trim()) return;
-    const newMsg = { id: Date.now().toString(), sender: 'user' as const, text: chatInput, timestamp: new Date() };
-    setMessages(prev => [...prev, newMsg]);
-    setChatInput('');
-    
-    // Simulate chef auto reply
-    setTimeout(() => {
-      setMessages(prev => [...prev, { 
-        id: Date.now().toString(), 
-        sender: 'chef', 
-        text: "Ricevuto! Me ne occupo subito. Ci aggiorniamo a breve! 😊🍳", 
-        timestamp: new Date() 
-      }]);
-    }, 2000);
-  };
-
-  const updateStatusFromChefTerminal = (nextStatus: OrderStatus, automatedReplyText?: string) => {
-    if (onUpdateOrderStatus) {
-      onUpdateOrderStatus(order.id, nextStatus);
-    }
-    
-    // Add custom log to simulator console
-    const timeNow = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setStatusLogs(prev => [
-      `[${timeNow}] Stato ordine cambiato in: ${nextStatus}`, 
-      ...prev
-    ]);
-
-    // Append automated chef chat message to user
-    if (automatedReplyText) {
-      setTimeout(() => {
-        setMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          sender: 'chef',
-          text: automatedReplyText,
-          timestamp: new Date()
-        }]);
-      }, 800);
-    }
-  };
-
-  const timelineEntries: OrderTimelineEntry[] = React.useMemo(() => {
-    if (order.timeline && order.timeline.length > 0) {
-      return order.timeline.map((entry) => ({
-        ...entry,
-        timestamp: entry.timestamp instanceof Date ? entry.timestamp : new Date(entry.timestamp),
+      return order.messages.map((m, idx) => ({
+        id: m.id || `msg-${idx}`,
+        sender: m.sender === 'chef' ? 'chef' : 'user',
+        text: m.text,
+        time: formatOrderMessageTime(m.timestamp),
       }));
     }
-    const baseTime = order.timestamp instanceof Date ? order.timestamp : new Date(order.timestamp);
-    const entries: OrderTimelineEntry[] = [
+    return [
       {
-        id: `tl-created-${order.id}`,
-        status: 'PENDING_CONFIRMATION',
-        title: 'Ordine inviato',
-        description: 'Ordine inviato! In attesa di conferma dallo chef.',
-        timestamp: baseTime,
+        id: 'welcome-msg',
+        sender: 'chef',
+        text: `Ciao ${order.customerName?.split(' ')[0] || ''}! Ho ricevuto il tuo ordine #${order.id.slice(-4)}. Scrivimi pure qui se hai bisogno.`,
+        time: formatOrderMessageTime(order.timestamp || new Date()),
       },
     ];
-    if (order.status !== 'PENDING_CONFIRMATION') {
-      entries.push({
-        id: `tl-current-${order.id}-${order.status}`,
-        status: order.status,
-        title: ORDER_STATUS_LABELS[order.status] || order.status,
-        description: STATUS_CHAT_UPDATES[order.status] || 'Aggiornamento stato in tempo reale.',
-        timestamp: new Date(),
-      });
+  });
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isChatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-    return entries;
-  }, [order.id, order.status, order.timeline, order.timestamp]);
+  }, [messages, isChatOpen]);
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = messageInput.trim();
+    if (!trimmed) return;
+
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `msg-${Date.now()}`,
+        sender: isChefView ? 'chef' : 'user',
+        text: trimmed,
+        time: now,
+      },
+    ]);
+    setMessageInput('');
+  };
+
+  const pickupLocationText = matchingChef?.location || 'Cucina dello Chef (indirizzo comunicato in chat)';
+  const deliveryAddressText = deliveryAddress || 'Indirizzo registrato dal cliente';
 
   return (
-    <div className="animate-fade-in space-y-6 max-w-5xl mx-auto px-2 pb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <button onClick={onBack} className="text-gray-400 hover:text-black flex items-center text-sm font-bold w-fit">
-          <ChevronRight className="w-4 h-4 rotate-180 mr-1" /> Torna alla dashboard
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4">
+      {/* Header compatto */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-stone-600 hover:text-stone-900 bg-white border border-stone-200 rounded-xl px-3 py-2 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4 shrink-0" />
+          <span>{isChefView ? 'Torna alla Dashboard' : 'I miei ordini'}</span>
         </button>
+
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100 uppercase tracking-widest">
-            {order.status === 'PENDING_CONFIRMATION' ? 'PAGAMENTO AL RITIRO / CONSEGNA' : 'STATO PRENOTAZIONE LIVE'}
+          <span className="text-xs font-semibold text-stone-500 bg-stone-100 px-2.5 py-1.5 rounded-lg">
+            Ordine #{order.id.slice(-5).toUpperCase()}
           </span>
-          <span className="text-[10px] font-black text-gray-500 bg-gray-100 px-3 py-1 rounded-full uppercase tracking-widest font-mono">
-            ID #{order.id.split('-')[0]}
+          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg">
+            Contanti {isDelivery ? 'alla consegna' : 'al ritiro'}
           </span>
         </div>
       </div>
 
-      {!isChefView && order.status === 'COMPLETED' && (() => {
-        const submittedReview = reviews.find(r => r.orderId === order.id);
-        const eligible = isOrderEligibleForReview(order, reviews) && Boolean(onRateOrder);
-        return (
-          <div className="bg-orange-50 border-2 border-orange-200 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-sm">
-            <div className="flex items-start sm:items-center gap-3.5">
-              <div className="w-10 h-10 rounded-2xl bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                <Star className="w-5 h-5 fill-current shrink-0" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm font-black text-gray-900">
-                  {eligible ? 'Ordine completato! Come ti sei trovato?' : 'Grazie per la tua recensione verificata'}
-                </p>
-                <p className="text-[11px] sm:text-xs font-medium text-gray-600 mt-0.5">
-                  {eligible
-                    ? `Valuta piatti, servizio e packaging di ${formatChefDisplayName(order.chefName)}.`
-                    : 'La tua valutazione aiuta la community MESA a scegliere le cucine migliori.'}
-                </p>
-              </div>
-            </div>
-            {eligible ? (
-              <button
-                type="button"
-                onClick={() => onRateOrder?.(order)}
-                className="px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all shrink-0"
-              >
-                <Star className="w-4 h-4 fill-current shrink-0" />
-                <span>Valuta ordine</span>
-              </button>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black shrink-0">
-                <Star className="w-4 h-4 fill-current text-amber-500 shrink-0" />
-                <span>{(submittedReview?.ratingOverall ?? order.reviewRating ?? 5).toFixed(1)} / 5 • Recensito</span>
-              </span>
-            )}
+      {justPlaced && !isChefView && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="text-sm text-emerald-900">
+            <p className="font-semibold">Ordine inviato allo chef!</p>
+            <p className="text-emerald-700 text-xs mt-0.5">
+              Pagherai €{order.total.toFixed(2)} in contanti al momento {isDelivery ? 'della consegna' : 'del ritiro'}.
+            </p>
           </div>
-        );
-      })()}
-
-      {!isChefView && (justPlaced || order.status === 'PENDING_CONFIRMATION') && (
-        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-sm">
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
-              <CheckCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs sm:text-sm font-black text-emerald-950">
-                Ordine inviato! In attesa di conferma dallo chef
-              </p>
-              <p className="text-[11px] sm:text-xs font-medium text-emerald-800 mt-0.5">
-                Riceverai un avviso in tempo reale nella barra in alto e in questa timeline appena {formatChefDisplayName(order.chefName)} aggiornerà lo stato.
-              </p>
-            </div>
-          </div>
-          {allowClientCancel && (
-            <button
-              type="button"
-              onClick={() => onCancelOrder?.(order.id)}
-              className="px-4 py-2.5 bg-white hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all shrink-0"
-            >
-              <XCircle className="w-3.5 h-3.5" />
-              <span>Annulla Ordine</span>
-            </button>
-          )}
         </div>
       )}
 
-      <div className={`rounded-[2.5rem] p-6 sm:p-8 text-white relative overflow-hidden shadow-2xl ${
-        isTerminated
-          ? 'bg-gradient-to-r from-red-600 to-rose-700'
-          : order.status === 'CONFIRMED' || order.status === 'COMPLETED'
-            ? 'bg-gradient-to-r from-emerald-600 to-green-600'
-            : 'bg-gradient-to-r from-orange-500 to-amber-600'
-      }`}>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full opacity-10 blur-3xl -mr-24 -mt-24"></div>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 relative z-10">
+      {/* 1. Card Stato Ordine + Barra compatta */}
+      <section className="bg-white border border-stone-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-              <p className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white/80">
-                {isChefView ? 'Stato Ordine (Vista Cuoco)' : 'Stato Ordine (Vista Cliente)'}
-              </p>
-            </div>
-            <h3 className="text-3xl sm:text-4xl font-black tracking-tight">
-              {isRejected ? 'Rifiutato' : isCancelled ? 'Annullato' : activeSteps[currentStepIndex]?.label}
-            </h3>
-            <p className="text-xs sm:text-sm text-white/95 mt-1 font-medium">
-              {isRejected
-                ? 'Lo chef non ha potuto accettare questa prenotazione. Nessun addebito è stato effettuato.'
-                : isCancelled
-                  ? 'Prenotazione annullata dal cliente prima della conferma. Nessun addebito è stato effettuato.'
-                  : activeSteps[currentStepIndex]?.description}
-            </p>
-          </div>
-          <div className="bg-white/10 backdrop-blur-md p-4 rounded-3xl border border-white/25 text-right w-full md:w-auto">
-            <p className="text-[9px] font-black uppercase tracking-widest text-white/80 mb-0.5">
-              {order.deliveryMode === 'delivery' ? 'Consegna Prenotata' : 'Ritiro Prenotato'}
-            </p>
-            <p className="text-xl sm:text-2xl font-black font-mono text-white">{order.estimatedTime === 'In arrivo...' ? '35-45 Minuti' : order.estimatedTime}</p>
+            <span
+              className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${statusSummary.badgeClass}`}
+            >
+              {ORDER_STATUS_LABELS[order.status]}
+            </span>
+            <h1 className="text-lg sm:text-xl font-bold text-stone-900 mt-2">
+              {statusSummary.title}
+            </h1>
+            {statusSummary.subtitle && (
+              <p className="text-sm text-stone-600 mt-0.5">{statusSummary.subtitle}</p>
+            )}
           </div>
         </div>
 
-        {/* Progress Bar steps */}
-        {!isTerminated && (
-          <div className="relative mt-8 px-2 sm:px-6">
-            <div className="absolute top-5 left-8 right-8 h-1 bg-white/20"></div>
-            <div 
-              className="absolute top-5 left-8 h-1 bg-white transition-all duration-1000 shadow-lg"
-              style={{ width: `calc(${(currentStepIndex / (activeSteps.length - 1)) * 100}% - 4px)` }}
-            ></div>
-            
-            <div className="flex justify-between relative z-10">
-              {activeSteps.map((step, idx) => {
-                const Icon = step.icon;
-                const isCompleted = idx < currentStepIndex;
-                const isActive = idx === currentStepIndex;
+        {/* Barra progressiva orizzontale compatta */}
+        {!isTerminalCancelled ? (
+          <div className="pt-1">
+            <div className={`grid ${isDelivery ? 'grid-cols-6 gap-1 sm:gap-2' : 'grid-cols-5 gap-1.5 sm:gap-2'}`}>
+              {steps.map((step, index) => {
+                const StepIcon = step.icon;
+                const isDone = activeStepIndex > index || order.status === 'COMPLETED';
+                const isCurrent = activeStepIndex === index && order.status !== 'COMPLETED';
 
                 return (
-                  <div key={step.status} className="flex flex-col items-center">
-                    <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all ${
-                      isCompleted ? 'bg-green-500 text-white shadow-lg border-2 border-white' : 
-                      isActive ? 'bg-white text-orange-600 shadow-2xl scale-125 ring-4 ring-white/30' : 
-                      'bg-white/15 border border-white/20 text-white/50'
-                    }`}>
-                      <Icon className="w-5 h-5" />
+                  <div
+                    key={step.status}
+                    className="flex flex-col items-center text-center gap-1.5 min-w-0"
+                  >
+                    <div
+                      className={`w-full h-1.5 rounded-full transition-colors ${
+                        isDone
+                          ? 'bg-emerald-500'
+                          : isCurrent
+                          ? 'bg-orange-500 animate-pulse'
+                          : 'bg-stone-200'
+                      }`}
+                    />
+                    <div
+                      className={`w-7 h-7 rounded-full flex items-center justify-center border transition-colors ${
+                        isDone
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-600'
+                          : isCurrent
+                          ? 'bg-orange-50 border-orange-500 text-orange-600'
+                          : 'bg-stone-50 border-stone-200 text-stone-400'
+                      }`}
+                    >
+                      <StepIcon className="w-3.5 h-3.5 shrink-0" />
                     </div>
-                    <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-widest mt-2 hidden sm:block ${
-                      isActive ? 'text-white' : 'text-white/60'
-                    }`}>
+                    <span
+                      className={`text-[10px] sm:text-xs font-semibold leading-tight truncate w-full ${
+                        isDone
+                          ? 'text-emerald-700'
+                          : isCurrent
+                          ? 'text-orange-700'
+                          : 'text-stone-400'
+                      }`}
+                    >
                       {step.label}
                     </span>
                   </div>
@@ -369,378 +336,370 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
               })}
             </div>
           </div>
+        ) : (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5 flex items-center gap-2 text-xs sm:text-sm text-red-700">
+            <XCircle className="w-4 h-4 shrink-0" />
+            <span>
+              {order.status === 'REJECTED'
+                ? 'Ordine rifiutato dallo chef. Puoi scegliere un altro piatto dallo storefront.'
+                : 'Ordine annullato. Puoi effettuare un nuovo ordine dallo storefront.'}
+            </span>
+          </div>
         )}
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Tracking & Map */}
-        <div className="lg:col-span-7 space-y-6">
-          {/* Simulated Live Map */}
-          <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
-            <div className="bg-black py-4 px-6 text-white text-sm font-bold flex justify-between items-center">
-              <span className="flex items-center gap-1.5 font-black text-[10px] uppercase tracking-widest">
-                <Activity className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
-                Dettagli Consegna & GPS MESA
-              </span>
-              <div className="flex items-center gap-3">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <span className="text-[9px] font-black uppercase tracking-widest text-green-400">Canale GPS Attivo</span>
-              </div>
-            </div>
-            
-            <div className="h-64 bg-gray-50 relative overflow-hidden">
-               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/pinstriped-suit.png')] opacity-10"></div>
-               {/* Map Grid Animation */}
-               <div className="absolute inset-0 grid grid-cols-12 grid-rows-8 gap-4 p-4 opacity-20">
-                  {Array.from({length: 96}).map((_, i) => <div key={i} className="border border-black/10 rounded-sm"></div>)}
-               </div>
-               
-               {/* Pulsing Rider Location */}
-               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                  <div className="relative">
-                    <div className="absolute -inset-4 bg-orange-500/20 rounded-full animate-ping"></div>
-                    <div className="relative w-8 h-8 bg-black rounded-full flex items-center justify-center shadow-2xl border-2 border-orange-500">
-                       <Navigation className="w-4 h-4 text-orange-500 fill-current rotate-45" />
-                    </div>
-                  </div>
-               </div>
-
-               <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-xl border border-orange-100 flex items-center gap-3">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-800">🛵 Consegna: {order.deliveryMode === 'delivery' ? 'Domicilio' : 'Ritiro in Sede'}</span>
-               </div>
-            </div>
-
-            <div className="p-6 sm:p-8 space-y-4">
-              <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                <div>
-                  <h4 className="font-black italic text-gray-900 text-lg">Piatto ordinato da {formatChefDisplayName(order.chefName)}</h4>
-                  <p className="text-gray-500 text-xs mt-0.5">Grazie per aver sostenuto la vera cucina fatta in casa locale.</p>
-                </div>
-                <div className="bg-orange-50 text-orange-700 font-mono font-black text-xs px-3 py-1.5 rounded-xl border border-orange-100">
-                  € {order.total.toFixed(2)}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {order.items.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-                    <div>
-                      <h5 className="font-bold text-xs text-gray-800">{item.name} <span className="text-orange-500 ml-1">x{item.quantity}</span></h5>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{item.preferences.notes ? `Note: "${item.preferences.notes}"` : 'Senza preferenze particolari'}</p>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-gray-700">€ {(item.price * item.quantity).toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
+        {/* Info essenziali modalità e orario */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-stone-100 text-xs sm:text-sm">
+          <div className="flex items-start gap-2.5 bg-stone-50 rounded-xl p-3">
+            {isDelivery ? (
+              <Bike className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+            ) : (
+              <Store className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0">
+              <p className="font-semibold text-stone-800">
+                {isDelivery ? 'Consegna a domicilio' : 'Ritiro in sede'}
+              </p>
+              <p className="text-stone-600 text-xs mt-0.5 break-words flex items-start gap-1">
+                <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-stone-400" />
+                <span>{isDelivery ? deliveryAddressText : pickupLocationText}</span>
+              </p>
             </div>
           </div>
 
-          {/* Real-time Order Timeline inside ORDINI */}
-          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-orange-600" />
-                <h4 className="font-black text-gray-900 text-sm uppercase tracking-wider">Timeline Ordine & Aggiornamenti</h4>
-              </div>
-              <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 uppercase tracking-widest">
-                Live
-              </span>
-            </div>
-            <div className="space-y-4">
-              {timelineEntries.map((entry, idx) => {
-                const isLast = idx === timelineEntries.length - 1;
-                const isEntryRejected = entry.status === 'REJECTED';
-                return (
-                  <div key={entry.id} className="flex items-start gap-3">
-                    <div className="flex flex-col items-center">
-                      <span
-                        className={`w-3 h-3 rounded-full mt-1 ${
-                          isEntryRejected || entry.status === 'CANCELLED'
-                            ? 'bg-red-500'
-                            : isLast
-                              ? 'bg-orange-600 ring-4 ring-orange-100'
-                              : 'bg-emerald-500'
-                        }`}
-                      />
-                      {!isLast && <span className="w-0.5 h-7 bg-gray-200 mt-1" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-black text-gray-900">{entry.title}</p>
-                        <span className="text-[10px] font-mono text-gray-400 shrink-0">
-                          {entry.timestamp.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      {entry.description && (
-                        <p className="text-[11px] text-gray-600 font-medium mt-0.5">{entry.description}</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+          <div className="flex items-start gap-2.5 bg-stone-50 rounded-xl p-3">
+            <Calendar className="w-4 h-4 text-stone-600 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="font-semibold text-stone-800">Data e fascia oraria</p>
+              <p className="text-stone-600 text-xs mt-0.5">
+                {scheduleLabel || 'Appena pronto / da concordare'}
+              </p>
             </div>
           </div>
-      </div>
+        </div>
+      </section>
 
-        {/* Right Column: Chat for Client; Terminale Cuoco + Chat for Chef */}
-        <div className="lg:col-span-5 space-y-6">
-          {isChefView && (
-            <div className="bg-gray-100 p-1.5 rounded-2xl flex gap-2">
+      {/* Controlli rapidi CUOCO (solo cambio stato essenziale) */}
+      {isChefView && onUpdateOrderStatus && !isTerminalCancelled && (
+        <section className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2 text-emerald-900 font-semibold text-sm">
+            <ChefHat className="w-4 h-4 shrink-0 text-emerald-700" />
+            <span>Gestione stato ordine</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {order.status === 'PENDING_CONFIRMATION' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onUpdateOrderStatus(order.id, 'CONFIRMED')}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
+                >
+                  <Check className="w-4 h-4 shrink-0" />
+                  <span>Conferma ordine</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onUpdateOrderStatus(order.id, 'CANCELLED')}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold transition-colors"
+                >
+                  <XCircle className="w-4 h-4 shrink-0" />
+                  <span>Rifiuta</span>
+                </button>
+              </>
+            )}
+
+            {(order.status === 'CONFIRMED' || order.status === 'PLACED') && (
               <button
-                onClick={() => setActiveTab('chef-sim')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                  activeTab === 'chef-sim' 
-                    ? 'bg-black text-white shadow-md' 
-                    : 'text-gray-500 hover:text-black hover:bg-gray-200/50'
-                }`}
+                type="button"
+                onClick={() => onUpdateOrderStatus(order.id, 'PREPARING')}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold transition-colors"
               >
-                <Smartphone className="w-4 h-4" />
-                <span>📱 Terminale Cuoco</span>
+                <Utensils className="w-4 h-4 shrink-0" />
+                <span>Inizia a preparare</span>
               </button>
+            )}
+
+            {order.status === 'PREPARING' && (
               <button
-                onClick={() => setActiveTab('chat')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                  activeTab === 'chat' 
-                    ? 'bg-black text-white shadow-md' 
-                    : 'text-gray-500 hover:text-black hover:bg-gray-200/50'
-                }`}
+                type="button"
+                onClick={() => onUpdateOrderStatus(order.id, 'READY')}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
               >
-                <MessageSquare className="w-4 h-4" />
-                <span>Chat Utente</span>
+                <PackageCheck className="w-4 h-4 shrink-0" />
+                <span>Segna come pronto</span>
+              </button>
+            )}
+
+            {order.status === 'READY' && isDelivery && (
+              <button
+                type="button"
+                onClick={() => onUpdateOrderStatus(order.id, 'DELIVERING')}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors"
+              >
+                <Bike className="w-4 h-4 shrink-0" />
+                <span>In consegna</span>
+              </button>
+            )}
+
+            {(order.status === 'DELIVERING' || (order.status === 'READY' && !isDelivery)) && (
+              <button
+                type="button"
+                onClick={() => onUpdateOrderStatus(order.id, 'COMPLETED')}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
+              >
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{isDelivery ? 'Segna consegnato' : 'Segna ritirato / completato'}</span>
+              </button>
+            )}
+
+            {order.status === 'COMPLETED' && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-100 text-emerald-800 text-sm font-semibold">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Ordine completato</span>
+              </span>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Card Valutazione Cliente per Ordine Completato */}
+      {!isChefView && order.status === 'COMPLETED' && (canRate || alreadyReviewed) && (
+        <section
+          className={`rounded-2xl p-4 border ${
+            alreadyReviewed
+              ? 'bg-amber-50/70 border-amber-200'
+              : 'bg-orange-50 border-orange-200'
+          }`}
+        >
+          {alreadyReviewed ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                  <Star className="w-5 h-5 fill-amber-500 text-amber-500 shrink-0" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-stone-900">Recensione inviata</p>
+                  {existingReview?.comment ? (
+                    <p className="text-xs text-stone-600 italic mt-0.5">“{existingReview.comment}”</p>
+                  ) : (
+                    <p className="text-xs text-stone-600">
+                      Grazie per aver valutato {formatChefDisplayName(order.chefName)}.
+                    </p>
+                  )}
+                </div>
+              </div>
+              {typeof reviewedScore === 'number' && (
+                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white border border-amber-200 text-amber-700 text-sm font-bold">
+                  <Star className="w-4 h-4 fill-amber-500 text-amber-500 shrink-0" />
+                  <span>{reviewedScore.toFixed(1)}</span>
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                  <Star className="w-5 h-5 shrink-0" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-stone-900">
+                    Valuta Cuoco e Piatti
+                  </h2>
+                  <p className="text-xs sm:text-sm text-stone-600">
+                    Racconta com’è andata con {formatChefDisplayName(order.chefName)} (piatti, servizio e packaging).
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onRateOrder?.(order)}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold shrink-0 transition-colors"
+              >
+                <Star className="w-4 h-4 shrink-0" />
+                <span>Valuta Cuoco e Piatti</span>
               </button>
             </div>
           )}
+        </section>
+      )}
 
-          {isChefView && activeTab === 'chef-sim' ? (
-            /* Chef Console (only visible when logged in as 'chef') */
-            <div className="bg-black text-white rounded-[2.5rem] p-6 shadow-2xl relative border-4 border-gray-800 flex flex-col min-h-[500px] overflow-hidden">
-              {/* Phone Status Bar Accent */}
-              <div className="flex justify-between items-center text-[9px] font-mono text-gray-500 border-b border-white/10 pb-3 mb-4">
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></span>
-                  <span className="text-gray-400">CUOCO LIVE</span>
-                </div>
-                <div className="bg-white/5 px-2 py-0.5 rounded text-white text-[8px] uppercase tracking-wider font-sans font-black">
-                  MESA Live Sync
-                </div>
-                <div className="flex items-center gap-1 text-gray-400">
-                  <Wifi className="w-3 h-3 text-green-500" />
-                  <span>5G</span>
-                </div>
-              </div>
+      {/* 2. Riepilogo Ordine Essenziale */}
+      <section className="bg-white border border-stone-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-stone-100">
+          <div className="flex items-center gap-2">
+            <ChefHat className="w-4 h-4 text-orange-500 shrink-0" />
+            <span className="font-bold text-stone-900 text-sm sm:text-base">
+              {formatChefDisplayName(order.chefName)}
+            </span>
+          </div>
 
-              {/* Title & Status */}
-              <div className="flex items-start justify-between gap-2 mb-4">
-                <div>
-                  <h4 className="font-black italic text-md leading-tight text-white mb-0.5">Console {formatChefDisplayName(order.chefName)}</h4>
-                  <p className="text-[10px] text-gray-400">Simulatore della ricezione ed evasione dell'ordine</p>
-                </div>
-                <div className={`px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider border ${
-                  order.status === 'PENDING_CONFIRMATION'
-                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
-                    : isTerminated
-                      ? 'bg-red-500/15 border-red-500/30 text-red-300'
-                      : 'bg-green-500/15 border-green-500/20 text-green-400'
-                }`}>
-                  {order.status === 'PENDING_CONFIRMATION' ? 'In attesa' : isRejected ? 'Rifiutato' : isCancelled ? 'Annullato' : 'Confermato'} €{order.total.toFixed(2)}
-                </div>
-              </div>
-
-              {/* Notification Banner */}
-              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl mb-4 relative">
-                <div className="flex items-start gap-3">
-                  <div className="bg-orange-500/20 p-2.5 rounded-xl text-orange-400 shrink-0">
-                    <BellRing className="w-4 h-4 animate-bounce" />
-                  </div>
-                  <div>
-                    <span className="text-[8px] font-black uppercase tracking-widest text-[#ea580c]">NOTIFICA PRENOTAZIONE</span>
-                    <h5 className="font-bold text-xs text-white mt-0.5">
-                      {order.status === 'PENDING_CONFIRMATION'
-                        ? 'Prenotazione ricevuta (pagamento al ritiro/consegna)'
-                        : isRejected
-                          ? 'Prenotazione rifiutata dallo chef'
-                          : isCancelled
-                            ? 'Prenotazione annullata dal cliente'
-                            : 'Prenotazione confermata dallo chef'}
-                    </h5>
-                    <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">
-                      Il sistema in tempo reale aggiorna istantaneamente Cliente, Cuoco e Admin su Firestore.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Console Logs */}
-              <div className="flex-1 overflow-y-auto mb-4 p-3 bg-white/5 rounded-xl space-y-1.5 h-32 text-[10px] font-mono scrollbar-none">
-                <p className="text-gray-500 text-[9px] uppercase font-black font-sans tracking-wider sticky top-0 bg-black/60 backdrop-blur-md pb-0.5 z-10 border-b border-white/5">NOTIFICHE CENTRALIZZATE</p>
-                {statusLogs.map((log, idx) => (
-                  <div key={idx} className="flex gap-2 text-gray-300">
-                    <span className="text-orange-500 shrink-0">▸</span>
-                    <span className="leading-snug">{log}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Action Board (Chef Side control) */}
-              <div className="border-t border-white/10 pt-4 mt-auto">
-                <span className="text-[8px] font-black uppercase tracking-widest text-gray-505 block mb-2 text-center text-gray-400">Azioni Disponibili per lo Chef</span>
-                
-                {order.status === 'PENDING_CONFIRMATION' && (
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      onClick={() => updateStatusFromChefTerminal(
-                        'CONFIRMED', 
-                        `✅ Ho confermato la tua prenotazione! Il pagamento avverrà al ritiro o alla consegna secondo le indicazioni dell'ordine.`
-                      )}
-                      className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-black uppercase tracking-wider text-xs rounded-2xl shadow-lg transition-all active:scale-95"
-                    >
-                      Conferma
-                    </button>
-                    <button
-                      onClick={() => updateStatusFromChefTerminal(
-                        'REJECTED', 
-                        `Mi dispiace, non posso accettare questa prenotazione per la data richiesta.`
-                      )}
-                      className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-wider text-xs rounded-2xl shadow-lg transition-all active:scale-95"
-                    >
-                      Rifiuta
-                    </button>
-                  </div>
-                )}
-
-                {(isRejected || isCancelled) && (
-                  <div className="bg-red-500/10 border border-red-500/20 text-red-300 p-4 rounded-2xl text-center">
-                    <AlertCircle className="w-7 h-7 text-red-400 mx-auto mb-1.5" />
-                    <p className="font-black uppercase tracking-wider text-[11px]">
-                      {isCancelled ? 'Prenotazione Annullata' : 'Prenotazione Rifiutata'}
-                    </p>
-                    <p className="text-[10px] text-gray-400 mt-1">Stato sincronizzato con Cliente e Admin.</p>
-                  </div>
-                )}
-
-                {(order.status === 'PLACED' || order.status === 'CONFIRMED') && (
-                  <button
-                    onClick={() => updateStatusFromChefTerminal(
-                      'PREPARING', 
-                      `🍳 Sto accendendo i fornelli e preparando gli ingredienti per il tuo piatto! Sarà servito caldissimo.`
-                    )}
-                    className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-wider text-xs rounded-2xl shadow-lg transition-all animate-pulse active:scale-95"
-                  >
-                    👨‍🍳 Inizia a Preparare
-                  </button>
-                )}
-
-                {order.status === 'PREPARING' && (
-                  <button
-                    onClick={() => updateStatusFromChefTerminal(
-                      'READY', 
-                      `✅ Ottime notizie! Ho preparato e confezionato con la massima cura il tuo ordine. È ora pronto!`
-                    )}
-                    className="w-full py-3 bg-[#ea580c] hover:bg-orange-600 text-white font-black uppercase tracking-wider text-xs rounded-2xl shadow-lg transition-all active:scale-95"
-                  >
-                    🍱 Impacchetta e Segna come Pronto
-                  </button>
-                )}
-
-                {order.status === 'READY' && order.deliveryMode === 'delivery' && (
-                  <button
-                    onClick={() => updateStatusFromChefTerminal(
-                      'DELIVERING', 
-                      `🛵 Il rider di fiducia ha ritirato il piatto ed è appena partito per la consegna!`
-                    )}
-                    className="w-full py-3 bg-[#ea580c] hover:bg-orange-600 text-white font-black uppercase tracking-wider text-xs rounded-2xl shadow-lg transition-all active:scale-95"
-                  >
-                    🛵 Affida al Rider MESA Delivery
-                  </button>
-                )}
-
-                {order.status === 'READY' && order.deliveryMode === 'pickup' && (
-                  <button
-                    onClick={() => updateStatusFromChefTerminal(
-                      'COMPLETED', 
-                      `🎉 Ti ringrazio tantissimo! La consegna del piatto caldo si è conclusa con successo.`
-                    )}
-                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-black uppercase tracking-wider text-xs rounded-2xl shadow-lg transition-all active:scale-95"
-                  >
-                    🛍️ Consegnato al Cliente (Pickup)
-                  </button>
-                )}
-
-                {order.status === 'DELIVERING' && (
-                  <button
-                    onClick={() => updateStatusFromChefTerminal(
-                      'COMPLETED', 
-                      `🎉 Buon appetito! Il Rider conferma l'avvenuta consegna del pacco. Facci sapere se ti è piaciuto!`
-                    )}
-                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-black uppercase tracking-wider text-xs rounded-2xl shadow-lg transition-all active:scale-95"
-                  >
-                    🏁 Segna come Consegnato con Successo
-                  </button>
-                )}
-
-                {order.status === 'COMPLETED' && (
-                  <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-2xl text-center">
-                    <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                    <p className="font-black uppercase tracking-wider text-[11px]">Evasione Completata</p>
-                    <p className="text-[10px] text-gray-400 mt-1 leading-normal">
-                      Grazie! I fondi dell'ordine di <strong>€{order.total.toFixed(2)}</strong> sono stati trasferiti con successo sul portafoglio virtuale dello Chef e l'utente è stato notificato.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* MESA Connect - Chat System */
-            <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col h-[500px]">
-               <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 bg-orange-100 rounded-2xl flex items-center justify-center text-orange-600">
-                        <MessageSquare className="w-5 h-5" />
-                     </div>
-                     <div>
-                        <h4 className="font-black italic text-gray-900 leading-none">MESA Connect</h4>
-                        <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mt-1">{formatChefDisplayName(order.chefName)} online</p>
-                     </div>
-                  </div>
-               </div>
-
-               <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50/30 custom-scrollbar">
-                  {messages.map((m) => (
-                    <div key={m.id} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] p-4 rounded-3xl text-sm font-medium shadow-sm leading-relaxed ${
-                        m.sender === 'user' 
-                          ? 'bg-orange-600 text-white rounded-tr-none font-bold' 
-                          : 'bg-white text-gray-800 rounded-tl-none border border-gray-100 font-medium'
-                      }`}>
-                        {m.text}
-                      </div>
-                    </div>
-                  ))}
-               </div>
-
-               <div className="p-4 bg-white border-t border-gray-50">
-                  <div className="flex items-center gap-2 bg-gray-50 rounded-2xl p-2 border border-gray-100 focus-within:border-orange-500">
-                     <input 
-                      type="text" 
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                      placeholder="Scrivi allo chef..." 
-                      className="flex-1 bg-transparent px-3 py-2 text-xs font-bold outline-none text-gray-800"
-                     />
-                     <button 
-                      onClick={handleSendMessage}
-                      disabled={!chatInput.trim()}
-                      className="bg-black text-white p-2.5 rounded-xl hover:bg-orange-600 transition-all disabled:opacity-30"
-                     >
-                       <Send className="w-4 h-4" />
-                     </button>
-                  </div>
-               </div>
+          {isChefView && order.customerName && (
+            <div className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-stone-600 bg-stone-50 px-2.5 py-1 rounded-lg">
+              <User className="w-3.5 h-3.5 shrink-0 text-stone-400" />
+              <span>Cliente: {order.customerName}</span>
             </div>
           )}
         </div>
-      </div>
+
+        <ul className="divide-y divide-stone-100">
+          {order.items.map((item, idx) => (
+            <li
+              key={`${item.id}-${idx}`}
+              className="py-2.5 first:pt-0 last:pb-0 flex items-start justify-between gap-3"
+            >
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="inline-flex items-center justify-center min-w-[1.75rem] h-6 px-1.5 rounded-md bg-stone-100 text-stone-800 text-xs font-bold shrink-0">
+                  {item.quantity}x
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-stone-900 break-words">
+                    {item.name}
+                  </p>
+                  {item.preferences?.notes && (
+                    <p className="text-xs text-stone-500 mt-0.5 break-words">
+                      Note: {item.preferences.notes}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <span className="text-sm font-semibold text-stone-800 shrink-0">
+                €{(item.price * item.quantity).toFixed(2)}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="pt-3 border-t border-stone-100 flex items-center justify-between gap-2">
+          <span className="text-xs sm:text-sm text-stone-600">
+            Totale da pagare in contanti {isDelivery ? 'alla consegna' : 'al ritiro'}
+          </span>
+          <span className="text-lg sm:text-xl font-bold text-stone-900">
+            €{order.total.toFixed(2)}
+          </span>
+        </div>
+
+        {canCancel && (
+          <div className="pt-2 border-t border-stone-100 flex flex-wrap items-center justify-end gap-2">
+            {confirmCancel ? (
+              <>
+                <span className="text-xs text-stone-600 mr-auto">Annullare questo ordine?</span>
+                <button
+                  type="button"
+                  onClick={() => setConfirmCancel(false)}
+                  className="px-3 py-1.5 rounded-lg border border-stone-200 text-xs font-semibold text-stone-600 hover:bg-stone-50"
+                >
+                  Indietro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCancelOrder?.(order.id)}
+                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-semibold text-white"
+                >
+                  Conferma annullamento
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmCancel(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                <XCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>Annulla ordine</span>
+              </button>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* 3. Chat rapida compatta e richiudibile */}
+      <section className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
+        <button
+          type="button"
+          onClick={() => setIsChatOpen((prev) => !prev)}
+          className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-stone-50 transition-colors"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-stone-100 text-stone-700 flex items-center justify-center shrink-0">
+              <MessageSquare className="w-4 h-4 shrink-0" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-stone-900">
+                {isChefView ? 'Chat con il Cliente' : 'Chat con il Cuoco'}
+              </p>
+              <p className="text-xs text-stone-500 truncate">
+                {messages.length} {messages.length === 1 ? 'messaggio' : 'messaggi'} · Tocca per{' '}
+                {isChatOpen ? 'chiudere' : 'aprire'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 text-stone-500">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-stone-100 text-stone-700">
+              {messages.length}
+            </span>
+            {isChatOpen ? (
+              <ChevronUp className="w-4 h-4 shrink-0" />
+            ) : (
+              <ChevronDown className="w-4 h-4 shrink-0" />
+            )}
+          </div>
+        </button>
+
+        {isChatOpen && (
+          <div className="border-t border-stone-100 flex flex-col">
+            <div className="max-h-64 overflow-y-auto p-4 space-y-2.5 bg-stone-50/60">
+              {messages.map((msg) => {
+                const isOwn = isChefView ? msg.sender === 'chef' : msg.sender === 'user';
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs sm:text-sm ${
+                        isOwn
+                          ? 'bg-orange-500 text-white rounded-br-sm'
+                          : 'bg-white border border-stone-200 text-stone-800 rounded-bl-sm'
+                      }`}
+                    >
+                      <p className="break-words">{msg.text}</p>
+                    </div>
+                    {msg.time && (
+                      <span className="text-[10px] text-stone-400 mt-1 px-1">{msg.time}</span>
+                    )}
+                  </div>
+                );
+              })}
+              <div ref={chatEndRef} />
+            </div>
+
+            <form
+              onSubmit={handleSendMessage}
+              className="p-3 bg-white border-t border-stone-100 flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
+                placeholder={
+                  isChefView ? 'Scrivi un messaggio al cliente...' : 'Scrivi un messaggio allo chef...'
+                }
+                className="flex-1 min-w-0 text-sm px-3 py-2 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+              />
+              <button
+                type="submit"
+                disabled={!messageInput.trim()}
+                aria-label="Invia messaggio"
+                className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-stone-200 disabled:text-stone-400 text-white shrink-0 transition-colors"
+              >
+                <Send className="w-4 h-4 shrink-0" />
+              </button>
+            </form>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

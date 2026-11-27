@@ -2839,22 +2839,32 @@ function App() {
                 Accedi o Registrati
               </button>
             </div>
-          ) : selectedOrder ? (
-            <OrderTracking 
-              order={orders.find(o => o.id === selectedOrder.id) || selectedOrder} 
-              reviews={reviews}
-              onRateOrder={currentUser.role === 'client' ? setReviewOrder : undefined}
-              onBack={() => {
-                setSelectedOrder(null);
-                setRecentlyPlacedOrderId(null);
-              }} 
-              chefs={chefs} 
-              userRole={currentUser.role}
-              justPlaced={selectedOrder.id === recentlyPlacedOrderId}
-              onUpdateOrderStatus={currentUser.role === 'chef' || currentUser.role === 'admin' ? handleUpdateOrderStatus : undefined}
-              onCancelOrder={currentUser.role === 'client' ? handleCancelOrderByClient : undefined}
-            />
-          ) : (
+          ) : selectedOrder ? (() => {
+            const activeOrder = orders.find(o => o.id === selectedOrder.id) || selectedOrder;
+            const orderCustomer = registeredUsers.find(u => u.id === activeOrder.userId);
+            const customerAddr = orderCustomer?.addresses.find(a => a.isVerified) || orderCustomer?.addresses[0];
+            const resolvedDeliveryAddress =
+              (customerAddr ? `${customerAddr.street}, ${customerAddr.zip} ${customerAddr.city}` : '') ||
+              (activeOrder.userId === currentUser.id ? verifiedAddress : '') ||
+              undefined;
+            return (
+              <OrderTracking 
+                order={activeOrder} 
+                reviews={reviews}
+                onRateOrder={currentUser.role === 'client' ? setReviewOrder : undefined}
+                onBack={() => {
+                  setSelectedOrder(null);
+                  setRecentlyPlacedOrderId(null);
+                }} 
+                chefs={chefs} 
+                userRole={currentUser.role}
+                justPlaced={selectedOrder.id === recentlyPlacedOrderId}
+                onUpdateOrderStatus={currentUser.role === 'chef' || currentUser.role === 'admin' ? handleUpdateOrderStatus : undefined}
+                onCancelOrder={currentUser.role === 'client' ? handleCancelOrderByClient : undefined}
+                deliveryAddress={resolvedDeliveryAddress}
+              />
+            );
+          })() : (
             <div className="animate-fade-in space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <h2 className="text-3xl font-black text-orange-600 tracking-tight">
