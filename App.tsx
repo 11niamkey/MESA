@@ -24,6 +24,13 @@ import { OrderTracking } from './components/OrderTracking';
 import { OrderReviewModal, ReviewSubmissionPayload } from './components/OrderReviewModal';
 import { ShareModal } from './components/ShareModal';
 import { AdminDashboard } from './components/AdminDashboard';
+
+// Hidden staff entry point. The admin login is NOT linked anywhere in the UI:
+// it opens only when this exact path is visited (e.g. https://mesa-food.web.app/mesa-staff).
+// Change it here to move the staff entrance.
+const ADMIN_ACCESS_PATH = '/mesa-staff';
+const isAdminAccessPath = () =>
+  typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === ADMIN_ACCESS_PATH;
 import { LaunchTour } from './components/LaunchTour';
 import { ChefOnboarding } from './components/ChefOnboarding';
 import { ChefGroupSection } from './components/ChefGroupSection';
@@ -1663,6 +1670,12 @@ function App() {
       localStorage.removeItem('mesa_landing_seen');
     } catch {}
 
+    if (isAdminAccessPath()) {
+      setAuthInitialRole('admin');
+      setIsAuthOpen(true);
+      return;
+    }
+
     const params = new URLSearchParams(window.location.search);
     const chefId = params.get('chef');
     if (chefId) {
@@ -1743,6 +1756,8 @@ function App() {
 
   const handleAuthModalClose = () => {
     setIsAuthOpen(false);
+    if (authInitialRole === 'admin') setAuthInitialRole('client');
+    if (isAdminAccessPath()) window.history.replaceState({}, '', '/');
     landingAuthOriginRef.current = false;
     setPendingBookingDish(null);
     setPendingBookingPayload(null);
@@ -1770,9 +1785,6 @@ function App() {
     }
 
     if (view === ViewState.ADMIN_DASHBOARD && currentUser?.role !== 'admin') {
-      setAuthInitialRole('admin');
-      showNotification("Accesso riservato. Inserisci la password amministratore per accedere.");
-      setIsAuthOpen(true);
       return;
     }
 
@@ -1796,10 +1808,6 @@ function App() {
   const handleQuickAdminAccess = () => {
     if (currentUser?.role === 'admin') {
       setCurrentView(ViewState.ADMIN_DASHBOARD);
-    } else {
-      setAuthInitialRole('admin');
-      showNotification("Area riservata. Inserisci la password per accedere all'area amministratore.");
-      setIsAuthOpen(true);
     }
   };
 
@@ -2307,6 +2315,8 @@ function App() {
 
   const handleAuthSuccess = async (user: AppUser, isNewRegistration?: boolean) => {
     setCurrentUser(user);
+    if (isAdminAccessPath()) window.history.replaceState({}, '', '/');
+    if (user.role !== 'admin' && authInitialRole === 'admin') setAuthInitialRole('client');
 
     if (isNewRegistration) {
       showNotification(
@@ -2695,7 +2705,6 @@ function App() {
           onEnterApp={() => handleLandingRoleEnter('client')} 
           onNavigateToBecomeChef={() => handleLandingRoleEnter('chef')} 
           onShareClick={() => setIsShareOpen(true)}
-          onAdminAccess={handleQuickAdminAccess}
           onPwaInstallClick={() => setIsPwaModalOpen(true)}
         />
         <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
@@ -3338,7 +3347,7 @@ function App() {
           />
         )}
 
-        {currentView === ViewState.ADMIN_DASHBOARD && (
+        {currentView === ViewState.ADMIN_DASHBOARD && currentUser?.role === 'admin' && (
           <AdminDashboard 
             chefs={chefs} 
             reviews={reviews}

@@ -185,7 +185,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           u => u.email.trim().toLowerCase() === normalizedInputEmail
         );
         if (otherRoleMatch && role !== 'admin') {
-          const roleLabel = otherRoleMatch.role === 'chef' ? 'Cuoco' : otherRoleMatch.role === 'admin' ? 'Admin' : 'Cliente';
+          if (otherRoleMatch.role === 'admin') {
+            // Never reveal staff accounts or where the staff login lives.
+            setErrorMsg('Email o password non corrette. Riprova.');
+            return;
+          }
+          const roleLabel = otherRoleMatch.role === 'chef' ? 'Cuoco' : 'Cliente';
           setErrorMsg(`Questa email è registrata come ${roleLabel}. Seleziona la scheda "${roleLabel}" in alto per accedere.`);
           return;
         }
@@ -364,12 +369,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <X className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
           </button>
 
-          {/* Switch dei Ruoli */}
+          {/* Switch dei Ruoli (solo Cliente/Cuoco: l'accesso Admin vive su un percorso riservato) */}
+          {role !== 'admin' && (
           <div className="flex border-b border-gray-100 bg-gray-50 pr-14 sm:pr-16 relative">
             <button
               type="button"
               onClick={() => {
-                if (role === 'admin') { setEmail(''); setPassword(''); }
                 setRole('client');
                 setErrorMsg('');
               }}
@@ -383,7 +388,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="button"
               onClick={() => {
-                if (role === 'admin') { setEmail(''); setPassword(''); }
                 setRole('chef');
                 setErrorMsg('');
               }}
@@ -394,23 +398,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <ChefHat className="w-4 h-4 shrink-0" />
               <span>Cuoco</span>
             </button>
-            <button
-              type="button"
-              onClick={() => { 
-                setRole('admin'); 
-                setMode('login'); 
-                setEmail('');
-                setPassword('');
-                setErrorMsg(''); 
-              }}
-              className={`flex-1 py-4 sm:py-5 text-[10px] font-black uppercase tracking-widest flex flex-col items-center justify-center gap-1 transition-colors ${
-                role === 'admin' ? 'bg-slate-900 text-violet-300 border-b-4 border-violet-500' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-500'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4 shrink-0" />
-              <span>Admin</span>
-            </button>
           </div>
+          )}
 
           <div className="p-6 sm:p-8 max-h-[82vh] overflow-y-auto">
             {/* Banner di Ruolo Ben Visibile per Evitare Errori di Scelta */}
