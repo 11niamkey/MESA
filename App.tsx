@@ -2384,7 +2384,10 @@ function App() {
     landingAuthOriginRef.current = false;
 
     if (user.role === 'admin') {
-      navigateTo(ViewState.ADMIN_DASHBOARD);
+      // currentUser state isn't updated yet here, so bypass navigateTo's admin guard
+      setCurrentView(ViewState.ADMIN_DASHBOARD);
+      setIsCartOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (user.role === 'client' && cart.length > 0) {
       setCurrentView(ViewState.HOME);
       setIsCartOpen(true);
