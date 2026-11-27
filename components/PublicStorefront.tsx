@@ -108,20 +108,20 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
       </div>
 
       {/* Main Content Area */}
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
           
           {/* Menu Section */}
-          <div className="lg:col-span-8 space-y-10">
+          <div className="lg:col-span-8 space-y-8">
             <div className="flex items-center justify-between mb-2">
                <h2 className="text-xl sm:text-2xl font-black italic tracking-tight border-l-8 border-orange-600 pl-6 text-orange-600 whitespace-nowrap truncate">I Piatti dello Chef</h2>
                <span className="text-[10px] font-black text-black uppercase tracking-[0.2em] shrink-0">{chef.dishes.length} Proposte</span>
             </div>
 
-            <div className="grid grid-cols-1 gap-8">
+            <div className="grid grid-cols-1 gap-6 sm:gap-8">
               {chef.dishes.map(dish => (
-                <div key={dish.id} className="group bg-gray-50 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-100 overflow-hidden flex flex-col md:flex-row hover:shadow-2xl transition-all duration-500 border-b-8 border-b-orange-600/10">
-                  <div className="w-full md:w-64 h-44 sm:h-64 flex-shrink-0 relative overflow-hidden">
+                <div key={dish.id} className="group bg-gray-50 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 overflow-hidden flex flex-col md:flex-row hover:shadow-2xl transition-all duration-500 border-b-8 border-b-orange-600/10">
+                  <div className="w-full aspect-[16/10] md:aspect-auto md:w-56 md:h-48 shrink-0 relative overflow-hidden">
                     <img 
                       src={dish.image || DEFAULT_FOOD_IMAGE} 
                       alt={dish.name} 
@@ -133,13 +133,13 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                     </div>
                     <button 
                       onClick={() => setHeritageDish(dish)}
-                      className="absolute bottom-4 right-4 p-3 bg-orange-600 text-white rounded-2xl shadow-xl hover:scale-110 transition-all flex items-center gap-2"
+                      className="absolute bottom-4 right-4 p-2.5 bg-orange-600 text-white rounded-2xl shadow-xl hover:scale-110 transition-all flex items-center gap-2"
                     >
-                      <Compass className="w-5 h-5" />
+                      <Compass className="w-5 h-5 shrink-0" />
                       <span className="text-[10px] font-black uppercase">Scopri Eredità</span>
                     </button>
                   </div>
-                  <div className="p-5 sm:p-8 flex flex-col justify-between flex-1 gap-3">
+                  <div className="p-5 sm:p-6 flex flex-col justify-between flex-1 gap-3">
                     <div>
                       <h3 className="text-xl sm:text-2xl font-black italic text-orange-600 group-hover:text-orange-700 transition-colors mb-2 truncate">{dish.name}</h3>
                       <p className="text-black text-xs sm:text-sm leading-snug sm:leading-relaxed mb-3 italic font-medium">
@@ -155,9 +155,9 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                     {canBook ? (
                       <button 
                         onClick={() => onAddDish(dish)}
-                        className="w-full py-3.5 sm:py-5 bg-orange-600 hover:bg-orange-700 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 shadow-orange-950/15 border-b-4 border-orange-850 hover:border-orange-950"
+                        className="w-full py-3.5 sm:py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 shadow-orange-950/15 border-b-4 border-orange-850 hover:border-orange-950"
                       >
-                        <ShoppingBag className="w-5 h-5" /> Prenota questo piatto
+                        <ShoppingBag className="w-5 h-5 shrink-0" /> Prenota questo piatto
                       </button>
                     ) : (
                       <div className="space-y-2">

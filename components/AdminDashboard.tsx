@@ -306,11 +306,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="flex border-b border-gray-100 overflow-x-auto pb-px gap-2">
         <button
           onClick={() => setAdminTab('orders')}
-          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             adminTab === 'orders' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <ShoppingBag className="w-4 h-4" /> Monitoraggio Ordini ({orders.length})
+          <ShoppingBag className="w-4 h-4 shrink-0" /> Monitoraggio Ordini ({orders.length})
           {pendingOrdersCount > 0 && (
             <span className="ml-1 px-2 py-0.5 text-[10px] bg-orange-600 text-white rounded-full font-bold animate-pulse">
               {pendingOrdersCount}
@@ -320,29 +320,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <button
           onClick={() => setAdminTab('accounting')}
-          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             adminTab === 'accounting' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <Landmark className="w-4 h-4" /> Contabilità & Commissioni
+          <Landmark className="w-4 h-4 shrink-0" /> Contabilità & Commissioni
         </button>
 
         <button
           onClick={() => setAdminTab('dishes')}
-          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             adminTab === 'dishes' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <UtensilsCrossed className="w-4 h-4" /> Piatti & Menu ({allDishes.length})
+          <UtensilsCrossed className="w-4 h-4 shrink-0" /> Piatti & Menu ({allDishes.length})
         </button>
 
         <button
           onClick={() => setAdminTab('applications')}
-          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             adminTab === 'applications' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <FileText className="w-4 h-4" /> Candidature & Verifiche Cuochi
+          <FileText className="w-4 h-4 shrink-0" /> Candidature & Verifiche Cuochi
           {pendingAppsCount > 0 && (
             <span className="ml-1.5 px-2 py-0.5 text-[10px] bg-red-600 text-white rounded-full font-bold animate-pulse">
               {pendingAppsCount}
@@ -352,29 +352,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <button
           onClick={() => setAdminTab('chefs')}
-          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             adminTab === 'chefs' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <ChefHat className="w-4 h-4" /> Cuochi Attivi nel Catalogo ({chefs.length})
+          <ChefHat className="w-4 h-4 shrink-0" /> Cuochi Attivi nel Catalogo ({chefs.length})
         </button>
 
         <button
           onClick={() => setAdminTab('users')}
-          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             adminTab === 'users' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <Users className="w-4 h-4" /> Utenti & Indirizzi Verificati ({registeredUsers.length})
+          <Users className="w-4 h-4 shrink-0" /> Utenti & Indirizzi Verificati ({registeredUsers.length})
         </button>
 
         <button
           onClick={() => setAdminTab('cockpit')}
-          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             adminTab === 'cockpit' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <BarChart3 className="w-4 h-4" /> Cockpit Strategico & AI
+          <BarChart3 className="w-4 h-4 shrink-0" /> Cockpit Strategico & AI
         </button>
       </div>
 

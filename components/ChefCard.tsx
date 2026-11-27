@@ -43,12 +43,12 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
                 {chef.countryName && <span className="text-[9px] bg-gray-100 text-black px-1.5 py-0.5 rounded-md font-bold tracking-widest uppercase shrink-0">{chef.countryName}</span>}
               </div>
               <div className="flex items-center text-xs font-bold text-gray-500 uppercase tracking-wide">
-                <MapPin className="w-3 h-3 mr-1 text-orange-500" />
+                <MapPin className="w-3 h-3 mr-1 text-orange-500 shrink-0" />
                 {chef.location} • {chef.distance} km
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <div className="flex items-center bg-yellow-400 text-black px-2 py-0.5 rounded-lg text-[10px] font-black">
-                  <Star className="w-3 h-3 mr-1 fill-current" />
+                  <Star className="w-3 h-3 mr-1 fill-current shrink-0" />
                   {chef.rating}
                 </div>
                 <div className="flex items-center bg-orange-100 text-orange-800 px-2 py-0.5 rounded-lg text-[10px] font-bold">
@@ -63,9 +63,9 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
           </div>
           <button 
             onClick={() => onViewProfile(chef)}
-            className="bg-orange-100 p-3 rounded-2xl text-orange-600 hover:bg-orange-600 hover:text-white transition-all transform active:scale-90"
+            className="bg-orange-100 p-3 rounded-2xl text-orange-600 hover:bg-orange-600 hover:text-white transition-all transform active:scale-90 shrink-0"
           >
-            <ChevronRight className="w-6 h-6" />
+            <ChevronRight className="w-6 h-6 shrink-0" />
           </button>
         </div>
       </div>

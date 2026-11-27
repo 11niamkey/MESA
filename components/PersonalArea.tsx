@@ -506,20 +506,20 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
       <div className="flex border-b border-gray-100 overflow-x-auto pb-px">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             activeTab === 'profile' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <User className="w-4 h-4" /> Info Personali
+          <User className="w-4 h-4 shrink-0" /> Info Personali
         </button>
 
         <button
           onClick={() => setActiveTab('addresses')}
-          className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 relative ${
+          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 relative ${
             activeTab === 'addresses' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          <MapPin className="w-4 h-4" /> Indirizzi Verificati
+          <MapPin className="w-4 h-4 shrink-0" /> Indirizzi Verificati
           {currentUser.addresses.length > 0 && (
             <span className="ml-1 px-1.5 py-0.5 text-[9px] bg-orange-100 text-orange-700 rounded-full">
               {currentUser.addresses.length}
@@ -531,19 +531,19 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           <>
             <button
               onClick={() => setActiveTab('orders')}
-              className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
                 activeTab === 'orders' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
-              <ClipboardList className="w-4 h-4" /> Storia Ordini
+              <ClipboardList className="w-4 h-4 shrink-0" /> Storia Ordini
             </button>
             <button
               onClick={() => setActiveTab('client-payments')}
-              className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
                 activeTab === 'client-payments' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
-              <Globe className="w-4 h-4" /> Metodi di Pagamento
+              <Globe className="w-4 h-4 shrink-0" /> Metodi di Pagamento
             </button>
           </>
         )}
@@ -552,19 +552,19 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           <>
             <button
               onClick={() => setActiveTab('kitchen')}
-              className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
                 activeTab === 'kitchen' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
-              <ChefHat className="w-4 h-4" /> La Mia Cucina
+              <ChefHat className="w-4 h-4 shrink-0" /> La Mia Cucina
             </button>
             <button
               onClick={() => setActiveTab('chef-orders')}
-              className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
                 activeTab === 'chef-orders' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
-              <ClipboardList className="w-4 h-4" /> Gestione Ordini
+              <ClipboardList className="w-4 h-4 shrink-0" /> Gestione Ordini
               {pendingChefOrdersCount > 0 && (
                 <span className="ml-1 px-2 py-0.5 text-[10px] bg-red-600 text-white rounded-full font-black animate-pulse">
                   {pendingChefOrdersCount}
@@ -573,19 +573,19 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('chef-menu')}
-              className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
                 activeTab === 'chef-menu' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
-              <ClipboardList className="w-4 h-4" /> Il Mio Menu
+              <ClipboardList className="w-4 h-4 shrink-0" /> Il Mio Menu
             </button>
             <button
               onClick={() => setActiveTab('chef-wallet')}
-              className={`py-4 px-6 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
                 activeTab === 'chef-wallet' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
-              <User className="w-4 h-4" /> Guadagni & Wallet
+              <User className="w-4 h-4 shrink-0" /> Guadagni & Wallet
             </button>
           </>
         )}

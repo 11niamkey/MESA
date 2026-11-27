@@ -32,7 +32,7 @@ export const ChefGroupSection: React.FC<ChefGroupSectionProps> = ({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {chefs.slice(0, 4).map(chef => (
           <ChefCard 
             key={chef.id} 

@@ -2536,7 +2536,7 @@ function App() {
                                 <AllergensRow allergens={dish.allergens} className="mb-2" />
                                 <div className="flex flex-wrap gap-1.5">
                                   <span className="px-2 py-0.5 bg-orange-50 text-orange-800 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
-                                    <Clock className="w-3 h-3 text-orange-600" /> 25-35 min
+                                    <Clock className="w-3 h-3 text-orange-600 shrink-0" /> 25-35 min
                                   </span>
                                   {dish.tags.slice(0, 2).map(tag => (
                                     <span key={tag} className="px-2 py-0.5 bg-gray-50 border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-500">
@@ -2563,11 +2563,11 @@ function App() {
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0">
                                     <span className="flex items-center gap-0.5 bg-amber-400/15 text-amber-800 px-2 py-0.5 rounded-lg text-[9px] font-black">
-                                      <Star className="w-2.5 h-2.5 fill-current text-amber-500" />
+                                      <Star className="w-2.5 h-2.5 fill-current text-amber-500 shrink-0" />
                                       {chef.rating}
                                     </span>
                                     <span className="flex items-center gap-0.5 text-gray-500 text-[9px] font-bold">
-                                      <MapPin className="w-2.5 h-2.5 text-orange-600" />
+                                      <MapPin className="w-2.5 h-2.5 text-orange-600 shrink-0" />
                                       {chef.distance} km
                                     </span>
                                   </div>
@@ -2581,7 +2581,7 @@ function App() {
                                     }}
                                     className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-black text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
                                   >
-                                    <ShoppingBag className="w-4 h-4" />
+                                    <ShoppingBag className="w-4 h-4 shrink-0" />
                                     <span>Scegli e Prenota</span>
                                   </button>
                                 ) : (
@@ -2598,7 +2598,7 @@ function App() {
                                       }}
                                       className="w-full py-2.5 rounded-xl bg-black hover:bg-orange-600 text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
                                     >
-                                      <ShoppingBag className="w-4 h-4" />
+                                      <ShoppingBag className="w-4 h-4 shrink-0" />
                                       <span>Aggiungi al carrello</span>
                                     </button>
                                   </div>
@@ -2615,7 +2615,7 @@ function App() {
                       <h3 className="text-xl font-black text-gray-900 tracking-tight">
                         Cuochi Corrispondenti ({filteredChefs.length})
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                         {filteredChefs.map(chef => (
                           <ChefCard key={chef.id} chef={chef} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
                         ))}
@@ -2917,7 +2917,7 @@ function App() {
         >
           <div className="flex items-center space-x-3 min-w-0">
             <div className="bg-white/20 p-2.5 rounded-xl flex items-center justify-center shrink-0">
-              <ShoppingBag className="w-5 h-5 text-white" />
+              <ShoppingBag className="w-5 h-5 text-white shrink-0" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center space-x-2">

@@ -100,15 +100,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
         onClick={onClose} 
         aria-label="Chiudi carrello"
       />
       
-      <div className="absolute inset-y-0 right-0 max-w-md w-full flex">
-        <div className="w-full h-full flex flex-col bg-white shadow-2xl animate-slide-in-right">
+      <div className="relative z-10 w-full max-w-lg max-h-[90vh] flex flex-col bg-white rounded-[2rem] shadow-2xl overflow-hidden animate-fade-in-up">
           
           <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-100 bg-white shadow-sm">
             <div className="flex items-center space-x-3 min-w-0">
@@ -168,15 +167,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         src={item.image || availableChefs.find(c => c.id === item.chefId)?.dishes.find(d => d.id === item.id)?.image || DEFAULT_FOOD_IMAGE} 
                         alt={item.name} 
                         onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_FOOD_IMAGE; }}
-                        className="w-16 h-16 rounded-xl object-cover" 
+                        className="w-16 h-16 rounded-xl object-cover shrink-0" 
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start">
+                        <div className="flex justify-between items-start gap-2">
                            <h3 className="text-sm font-bold text-gray-900 line-clamp-1">{item.name}</h3>
                            {item.deliveryMode === 'delivery' ? (
-                             <Truck className="w-4 h-4 text-orange-500" />
+                             <Truck className="w-4 h-4 text-orange-500 shrink-0" />
                            ) : (
-                             <Store className="w-4 h-4 text-gray-400" />
+                             <Store className="w-4 h-4 text-gray-400 shrink-0" />
                            )}
                         </div>
                         <p className="text-sm font-medium text-orange-600 mb-1">€ {item.price.toFixed(2)}</p>
@@ -188,7 +187,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         )}
                         
                         <div className="flex items-center text-xs text-gray-500 mb-2 bg-gray-50 px-2 py-1 rounded-md w-fit">
-                          <CalendarClock className="w-3 h-3 mr-1.5" />
+                          <CalendarClock className="w-3 h-3 mr-1.5 shrink-0" />
                           <span>{item.scheduledDate} - {item.scheduledTime}</span>
                         </div>
                         
@@ -204,16 +203,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                           <div className="flex items-center space-x-3 bg-gray-50 rounded-lg p-1">
                             <button 
                               onClick={() => onUpdateQuantity(item.id, -1)}
-                              className="w-6 h-6 rounded-md bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-orange-600 shadow-sm"
+                              className="w-6 h-6 rounded-md bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-orange-600 shadow-sm shrink-0"
                             >
-                              <Minus className="w-3 h-3" />
+                              <Minus className="w-3 h-3 shrink-0" />
                             </button>
                             <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
                             <button 
                               onClick={() => onUpdateQuantity(item.id, 1)}
-                              className="w-6 h-6 rounded-md bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-orange-600 shadow-sm"
+                              className="w-6 h-6 rounded-md bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-orange-600 shadow-sm shrink-0"
                             >
-                              <Plus className="w-3 h-3" />
+                              <Plus className="w-3 h-3 shrink-0" />
                             </button>
                           </div>
                           <div className="font-bold text-gray-900 text-sm">
@@ -315,7 +314,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 onClick={() => void handleConfirmOrderClick()}
                 className="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-black text-base uppercase tracking-wider rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center space-x-2 border-b-4 border-orange-800 disabled:opacity-60"
               >
-                <CheckCircle className="w-5 h-5" />
+                <CheckCircle className="w-5 h-5 shrink-0" />
                 <span>{isSubmittingOrder ? 'Invio in corso...' : 'Conferma Ordine'}</span>
               </button>
               
@@ -327,7 +326,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </button>
             </div>
           )}
-        </div>
       </div>
     </div>
   );
