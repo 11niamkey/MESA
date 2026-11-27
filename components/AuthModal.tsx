@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, User, ChefHat, ShieldCheck, MapPin, Eye, EyeOff, Smartphone, Sparkles, ShoppingBag, Lock, ArrowLeft } from 'lucide-react';
 import { AppUser, UserAddress, Chef } from '../types';
 import { auth, isFirebaseConfigured } from '../firebase';
+import { ADMIN_EMAIL } from '../adminConfig';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -62,7 +63,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         if (initialRole === 'admin') {
           setEmail('');
         } else {
-          setEmail(prev => (prev === 'admin@mesa.com' ? '' : prev));
+          setEmail(prev => (prev === ADMIN_EMAIL ? '' : prev));
         }
       }
       setErrorMsg('');
@@ -136,6 +137,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         if (isFirebaseConfigured && auth) {
           try {
             const cred = await signInWithEmailAndPassword(auth, normalizedInputEmail, password);
+            const credEmail = (cred.user.email || normalizedInputEmail).trim().toLowerCase();
+            if (credEmail === ADMIN_EMAIL) {
+              // Staff account: verified by Firebase Auth only, never stores a password in Firestore
+              const storedAdmin = registeredUsers.find(u => u.id === 'usr-admin');
+              const { password: _ignored, ...base } = { ...buildUserFromFirebase(cred.user, 'client'), ...(storedAdmin || {}) };
+              const adminUser: AppUser = { ...base, id: 'usr-admin', authUid: cred.user.uid, email: ADMIN_EMAIL, role: 'admin' };
+              await onRegisterUser(adminUser);
+              onLoginSuccess(adminUser, false);
+              onClose();
+              return;
+            }
             const existing = registeredUsers.find(
               u => u.email.trim().toLowerCase() === (cred.user.email || normalizedInputEmail).trim().toLowerCase()
             );
@@ -165,11 +177,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           }
         }
 
+        // Admin access requires a real Firebase Auth sign-in: no Firestore/default password fallback
+        if (role === 'admin' || normalizedInputEmail === ADMIN_EMAIL) {
+          setErrorMsg('Email o password non corrette. Riprova.');
+          return;
+        }
+
         // 2) Firestore-backed MESA user / catalog chef account verification
         const match = registeredUsers.find(
           u => u.email.trim().toLowerCase() === normalizedInputEmail && u.role === role
         );
-        if (match) {
+        if (match && match.role !== 'admin') {
           const expectedPassword = match.password || 'demo123';
           if (password !== expectedPassword) {
             setErrorMsg('La password inserita non è corretta. Riprova.');
@@ -184,7 +202,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const otherRoleMatch = registeredUsers.find(
           u => u.email.trim().toLowerCase() === normalizedInputEmail
         );
-        if (otherRoleMatch && role !== 'admin') {
+        if (otherRoleMatch) {
           if (otherRoleMatch.role === 'admin') {
             // Never reveal staff accounts or where the staff login lives.
             setErrorMsg('Email o password non corrette. Riprova.');
@@ -232,7 +250,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             return;
           }
         }
-        setErrorMsg(`Account ${role === 'chef' ? 'Cuoco' : role === 'admin' ? 'Admin' : 'Cliente'} non trovato con questa email. Registrati per iniziare!`);
+        setErrorMsg(`Account ${role === 'chef' ? 'Cuoco' : 'Cliente'} non trovato con questa email. Registrati per iniziare!`);
       } else {
         // Registration logic
         if (!normalizedInputEmail || !normalizedInputEmail.includes('@')) {

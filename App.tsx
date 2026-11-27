@@ -24,6 +24,7 @@ import { OrderTracking } from './components/OrderTracking';
 import { OrderReviewModal, ReviewSubmissionPayload } from './components/OrderReviewModal';
 import { ShareModal } from './components/ShareModal';
 import { AdminDashboard } from './components/AdminDashboard';
+import { ADMIN_EMAIL } from './adminConfig';
 
 // Hidden staff entry point. The admin login is NOT linked anywhere in the UI:
 // it opens only when this exact path is visited (e.g. https://mesa-food.web.app/mesa-staff).
@@ -188,7 +189,7 @@ const DEFAULT_USERS: AppUser[] = [
     id: 'usr-admin',
     name: 'Admin',
     lastName: 'MESA',
-    email: 'admin@mesa.com',
+    email: ADMIN_EMAIL,
     role: 'admin',
     createdAt: '10/05/2026',
     addresses: []
