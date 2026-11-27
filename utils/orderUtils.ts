@@ -1,8 +1,14 @@
-import { Order } from '../types';
+import { AppUser, Chef, Order } from '../types';
 
 export interface OrderDeleteResult {
   ok: boolean;
   deletedCount?: number;
+  error?: string;
+}
+
+export interface ProfileDeleteResult {
+  ok: boolean;
+  blockingCount?: number;
   error?: string;
 }
 
@@ -13,6 +19,70 @@ const CONCLUDED_STATUSES = new Set([
   'CANCELED',
   'ANNULLATO',
 ]);
+
+export const isActiveBlockingOrderStatus = (rawStatus: unknown): boolean => {
+  const normalizedStatus = String(rawStatus || '').trim().toUpperCase();
+  return !CONCLUDED_STATUSES.has(normalizedStatus);
+};
+
+export const matchesChefUser = (chef: Pick<Chef, 'id' | 'email' | 'name'>, user: Pick<AppUser, 'id' | 'email' | 'name' | 'lastName' | 'brandName'>): boolean => {
+  const normalizedUserEmail = (user.email || '').trim().toLowerCase();
+  const normalizedChefEmail = (chef.email || '').trim().toLowerCase();
+  if (normalizedUserEmail && normalizedChefEmail && normalizedChefEmail === normalizedUserEmail) {
+    return true;
+  }
+  return (
+    chef.id === `chef-${user.id}` ||
+    chef.id === user.id ||
+    `usr-${chef.id}` === user.id ||
+    `usr-${chef.id.replace('chef-', '')}` === user.id
+  );
+};
+
+export const getBlockingOrdersForUser = (
+  user: Pick<AppUser, 'id' | 'role' | 'email' | 'name' | 'lastName' | 'brandName'> | null | undefined,
+  orders: Order[],
+  chefs: Array<Pick<Chef, 'id' | 'email' | 'name'>> = []
+): Order[] => {
+  if (!user || user.role === 'admin' || !Array.isArray(orders)) {
+    return [];
+  }
+
+  const normalizedUserEmail = (user.email || '').trim().toLowerCase();
+
+  if (user.role === 'chef') {
+    const matchedChefs = chefs.filter(c => matchesChefUser(c, user));
+    const matchedChefIds = new Set(matchedChefs.map(c => c.id));
+    const matchedChefNames = new Set(matchedChefs.map(c => c.name.trim().toLowerCase()).filter(Boolean));
+    const fullName = `${user.name} ${user.lastName}`.trim().toLowerCase();
+    const brandName = (user.brandName || '').trim().toLowerCase();
+
+    return orders.filter((order) => {
+      if (!isActiveBlockingOrderStatus(order.status)) return false;
+      const orderChefName = (order.chefName || '').trim().toLowerCase();
+      const belongsToChef =
+        order.userId === user.id ||
+        matchedChefIds.has(order.chefId) ||
+        order.chefId === user.id ||
+        order.chefId === `chef-${user.id}` ||
+        `usr-${order.chefId}` === user.id ||
+        `usr-${String(order.chefId || '').replace('chef-', '')}` === user.id ||
+        (orderChefName ? matchedChefNames.has(orderChefName) : false) ||
+        (Boolean(fullName) && orderChefName === fullName) ||
+        (Boolean(brandName) && orderChefName === brandName);
+      return belongsToChef;
+    });
+  }
+
+  return orders.filter((order) => {
+    if (!isActiveBlockingOrderStatus(order.status)) return false;
+    const orderEmail = (order.customerEmail || '').trim().toLowerCase();
+    return (
+      order.userId === user.id ||
+      (Boolean(normalizedUserEmail) && orderEmail === normalizedUserEmail)
+    );
+  });
+};
 
 export const parseScheduledDate = (dateStr?: string): Date | null => {
   if (!dateStr) return null;

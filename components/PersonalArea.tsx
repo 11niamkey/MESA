@@ -10,8 +10,16 @@ import { ImagePickerBox } from './ImagePickerBox';
 import { AdminDishesPanel } from './AdminDishesPanel';
 import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, normalizeLocationToPordenone } from './italianTerritoryData';
 import { ConfirmDeleteOrdersModal } from './ConfirmDeleteOrdersModal';
+import { ConfirmDeleteProfileModal } from './ConfirmDeleteProfileModal';
 import { ReviewList } from './ReviewList';
-import { canClientCancelOrder, formatOrderCode, isConcludedOrder, OrderDeleteResult } from '../utils/orderUtils';
+import {
+  canClientCancelOrder,
+  formatOrderCode,
+  getBlockingOrdersForUser,
+  isConcludedOrder,
+  OrderDeleteResult,
+  ProfileDeleteResult,
+} from '../utils/orderUtils';
 import { formatChefDisplayReviews, getChefRatingSummary, isOrderEligibleForReview } from '../utils/reviewUtils';
 
 const formatChefDisplayName = (name?: string) => {
@@ -43,6 +51,7 @@ interface PersonalAreaProps {
   registeredUsers?: AppUser[];
   chefApplications?: ChefApplication[];
   onOpenOnboarding?: () => void;
+  onDeleteOwnProfile?: () => Promise<ProfileDeleteResult>;
 }
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
@@ -70,7 +79,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   onUnlockAudio,
   registeredUsers = [],
   chefApplications = [],
-  onOpenOnboarding
+  onOpenOnboarding,
+  onDeleteOwnProfile
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'orders' | 'kitchen' | 'chef-orders' | 'chef-menu' | 'chef-reviews' | 'chef-wallet' | 'client-payments'>(
     currentUser.role === 'chef' ? 'chef-orders' : 'profile'
@@ -96,6 +106,9 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   const [addressError, setAddressError] = useState('');
   const [confirmDeleteAddressId, setConfirmDeleteAddressId] = useState<string | null>(null);
   const [addressActionMsg, setAddressActionMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const [isDeleteProfileOpen, setIsDeleteProfileOpen] = useState(false);
+  const [isDeletingProfile, setIsDeletingProfile] = useState(false);
+  const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
 
   // General Profile Edit States
   const [profileName, setProfileName] = useState(currentUser.name);
@@ -209,6 +222,25 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   const pendingChefOrdersCount = chefOrders.filter(o => o.status === 'PENDING_CONFIRMATION').length;
   const userOrders = currentUser.role === 'chef' ? chefOrders : clientOrders;
   const concludedUserOrders = userOrders.filter(isConcludedOrder);
+  const blockingOrdersCount = getBlockingOrdersForUser(currentUser, orders, chefs).length;
+
+  const handleConfirmDeleteProfile = async () => {
+    if (!onDeleteOwnProfile) return;
+    setIsDeletingProfile(true);
+    setDeleteProfileError(null);
+    try {
+      const res = await onDeleteOwnProfile();
+      if (!res.ok) {
+        setDeleteProfileError(res.error || 'Impossibile eliminare il profilo al momento.');
+        return;
+      }
+      setIsDeleteProfileOpen(false);
+    } catch (err) {
+      setDeleteProfileError(err instanceof Error ? err.message : 'Errore durante l\'eliminazione del profilo.');
+    } finally {
+      setIsDeletingProfile(false);
+    }
+  };
 
   const handleConfirmDeleteOrders = async () => {
     if (!orderDeleteConfirm) return;
@@ -680,7 +712,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         
         {/* TAB 1: INFO PERSONALI */}
         {activeTab === 'profile' && (
-          <form onSubmit={handleSaveProfile} className="space-y-8 animate-fade-in text-left">
+          <div className="space-y-8 animate-fade-in text-left">
+          <form onSubmit={handleSaveProfile} className="space-y-8">
             <div>
               <h3 className={`text-xl sm:text-2xl font-black italic tracking-tight mb-2 ${
                 isChefRole ? 'text-emerald-700' : 'text-orange-600'
@@ -761,6 +794,38 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
               <Check className="w-4 h-4" strokeWidth={3} /> Salva Dati Profilo
             </button>
           </form>
+
+          {currentUser.role !== 'admin' && onDeleteOwnProfile && (
+            <div className="pt-8 border-t border-gray-100">
+              <div className="p-5 sm:p-6 rounded-3xl bg-red-50/60 border border-red-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs font-black uppercase tracking-widest text-red-700">
+                    Eliminazione Account
+                  </p>
+                  <p className="text-sm font-bold text-gray-900">
+                    Vuoi chiudere definitivamente il tuo profilo MESA?
+                  </p>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    {currentUser.role === 'chef'
+                      ? 'Rimuoverà account, indirizzi, vetrina pubblica e piatti. Puoi procedere solo se non hai ordini ancora attivi.'
+                      : 'Rimuoverà account, credenziali e indirizzi salvati. Puoi procedere solo se non hai ordini ancora attivi.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteProfileError(null);
+                    setIsDeleteProfileOpen(true);
+                  }}
+                  className="px-5 py-3 bg-white hover:bg-red-600 text-red-600 hover:text-white border-2 border-red-200 hover:border-red-600 rounded-2xl font-black uppercase tracking-wider text-xs transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0"
+                >
+                  <Trash2 className="w-4 h-4 shrink-0" />
+                  <span>Elimina profilo</span>
+                </button>
+              </div>
+            </div>
+          )}
+          </div>
         )}
 
         {/* TAB 2: GESTIONE INDIRIZZI VERIFICATI */}
@@ -1852,6 +1917,32 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
           }
         }}
         onConfirm={handleConfirmDeleteOrders}
+      />
+
+      <ConfirmDeleteProfileModal
+        isOpen={isDeleteProfileOpen}
+        userRole={currentUser.role}
+        userName={`${currentUser.name} ${currentUser.lastName}`.trim() || currentUser.email}
+        userEmail={currentUser.email}
+        blockingOrdersCount={blockingOrdersCount}
+        isDeleting={isDeletingProfile}
+        errorMessage={deleteProfileError}
+        onCancel={() => {
+          if (!isDeletingProfile) {
+            setIsDeleteProfileOpen(false);
+            setDeleteProfileError(null);
+          }
+        }}
+        onConfirm={handleConfirmDeleteProfile}
+        onGoToOrders={() => {
+          setIsDeleteProfileOpen(false);
+          setDeleteProfileError(null);
+          if (currentUser.role === 'chef') {
+            setActiveTab('chef-orders');
+          } else {
+            setActiveTab('orders');
+          }
+        }}
       />
     </div>
   );

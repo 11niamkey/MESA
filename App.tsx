@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { db, auth, isFirebaseConfigured, OperationType, handleFirestoreError } from './firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, getDoc, arrayUnion, writeBatch } from 'firebase/firestore';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { deleteUser, onAuthStateChanged, signOut } from 'firebase/auth';
 import { Header } from './components/Header';
 import { AddressGateModal } from './components/AddressGateModal';
 import { ChefCard } from './components/ChefCard';
@@ -38,7 +38,16 @@ import { AllergensRow } from './components/Allergens';
 import { ConfirmDeleteOrdersModal } from './components/ConfirmDeleteOrdersModal';
 import { isPordenoneLocation, normalizeLocationToPordenone, resolvePordenoneZip, findPordenoneComune } from './components/italianTerritoryData';
 import { playNewOrderChime, unlockAudioContext } from './utils/soundAlert';
-import { isConcludedOrder, canClientCancelOrder, formatOrderCode, formatOrderDeleteError, OrderDeleteResult } from './utils/orderUtils';
+import {
+  isConcludedOrder,
+  canClientCancelOrder,
+  formatOrderCode,
+  formatOrderDeleteError,
+  getBlockingOrdersForUser,
+  matchesChefUser,
+  OrderDeleteResult,
+  ProfileDeleteResult,
+} from './utils/orderUtils';
 import { isChefBookable, validateBetaOrderSubmission, BetaOrderValidationResult } from './utils/chefUtils';
 import { clampRating, computeOverallRating, getChefRatingSummary, isOrderEligibleForReview, MAX_REVIEW_COMMENT_LENGTH } from './utils/reviewUtils';
 import { MOCK_CHEFS } from './constants';
@@ -1408,6 +1417,130 @@ function App() {
       setCurrentView(ViewState.LANDING);
     }
     showNotification("Account rimosso definitivamente.");
+  };
+
+  const handleDeleteOwnProfile = async (): Promise<ProfileDeleteResult> => {
+    if (!currentUser) {
+      return { ok: false, error: 'Nessun profilo autenticato da eliminare.' };
+    }
+    if (currentUser.role === 'admin') {
+      return { ok: false, error: 'Gli account Staff/Admin non possono essere eliminati da questa schermata.' };
+    }
+
+    const blockingOrders = getBlockingOrdersForUser(currentUser, orders, chefs);
+    if (blockingOrders.length > 0) {
+      return {
+        ok: false,
+        blockingCount: blockingOrders.length,
+        error:
+          blockingOrders.length === 1
+            ? 'Hai 1 ordine ancora in corso. Completalo o annullalo prima di eliminare il profilo.'
+            : `Hai ${blockingOrders.length} ordini ancora in corso. Completa o annulla prima gli ordini aperti.`,
+      };
+    }
+
+    const targetUser = currentUser;
+    const normalizedEmail = (targetUser.email || '').trim().toLowerCase();
+    const matchingUserIds = Array.from(
+      new Set([
+        targetUser.id,
+        ...registeredUsers
+          .filter((u) => u.email.trim().toLowerCase() === normalizedEmail)
+          .map((u) => u.id),
+      ])
+    );
+    const matchingApps = chefApplications.filter(
+      (a) =>
+        a.userId === targetUser.id ||
+        (Boolean(normalizedEmail) && a.email.trim().toLowerCase() === normalizedEmail)
+    );
+    const matchingChefs =
+      targetUser.role === 'chef' ? chefs.filter((c) => matchesChefUser(c, targetUser)) : [];
+
+    // Stop auto-migration effects and clear session before Firestore/Auth teardown
+    currentUserRef.current = null;
+    setCurrentUser(null);
+    localStorage.removeItem('mesa_current_user');
+    localStorage.removeItem('mesa_verified_address');
+    localStorage.removeItem('mesa_guest_order_ids');
+
+    try {
+      for (const app of matchingApps) {
+        await firestoreDelete('chefApplications', app.id);
+      }
+
+      for (const chef of matchingChefs) {
+        await firestoreDelete('chefs', chef.id);
+        if (isFirebaseConfigured && db) {
+          try {
+            await setDoc(doc(db, 'settings', 'catalog'), { deletedChefIds: arrayUnion(chef.id) }, { merge: true });
+          } catch (err) {
+            console.error('Failed to record self-deleted chef id', err);
+          }
+        }
+      }
+
+      for (const uid of matchingUserIds) {
+        await firestoreDelete('users', uid);
+        if (isFirebaseConfigured && db) {
+          try {
+            await setDoc(doc(db, 'settings', 'catalog'), { deletedUserIds: arrayUnion(uid) }, { merge: true });
+          } catch (err) {
+            console.error('Failed to record self-deleted user id', err);
+          }
+        }
+      }
+    } catch (err) {
+      currentUserRef.current = targetUser;
+      setCurrentUser(targetUser);
+      const raw = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: `Impossibile completare la rimozione dei dati: ${raw}` };
+    }
+
+    if (auth?.currentUser) {
+      try {
+        await deleteUser(auth.currentUser);
+      } catch {
+        // Fallback to sign-out cleanly if Firebase Auth requires recent re-authentication
+      }
+    }
+    if (auth) {
+      await signOut(auth).catch(() => {});
+    }
+
+    const deletedAppIdSet = new Set(matchingApps.map((a) => a.id));
+    const deletedChefIdSet = new Set(matchingChefs.map((c) => c.id));
+    const deletedUserIdSet = new Set(matchingUserIds);
+
+    setRegisteredUsers((prev) => prev.filter((u) => !deletedUserIdSet.has(u.id)));
+    if (deletedAppIdSet.size > 0) {
+      setChefApplications((prev) => prev.filter((a) => !deletedAppIdSet.has(a.id)));
+    }
+    if (deletedChefIdSet.size > 0) {
+      setChefs((prev) => prev.filter((c) => !deletedChefIdSet.has(c.id)));
+    }
+
+    setVerifiedAddress('Pordenone (PN), Centro');
+    setGuestOrderIds([]);
+    setCart([]);
+    setFavorites([]);
+    setSelectedChef(null);
+    setSelectedOrder(null);
+    setReviewOrder(null);
+    setBookingDish(null);
+    setUnreadOrderAlertIds([]);
+    setRecentlyPlacedOrderId(null);
+    setPendingBookingDish(null);
+    setPendingBookingPayload(null);
+    setPendingPostAuthView(null);
+    setPendingCheckoutTotal(null);
+    navigateTo(ViewState.LANDING);
+    showNotification('Profilo eliminato definitivamente. I tuoi dati sono stati rimossi da MESA.', {
+      title: 'Profilo Eliminato',
+      variant: 'info',
+    });
+
+    return { ok: true };
   };
   
   const [orders, setOrders] = useState<Order[]>([]);
@@ -3097,6 +3230,7 @@ function App() {
             registeredUsers={registeredUsers}
             chefApplications={chefApplications}
             onOpenOnboarding={() => setIsOnboardingOpen(true)}
+            onDeleteOwnProfile={currentUser.role !== 'admin' ? handleDeleteOwnProfile : undefined}
           />
         )}
 
