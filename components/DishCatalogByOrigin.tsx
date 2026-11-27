@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Sparkles, MapPin, Star, Clock, ShoppingBag, Leaf, Flame, Info, ChevronDown, ChevronUp, Utensils } from 'lucide-react';
-import { Chef, Dish, Continent } from '../types';
+import { Chef, Dish, Continent, OrderReview } from '../types';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
 import { isChefBookable } from '../utils/chefUtils';
+import { getChefRatingSummary, getDishRatingSummary } from '../utils/reviewUtils';
 
 interface DishCatalogByOriginProps {
   chefs: Chef[];
+  reviews?: OrderReview[];
   onAddDish: (dish: Dish) => void;
   favorites: string[];
   onToggleFavorite: (dishId: string) => void;
@@ -19,6 +21,7 @@ interface DishWithChefDetails extends Dish {
   chefAvatar: string;
   chefNationality: string;
   chefRating: number;
+  chefRatingCount: number;
   chefDistance: number;
   chefContinent: Continent;
 }
@@ -27,6 +30,7 @@ const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a
 
 export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
   chefs,
+  reviews = [],
   onAddDish,
   favorites,
   onToggleFavorite,
@@ -35,17 +39,19 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
   const [expandedDishId, setExpandedDishId] = useState<string | null>(null);
 
   // Extract all dishes and bundle with chef info
-  const allDishesWithChef: DishWithChefDetails[] = chefs.flatMap(chef => 
-    chef.dishes.map(dish => ({
+  const allDishesWithChef: DishWithChefDetails[] = chefs.flatMap(chef => {
+    const summary = getChefRatingSummary(chef, reviews);
+    return chef.dishes.map(dish => ({
       ...dish,
       chefName: chef.name,
       chefAvatar: chef.avatar,
       chefNationality: chef.nationality,
-      chefRating: chef.rating,
+      chefRating: summary.average,
+      chefRatingCount: summary.count,
       chefDistance: chef.distance,
       chefContinent: chef.continent
-    }))
-  );
+    }));
+  });
 
   return (
     <div id="dish-catalog-provenance" className="my-6 sm:my-8 animate-fade-in scroll-mt-24">
@@ -213,14 +219,22 @@ export const DishCatalogByOrigin: React.FC<DishCatalogByOriginProps> = ({
                           </div>
                         </div>
 
-                        {/* Chef stats */}
+                        {/* Chef & Dish stats */}
                         <div className="flex items-center gap-2 shrink-0">
-                          <div className="flex items-center gap-0.5 bg-amber-400/15 text-amber-800 px-2 py-0.5 rounded-lg text-[9px] font-black">
-                            <Star className="w-2.5 h-2.5 fill-current text-amber-500" />
-                            {dish.chefRating}
-                          </div>
+                          {(() => {
+                            const dishRating = getDishRatingSummary(dish.id, reviews);
+                            const score = dishRating.average ?? dish.chefRating;
+                            const count = dishRating.count > 0 ? dishRating.count : dish.chefRatingCount;
+                            return (
+                              <div className="flex items-center gap-0.5 bg-amber-400/15 text-amber-800 px-2 py-0.5 rounded-lg text-[9px] font-black">
+                                <Star className="w-2.5 h-2.5 fill-current text-amber-500 shrink-0" />
+                                <span>{score.toFixed(1)}</span>
+                                <span>({count})</span>
+                              </div>
+                            );
+                          })()}
                           <div className="flex items-center gap-0.5 text-gray-500 text-[9px] font-bold">
-                            <MapPin className="w-2.5 h-2.5 text-orange-600" />
+                            <MapPin className="w-2.5 h-2.5 text-orange-600 shrink-0" />
                             {dish.chefDistance} km
                           </div>
                         </div>

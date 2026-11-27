@@ -20,10 +20,12 @@ import {
   Smartphone as PhoneIcon, 
   Share2, 
   AlertCircle,
-  XCircle
+  XCircle,
+  Star
 } from 'lucide-react';
-import { Order, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Chef, AppUser } from '../types';
+import { Order, OrderReview, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Chef, AppUser } from '../types';
 import { canClientCancelOrder } from '../utils/orderUtils';
+import { isOrderEligibleForReview } from '../utils/reviewUtils';
 
 const formatChefDisplayName = (name?: string) => {
   const trimmed = (name || 'MESA').trim();
@@ -32,6 +34,8 @@ const formatChefDisplayName = (name?: string) => {
 
 interface OrderTrackingProps {
   order: Order;
+  reviews?: OrderReview[];
+  onRateOrder?: (order: Order) => void;
   onBack: () => void;
   chefs?: Chef[];
   userRole?: AppUser['role'];
@@ -53,6 +57,8 @@ const STATUS_CHAT_UPDATES: Partial<Record<OrderStatus, string>> = {
 
 export const OrderTracking: React.FC<OrderTrackingProps> = ({ 
   order, 
+  reviews = [],
+  onRateOrder,
   onBack, 
   chefs,
   userRole,
@@ -226,6 +232,45 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({
           </span>
         </div>
       </div>
+
+      {!isChefView && order.status === 'COMPLETED' && (() => {
+        const submittedReview = reviews.find(r => r.orderId === order.id);
+        const eligible = isOrderEligibleForReview(order, reviews) && Boolean(onRateOrder);
+        return (
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-sm">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                <Star className="w-5 h-5 fill-current shrink-0" />
+              </div>
+              <div>
+                <p className="text-xs sm:text-sm font-black text-gray-900">
+                  {eligible ? 'Ordine completato! Come ti sei trovato?' : 'Grazie per la tua recensione verificata'}
+                </p>
+                <p className="text-[11px] sm:text-xs font-medium text-gray-600 mt-0.5">
+                  {eligible
+                    ? `Valuta piatti, servizio e packaging di ${formatChefDisplayName(order.chefName)}.`
+                    : 'La tua valutazione aiuta la community MESA a scegliere le cucine migliori.'}
+                </p>
+              </div>
+            </div>
+            {eligible ? (
+              <button
+                type="button"
+                onClick={() => onRateOrder?.(order)}
+                className="px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all shrink-0"
+              >
+                <Star className="w-4 h-4 fill-current shrink-0" />
+                <span>Valuta ordine</span>
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black shrink-0">
+                <Star className="w-4 h-4 fill-current text-amber-500 shrink-0" />
+                <span>{(submittedReview?.ratingOverall ?? order.reviewRating ?? 5).toFixed(1)} / 5 • Recensito</span>
+              </span>
+            )}
+          </div>
+        );
+      })()}
 
       {!isChefView && (justPlaced || order.status === 'PENDING_CONFIRMATION') && (
         <div className="bg-emerald-50 border-2 border-emerald-200 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-sm">

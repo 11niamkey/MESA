@@ -1,12 +1,14 @@
 import React from 'react';
 import { Star, MapPin, ChevronRight, Heart, Clock, ShoppingBag } from 'lucide-react';
-import { Chef, Dish } from '../types';
+import { Chef, Dish, OrderReview } from '../types';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
 import { isChefBookable } from '../utils/chefUtils';
+import { getChefRatingSummary, getDishRatingSummary } from '../utils/reviewUtils';
 
 interface ChefCardProps {
   chef: Chef;
+  reviews?: OrderReview[];
   onAddDish: (dish: Dish) => void;
   onViewProfile: (chef: Chef) => void;
   favorites: string[];
@@ -17,8 +19,9 @@ const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80';
 
-export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfile, favorites, onToggleFavorite }) => {
+export const ChefCard: React.FC<ChefCardProps> = ({ chef, reviews = [], onAddDish, onViewProfile, favorites, onToggleFavorite }) => {
   const canBook = isChefBookable(chef);
+  const ratingSummary = getChefRatingSummary(chef, reviews);
 
   return (
     <div className="bg-white rounded-[2.5rem] shadow-sm border border-orange-100 overflow-hidden transition-all hover:shadow-xl flex flex-col h-full">
@@ -47,9 +50,10 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
                 {chef.location} • {chef.distance} km
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                <div className="flex items-center bg-yellow-400 text-black px-2 py-0.5 rounded-lg text-[10px] font-black">
-                  <Star className="w-3 h-3 mr-1 fill-current shrink-0" />
-                  {chef.rating}
+                <div className="flex items-center bg-yellow-400 text-black px-2 py-0.5 rounded-lg text-[10px] font-black gap-1">
+                  <Star className="w-3 h-3 fill-current shrink-0" />
+                  <span>{ratingSummary.average.toFixed(1)}</span>
+                  <span className="text-black/75">({ratingSummary.count})</span>
                 </div>
                 <div className="flex items-center bg-orange-100 text-orange-800 px-2 py-0.5 rounded-lg text-[10px] font-bold">
                   ⏱️ 25-35 min
@@ -57,7 +61,6 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
                 <div className="flex items-center bg-green-100 text-green-800 px-2 py-0.5 rounded-lg text-[10px] font-bold">
                   🛵 Consegna €2.50
                 </div>
-                <span className="text-[10px] text-gray-400 font-bold uppercase">{chef.reviews.length} recensioni</span>
               </div>
             </div>
           </div>
@@ -78,7 +81,9 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 flex-1">
-          {chef.dishes.slice(0, 2).map((dish) => (
+          {chef.dishes.slice(0, 2).map((dish) => {
+            const dishSummary = getDishRatingSummary(dish.id, reviews);
+            return (
             <div key={dish.id} className="group flex flex-col h-full bg-white rounded-3xl border border-gray-100 overflow-hidden hover:border-orange-300 transition-all shadow-sm hover:shadow-lg relative">
               <div 
                 className="relative aspect-[16/10] w-full overflow-hidden shrink-0 cursor-pointer"
@@ -90,6 +95,13 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
                   onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_FOOD_IMAGE; }}
                   className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
                 />
+                {dishSummary.average !== null && (
+                  <div className="absolute top-2.5 left-2.5 bg-black/80 backdrop-blur-md text-amber-400 px-2 py-1 rounded-xl text-[10px] font-black flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-current shrink-0" />
+                    <span>{dishSummary.average.toFixed(1)}</span>
+                    <span className="text-white/80">({dishSummary.count})</span>
+                  </div>
+                )}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -139,7 +151,8 @@ export const ChefCard: React.FC<ChefCardProps> = ({ chef, onAddDish, onViewProfi
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
         
         {chef.dishes.length > 2 && (

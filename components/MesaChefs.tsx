@@ -1,16 +1,18 @@
 import React from 'react';
-import { Chef } from '../types';
-import { MapPin, ArrowRight, ShieldCheck, Award, Users } from 'lucide-react';
+import { Chef, OrderReview } from '../types';
+import { MapPin, ArrowRight, ShieldCheck, Award, Users, Star } from 'lucide-react';
 import { CountryFlag } from './CountryFlag';
+import { getChefRatingSummary } from '../utils/reviewUtils';
 
 interface MesaChefsProps {
   chefs: Chef[];
+  reviews?: OrderReview[];
   onViewProfile: (chef: Chef) => void;
 }
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80';
 
-export const MesaChefs: React.FC<MesaChefsProps> = ({ chefs, onViewProfile }) => {
+export const MesaChefs: React.FC<MesaChefsProps> = ({ chefs, reviews = [], onViewProfile }) => {
   return (
     <div className="animate-fade-in pb-12">
       {/* Hero Section for Chefs */}
@@ -75,10 +77,22 @@ export const MesaChefs: React.FC<MesaChefsProps> = ({ chefs, onViewProfile }) =>
                 className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent"></div>
-              <div className="absolute bottom-4 left-4 text-white">
-                <div className="flex items-center gap-2 mb-1">
-                    <CountryFlag flag={chef.nationality} title={chef.countryName} size="md" />
-                    <span className="px-2 py-0.5 bg-orange-600 text-[10px] font-bold uppercase rounded text-white tracking-wider">Verificato</span>
+              <div className="absolute bottom-4 left-4 right-4 text-white">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2">
+                      <CountryFlag flag={chef.nationality} title={chef.countryName} size="md" />
+                      <span className="px-2 py-0.5 bg-orange-600 text-[10px] font-bold uppercase rounded text-white tracking-wider">Verificato</span>
+                    </div>
+                    {(() => {
+                      const summary = getChefRatingSummary(chef, reviews);
+                      return (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-black/80 backdrop-blur-sm rounded-lg text-[10px] font-black text-amber-400 shrink-0">
+                          <Star className="w-3 h-3 fill-current shrink-0" />
+                          <span>{summary.average.toFixed(1)}</span>
+                          <span className="text-white/80">({summary.count})</span>
+                        </span>
+                      );
+                    })()}
                 </div>
                 <h3 className="text-2xl font-bold text-orange-400">{chef.name}</h3>
                 <div className="flex items-center text-sm text-gray-300 mt-1">

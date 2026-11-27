@@ -4,19 +4,28 @@ import {
   Plus, LogOut, ChefHat, Calendar, ClipboardList, 
   Clock, CheckCircle, Smartphone, Mail, Globe, Check, XCircle, Sparkles, AlertCircle, Volume2, VolumeX, BellRing 
 } from 'lucide-react';
-import { AppUser, UserAddress, Order, OrderStatus, ViewState, Chef, Dish, ChefApplication, ORDER_STATUS_LABELS } from '../types';
+import { AppUser, UserAddress, Order, OrderStatus, OrderReview, ViewState, Chef, Dish, ChefApplication, ORDER_STATUS_LABELS } from '../types';
 import { CountryFlag } from './CountryFlag';
 import { ImagePickerBox } from './ImagePickerBox';
 import { AdminDishesPanel } from './AdminDishesPanel';
 import { PORDENONE_COMUNI, findPordenoneComune, isPordenoneLocation, normalizeLocationToPordenone } from './italianTerritoryData';
 import { ConfirmDeleteOrdersModal } from './ConfirmDeleteOrdersModal';
+import { ReviewList } from './ReviewList';
 import { canClientCancelOrder, isConcludedOrder, OrderDeleteResult } from '../utils/orderUtils';
+import { formatChefDisplayReviews, getChefRatingSummary, isOrderEligibleForReview } from '../utils/reviewUtils';
+
+const formatChefDisplayName = (name?: string) => {
+  const trimmed = (name || 'MESA').trim();
+  return /^chef\b/i.test(trimmed) ? trimmed : `Chef ${trimmed}`;
+};
 
 interface PersonalAreaProps {
   currentUser: AppUser;
   onLogout: () => void;
   onUpdateUser: (updatedUser: AppUser) => void;
   orders: Order[];
+  reviews?: OrderReview[];
+  onRateOrder?: (order: Order) => void;
   onNavigate: (view: ViewState) => void;
   onSelectOrder: (order: Order) => void;
   chefs: Chef[];
@@ -42,6 +51,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   onLogout, 
   onUpdateUser, 
   orders,
+  reviews = [],
+  onRateOrder,
   onNavigate,
   onSelectOrder,
   chefs,
@@ -59,7 +70,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   chefApplications = [],
   onOpenOnboarding
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'orders' | 'kitchen' | 'chef-orders' | 'chef-menu' | 'chef-wallet' | 'client-payments'>(
+  const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'orders' | 'kitchen' | 'chef-orders' | 'chef-menu' | 'chef-reviews' | 'chef-wallet' | 'client-payments'>(
     currentUser.role === 'chef' ? 'chef-orders' : 'profile'
   );
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
@@ -71,7 +82,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   useEffect(() => {
     if (currentUser.role === 'chef') {
       setActiveTab('chef-orders');
-    } else if (activeTab === 'chef-orders' || activeTab === 'kitchen' || activeTab === 'chef-menu' || activeTab === 'chef-wallet') {
+    } else if (activeTab === 'chef-orders' || activeTab === 'kitchen' || activeTab === 'chef-menu' || activeTab === 'chef-reviews' || activeTab === 'chef-wallet') {
       setActiveTab('profile');
     }
   }, [currentUser.id, currentUser.role]);
@@ -580,6 +591,19 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
               <ClipboardList className="w-4 h-4 shrink-0" /> Il Mio Menu
             </button>
             <button
+              onClick={() => setActiveTab('chef-reviews')}
+              className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+                activeTab === 'chef-reviews' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <CheckCircle className="w-4 h-4 shrink-0" /> Recensioni
+              {matchingChef && (
+                <span className="ml-1 px-1.5 py-0.5 text-[9px] bg-amber-100 text-amber-800 rounded-full font-black">
+                  {getChefRatingSummary(matchingChef, reviews).average.toFixed(1)}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('chef-wallet')}
               className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
                 activeTab === 'chef-wallet' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -869,6 +893,37 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                         }`}>
                           {ORDER_STATUS_LABELS[order.status] || order.status}
                         </span>
+                        {currentUser.role === 'client' && order.status === 'COMPLETED' && (() => {
+                          const existingReview = reviews.find(r => r.orderId === order.id);
+                          const eligible = isOrderEligibleForReview(order, reviews) && Boolean(onRateOrder);
+                          if (eligible) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRateOrder?.(order);
+                                }}
+                                className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
+                              >
+                                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                                <span>Valuta ordine</span>
+                              </button>
+                            );
+                          }
+                          if (order.hasReview || order.isReviewed || existingReview) {
+                            const score = existingReview?.ratingOverall ?? order.reviewRating ?? 5;
+                            return (
+                              <span
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black shrink-0"
+                              >
+                                ★ {score.toFixed(1)}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                         {canClientCancelOrder(order) && onCancelOrder && (
                           <button
                             type="button"
@@ -1533,6 +1588,71 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                 title="Il Mio Menu"
                 subtitle="Tocca qualsiasi piatto per cambiarne foto, nome, descrizione, ingredienti e prezzo in tempo reale."
               />
+            )}
+          </div>
+        )}
+
+        {/* TAB 6B: CHEF REVIEWS (SOLA LETTURA PER IL CUOCO) */}
+        {activeTab === 'chef-reviews' && currentUser.role === 'chef' && (
+          <div className="space-y-6 animate-fade-in relative text-left">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-orange-600">
+                  Recensioni Clienti {matchingChef ? `— ${formatChefDisplayName(matchingChef.name)}` : ''}
+                </h3>
+                <p className="text-gray-600 text-xs sm:text-sm mt-1">
+                  Valutazioni verificate ricevute sugli ordini completati (visualizzazione in sola lettura).
+                </p>
+              </div>
+              {matchingChef && (() => {
+                const summary = getChefRatingSummary(matchingChef, reviews);
+                return (
+                  <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-black text-white shadow-md shrink-0 w-fit">
+                    <span className="text-amber-400 font-black text-base">★ {summary.average.toFixed(1)}</span>
+                    <span className="text-xs font-bold text-gray-300">({summary.count} recensioni)</span>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {matchingChef ? (() => {
+              const visibleChefReviews = reviews.filter(r => !r.isHidden && r.chefId === matchingChef.id);
+              const avgDishes = visibleChefReviews.length > 0
+                ? (visibleChefReviews.reduce((a, r) => a + r.ratingDishes, 0) / visibleChefReviews.length).toFixed(1)
+                : '-';
+              const avgService = visibleChefReviews.length > 0
+                ? (visibleChefReviews.reduce((a, r) => a + r.ratingService, 0) / visibleChefReviews.length).toFixed(1)
+                : '-';
+              const avgPackaging = visibleChefReviews.length > 0
+                ? (visibleChefReviews.reduce((a, r) => a + r.ratingPackaging, 0) / visibleChefReviews.length).toFixed(1)
+                : '-';
+              const displayList = formatChefDisplayReviews(matchingChef, reviews);
+
+              return (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-2xl bg-orange-50 border border-orange-100">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-orange-700">Qualità piatti</p>
+                      <p className="text-2xl font-black text-gray-900 mt-1">★ {avgDishes}</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Servizio e puntualità</p>
+                      <p className="text-2xl font-black text-gray-900 mt-1">★ {avgService}</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-600">Packaging / cura</p>
+                      <p className="text-2xl font-black text-gray-900 mt-1">★ {avgPackaging}</p>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-3xl p-5 sm:p-6 border border-gray-100">
+                    <ReviewList reviews={displayList} />
+                  </div>
+                </div>
+              );
+            })() : (
+              <div className="py-12 bg-gray-50 rounded-3xl text-center border-2 border-dashed border-gray-200 px-6">
+                <p className="font-bold text-gray-700 text-sm">Le recensioni appariranno qui dopo l&apos;attivazione del tuo profilo cuoco.</p>
+              </div>
             )}
           </div>
         )}

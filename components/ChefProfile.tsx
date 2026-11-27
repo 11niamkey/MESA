@@ -6,7 +6,7 @@ import {
   Leaf, Utensils, Globe, Compass, BookOpen, 
   History, Sparkles, Music, Wind, ShoppingBag
 } from 'lucide-react';
-import { Chef, Dish, ViewState } from '../types';
+import { Chef, Dish, OrderReview, ViewState } from '../types';
 import { ReviewList } from './ReviewList';
 import { StarRating } from './StarRating';
 import { HeritageJourney } from './HeritageJourney';
@@ -14,9 +14,11 @@ import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
 import { isChefBookable } from '../utils/chefUtils';
 import { getDishHeritageStory } from '../utils/heritageStories';
+import { formatChefDisplayReviews, getChefRatingSummary } from '../utils/reviewUtils';
 
 interface ChefProfileProps {
   chef: Chef;
+  reviews?: OrderReview[];
   onBack: () => void;
   onAddDish: (dish: Dish) => void;
   favorites: string[];
@@ -26,11 +28,13 @@ interface ChefProfileProps {
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 
-export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDish, favorites, onToggleFavorite, onNavigateToCulture }) => {
+export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, reviews = [], onBack, onAddDish, favorites, onToggleFavorite, onNavigateToCulture }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'heritage' | 'reviews'>('menu');
   const [expandedDishId, setExpandedDishId] = useState<string | null>(null);
   const [heritageDish, setHeritageDish] = useState<Dish | null>(null);
   const canBook = isChefBookable(chef);
+  const ratingSummary = getChefRatingSummary(chef, reviews);
+  const displayReviews = formatChefDisplayReviews(chef, reviews);
 
   const handleShare = () => {
     alert(`Link copiato negli appunti: https://mesa.app/chef/${chef.id}\nCondividi questo chef con i tuoi amici!`);
@@ -82,10 +86,10 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
                 <h1 className="text-4xl md:text-5xl font-black text-orange-600 tracking-tighter italic">{chef.name}</h1>
                 {chef.countryName && <span className="hidden md:inline-block text-xs bg-gray-100 text-black px-3 py-1 rounded-lg font-bold tracking-widest uppercase mt-2">{chef.countryName}</span>}
               </div>
-              <div className="flex items-center justify-center md:justify-start md:ml-auto gap-2 mt-4 md:mt-0 bg-black text-white px-4 py-2 rounded-2xl shadow-lg">
-                <Star className="w-4 h-4 text-orange-500 fill-current" />
-                <span className="font-black">{chef.rating}</span>
-                <span className="text-xs text-gray-400 font-bold uppercase">({chef.reviews.length} feedback)</span>
+              <div className="flex items-center justify-center md:justify-start md:ml-auto gap-2 mt-4 md:mt-0 bg-black text-white px-4 py-2 rounded-2xl shadow-lg shrink-0">
+                <Star className="w-4 h-4 text-amber-400 fill-current shrink-0" />
+                <span className="font-black">{ratingSummary.average.toFixed(1)}</span>
+                <span className="text-xs text-gray-300 font-bold uppercase">({ratingSummary.count})</span>
               </div>
             </div>
             
@@ -315,8 +319,8 @@ export const ChefProfile: React.FC<ChefProfileProps> = ({ chef, onBack, onAddDis
 
         {/* Tab 3: Recensioni */}
         {activeTab === 'reviews' && (
-          <div className="bg-white rounded-[3rem] p-8 border border-gray-100 shadow-sm animate-fade-in">
-            <ReviewList reviews={chef.reviews} />
+          <div className="bg-white rounded-[3rem] p-6 sm:p-8 border border-gray-100 shadow-sm animate-fade-in">
+            <ReviewList reviews={displayReviews} />
           </div>
         )}
       </div>

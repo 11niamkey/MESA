@@ -21,7 +21,7 @@ import { NotificationToast, ToastVariant } from './components/NotificationToast'
 import { BottomNav } from './components/BottomNav';
 import { InfoPage } from './components/InfoPage';
 import { OrderTracking } from './components/OrderTracking';
-import { OrderReviewModal } from './components/OrderReviewModal';
+import { OrderReviewModal, ReviewSubmissionPayload } from './components/OrderReviewModal';
 import { ShareModal } from './components/ShareModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { LaunchTour } from './components/LaunchTour';
@@ -40,8 +40,9 @@ import { isPordenoneLocation, normalizeLocationToPordenone, resolvePordenoneZip,
 import { playNewOrderChime, unlockAudioContext } from './utils/soundAlert';
 import { isConcludedOrder, canClientCancelOrder, formatOrderDeleteError, OrderDeleteResult } from './utils/orderUtils';
 import { isChefBookable, validateBetaOrderSubmission, BetaOrderValidationResult } from './utils/chefUtils';
+import { clampRating, computeOverallRating, getChefRatingSummary, isOrderEligibleForReview, MAX_REVIEW_COMMENT_LENGTH } from './utils/reviewUtils';
 import { MOCK_CHEFS } from './constants';
-import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
+import { CartItem, Dish, ViewState, FilterState, Chef, Order, OrderReview, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
 import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock, Volume2, VolumeX, Trash2, BellRing, XCircle } from 'lucide-react';
 
 const formatChefDisplayName = (name?: string) => {
@@ -525,6 +526,7 @@ function App() {
     let unsubOrders: (() => void) | undefined;
     let unsubApps: (() => void) | undefined;
     let unsubChefs: (() => void) | undefined;
+    let unsubReviews: (() => void) | undefined;
 
     (async () => {
       // Seed demo data once, then attach realtime listeners
@@ -725,6 +727,24 @@ function App() {
         },
         (error) => handleFirestoreError(error, OperationType.GET, 'chefApplications')
       );
+
+      // Listen to verified OrderReviews in real time
+      unsubReviews = onSnapshot(
+        collection(db, 'reviews'),
+        (snapshot) => {
+          const revs: OrderReview[] = snapshot.docs.map(d => {
+            const data = d.data() as OrderReview;
+            return {
+              ...data,
+              id: data.id || d.id,
+              orderId: data.orderId || d.id,
+              dishIds: Array.isArray(data.dishIds) ? data.dishIds : [],
+            };
+          });
+          setReviews(revs);
+        },
+        (error) => handleFirestoreError(error, OperationType.GET, 'reviews')
+      );
     })();
 
     return () => {
@@ -732,6 +752,7 @@ function App() {
       unsubOrders?.();
       unsubApps?.();
       unsubChefs?.();
+      unsubReviews?.();
     };
   }, []);
 
@@ -1379,6 +1400,7 @@ function App() {
   };
   
   const [orders, setOrders] = useState<Order[]>([]);
+  const [reviews, setReviews] = useState<OrderReview[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
 
@@ -2110,12 +2132,113 @@ function App() {
     }
   };
 
-  const handleReviewSubmit = (rating: number, comment: string) => {
-    if (!reviewOrder) return;
-    setOrders(prev => prev.map(o => o.id === reviewOrder.id ? { ...o, isReviewed: true } : o));
-    firestoreWrite('orders', reviewOrder.id, { isReviewed: true }, true);
+  const syncChefRatingInCatalog = async (chefId: string, nextReviews: OrderReview[]) => {
+    const targetChef = chefs.find(c => c.id === chefId);
+    if (!targetChef) return;
+    const summary = getChefRatingSummary(targetChef, nextReviews);
+    const updatedChef = { ...targetChef, rating: summary.average };
+    setChefs(prev => prev.map(c => (c.id === chefId ? updatedChef : c)));
+    await firestoreWrite('chefs', chefId, { rating: summary.average }, true);
+  };
+
+  const handleReviewSubmit = async (payload: ReviewSubmissionPayload) => {
+    if (!reviewOrder || !currentUser || currentUser.role !== 'client') return;
+    if (!isOrderEligibleForReview(reviewOrder, reviews)) {
+      showNotification('Questo ordine non è idoneo o è già stato recensito.', {
+        title: 'Recensione non consentita',
+        variant: 'warning',
+      });
+      setReviewOrder(null);
+      return;
+    }
+
+    const ratingDishes = clampRating(payload.ratingDishes);
+    const ratingService = clampRating(payload.ratingService);
+    const ratingPackaging = clampRating(payload.ratingPackaging);
+    const ratingOverall = computeOverallRating(ratingDishes, ratingService, ratingPackaging);
+    const cleanComment = (payload.comment || '').trim().slice(0, MAX_REVIEW_COMMENT_LENGTH);
+    const customerName = `${currentUser.name} ${currentUser.lastName}`.trim() || currentUser.email;
+    const dishIds = Array.from(new Set(reviewOrder.items.map(i => i.id).filter(Boolean)));
+
+    const newReview: OrderReview = {
+      id: reviewOrder.id,
+      orderId: reviewOrder.id,
+      customerId: currentUser.id,
+      customerName,
+      chefId: reviewOrder.chefId,
+      dishIds,
+      ratingDishes,
+      ratingService,
+      ratingPackaging,
+      ratingOverall,
+      comment: cleanComment,
+      createdAt: new Date().toISOString(),
+      isHidden: false,
+    };
+
+    const nextReviews = [newReview, ...reviews.filter(r => r.orderId !== reviewOrder.id)];
+    setReviews(nextReviews);
+    setOrders(prev =>
+      prev.map(o =>
+        o.id === reviewOrder.id
+          ? { ...o, hasReview: true, isReviewed: true, reviewRating: ratingOverall }
+          : o
+      )
+    );
+    if (selectedOrder?.id === reviewOrder.id) {
+      setSelectedOrder(prev =>
+        prev ? { ...prev, hasReview: true, isReviewed: true, reviewRating: ratingOverall } : prev
+      );
+    }
+
+    await firestoreWrite('reviews', newReview.id, newReview);
+    await firestoreWrite(
+      'orders',
+      reviewOrder.id,
+      { hasReview: true, isReviewed: true, reviewRating: ratingOverall },
+      true
+    );
+    await syncChefRatingInCatalog(reviewOrder.chefId, nextReviews);
+
     setReviewOrder(null);
-    showNotification("Grazie per la tua recensione! ⭐");
+    showNotification(`Grazie! Hai assegnato ★ ${ratingOverall.toFixed(1)} a ${formatChefDisplayName(reviewOrder.chefName)}.`, {
+      title: 'Recensione Verificata Pubblicata',
+      variant: 'success',
+    });
+  };
+
+  const handleToggleReviewVisibility = async (reviewId: string, hide: boolean) => {
+    const target = reviews.find(r => r.id === reviewId);
+    if (!target) return;
+    const nextReviews = reviews.map(r => (r.id === reviewId ? { ...r, isHidden: hide } : r));
+    setReviews(nextReviews);
+    await firestoreWrite('reviews', reviewId, { isHidden: hide }, true);
+    await syncChefRatingInCatalog(target.chefId, nextReviews);
+    showNotification(hide ? 'Recensione nascosta dalla vetrina pubblica.' : 'Recensione ripristinata in vetrina.', {
+      title: 'Moderazione Recensioni',
+      variant: hide ? 'warning' : 'success',
+    });
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    const target = reviews.find(r => r.id === reviewId);
+    if (!target) return;
+    const nextReviews = reviews.filter(r => r.id !== reviewId);
+    setReviews(nextReviews);
+    setOrders(prev =>
+      prev.map(o =>
+        o.id === target.orderId
+          ? { ...o, hasReview: false, isReviewed: false, reviewRating: undefined }
+          : o
+      )
+    );
+    await firestoreDelete('reviews', reviewId);
+    await firestoreWrite('orders', target.orderId, { hasReview: false, isReviewed: false }, true);
+    await syncChefRatingInCatalog(target.chefId, nextReviews);
+    showNotification('Recensione rimossa definitivamente.', {
+      title: 'Recensione Rimossa',
+      variant: 'info',
+    });
   };
 
   const handleViewProfile = (chef: Chef) => {
@@ -2365,6 +2488,7 @@ function App() {
       <div className="min-h-screen bg-white font-sans text-gray-900">
         <PublicStorefront 
           chef={selectedChef} 
+          reviews={reviews}
           onAddDish={handleInitiateBooking} 
           onExit={() => navigateTo(ViewState.HOME)} 
         />
@@ -2451,16 +2575,17 @@ function App() {
                 {/* Active Interactive Dish Catalog Subdivided By Provenance */}
                 <DishCatalogByOrigin 
                   chefs={chefs} 
+                  reviews={reviews}
                   onAddDish={handleInitiateBooking} 
                   favorites={favorites} 
                   onToggleFavorite={handleToggleFavorite} 
                   onViewProfile={handleViewProfile}
                 />
 
-                <ChefGroupSection title="Eccellenze Europee" chefs={chefsByContinent['Europa']} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
-                <ChefGroupSection title="Sapori dall'Africa" chefs={chefsByContinent['Africa']} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
-                <ChefGroupSection title="Tradizioni Asiatiche" chefs={chefsByContinent['Asia']} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
-                <ChefGroupSection title="Dalle Americhe" chefs={chefsByContinent['Americhe']} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
+                <ChefGroupSection title="Eccellenze Europee" chefs={chefsByContinent['Europa']} reviews={reviews} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
+                <ChefGroupSection title="Sapori dall'Africa" chefs={chefsByContinent['Africa']} reviews={reviews} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
+                <ChefGroupSection title="Tradizioni Asiatiche" chefs={chefsByContinent['Asia']} reviews={reviews} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
+                <ChefGroupSection title="Dalle Americhe" chefs={chefsByContinent['Americhe']} reviews={reviews} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
               </>
             ) : (
               <div className="space-y-6">
@@ -2655,7 +2780,7 @@ function App() {
                       </h3>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                         {filteredChefs.map(chef => (
-                          <ChefCard key={chef.id} chef={chef} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
+                          <ChefCard key={chef.id} chef={chef} reviews={reviews} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />
                         ))}
                       </div>
                     </div>
@@ -2680,7 +2805,7 @@ function App() {
           </div>
         )}
 
-        {currentView === ViewState.CHEFS && <MesaChefs chefs={filteredChefs} onViewProfile={handleViewProfile} />}
+        {currentView === ViewState.CHEFS && <MesaChefs chefs={filteredChefs} reviews={reviews} onViewProfile={handleViewProfile} />}
         {currentView === ViewState.HERITAGE && <HeritageMenu chefs={baseChefs} onAddDish={handleInitiateBooking} onViewProfile={handleViewProfile} favorites={favorites} onToggleFavorite={handleToggleFavorite} />}
         {currentView === ViewState.CULTURE && <CultureSection />}
         {currentView === ViewState.EXPERIENCES && <ExperiencesSection />}
@@ -2706,6 +2831,8 @@ function App() {
           ) : selectedOrder ? (
             <OrderTracking 
               order={orders.find(o => o.id === selectedOrder.id) || selectedOrder} 
+              reviews={reviews}
+              onRateOrder={currentUser.role === 'client' ? setReviewOrder : undefined}
               onBack={() => {
                 setSelectedOrder(null);
                 setRecentlyPlacedOrderId(null);
@@ -2815,7 +2942,7 @@ function App() {
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 self-end sm:self-auto">
+                    <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 self-end sm:self-auto">
                       <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
                         order.status === 'COMPLETED' || isConfirmed
                           ? 'bg-green-100 text-green-700 border-green-200'
@@ -2827,6 +2954,38 @@ function App() {
                       }`}>
                         {statusLabel}
                       </span>
+                      {currentUser.role === 'client' && order.status === 'COMPLETED' && (() => {
+                        const submittedReview = reviews.find(r => r.orderId === order.id);
+                        const eligible = isOrderEligibleForReview(order, reviews);
+                        if (eligible) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReviewOrder(order);
+                              }}
+                              className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
+                            >
+                              <Star className="w-3.5 h-3.5 fill-current shrink-0" />
+                              <span>Valuta ordine</span>
+                            </button>
+                          );
+                        }
+                        if (order.hasReview || order.isReviewed || submittedReview) {
+                          const score = submittedReview?.ratingOverall ?? order.reviewRating ?? 5;
+                          return (
+                            <span
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black shrink-0"
+                            >
+                              <Star className="w-3.5 h-3.5 fill-current text-amber-500 shrink-0" />
+                              <span>{score.toFixed(1)}</span>
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                       {allowCancel && (
                         <button
                           type="button"
@@ -2863,7 +3022,7 @@ function App() {
           )
         )}
         {currentView === ViewState.CHEF_PROFILE && selectedChef && (
-          <ChefProfile chef={selectedChef} onBack={() => navigateTo(ViewState.HOME)} onAddDish={handleInitiateBooking} favorites={favorites} onToggleFavorite={handleToggleFavorite} onNavigateToCulture={() => navigateTo(ViewState.CULTURE)} />
+          <ChefProfile chef={selectedChef} reviews={reviews} onBack={() => navigateTo(ViewState.HOME)} onAddDish={handleInitiateBooking} favorites={favorites} onToggleFavorite={handleToggleFavorite} onNavigateToCulture={() => navigateTo(ViewState.CULTURE)} />
         )}
         
         {currentView === ViewState.PROFILE && currentUser && (
@@ -2885,6 +3044,8 @@ function App() {
             }}
             onUpdateUser={handleUpdateUser}
             orders={orders}
+            reviews={reviews}
+            onRateOrder={currentUser.role === 'client' ? setReviewOrder : undefined}
             onNavigate={navigateTo}
             onSelectOrder={setSelectedOrder}
             chefs={chefs}
@@ -2907,6 +3068,9 @@ function App() {
         {currentView === ViewState.ADMIN_DASHBOARD && (
           <AdminDashboard 
             chefs={chefs} 
+            reviews={reviews}
+            onToggleReviewVisibility={handleToggleReviewVisibility}
+            onDeleteReview={handleDeleteReview}
             onUpdateChef={handleUpdateChef}
             onSaveChefDishes={handleSaveChefDishes}
             onDeleteChef={handleDeleteChef}

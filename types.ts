@@ -11,6 +11,22 @@ export interface Review {
   date: string;
 }
 
+export interface OrderReview {
+  id: string;
+  orderId: string;
+  customerId: string;
+  customerName: string;
+  chefId: string;
+  dishIds: string[];
+  ratingDishes: number;
+  ratingService: number;
+  ratingPackaging: number;
+  ratingOverall: number;
+  comment: string;
+  createdAt: string;
+  isHidden?: boolean;
+}
+
 export interface CultureStory {
   id: string;
   title: string;
@@ -154,6 +170,8 @@ export interface Order {
   chefName: string;
   deliveryMode: 'delivery' | 'pickup';
   estimatedTime: string;
+  hasReview?: boolean;
+  reviewRating?: number;
   isReviewed?: boolean;
   messages?: Message[];
   timeline?: OrderTimelineEntry[];

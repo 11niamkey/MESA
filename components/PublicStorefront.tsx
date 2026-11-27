@@ -1,23 +1,28 @@
 
 import React, { useState } from 'react';
-import { Chef, Dish } from '../types';
+import { Chef, Dish, OrderReview } from '../types';
 import { Star, MapPin, Utensils, Share2, ShoppingBag, ShieldCheck, ArrowLeft, Heart, Compass, Clock } from 'lucide-react';
 import { HeritageJourney } from './HeritageJourney';
 import { CountryFlag } from './CountryFlag';
 import { AllergensRow } from './Allergens';
+import { ReviewList } from './ReviewList';
 import { isChefBookable } from '../utils/chefUtils';
+import { formatChefDisplayReviews, getChefRatingSummary } from '../utils/reviewUtils';
 
 interface PublicStorefrontProps {
   chef: Chef;
+  reviews?: OrderReview[];
   onAddDish: (dish: Dish) => void;
   onExit: () => void;
 }
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 
-export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddDish, onExit }) => {
+export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, reviews = [], onAddDish, onExit }) => {
   const [heritageDish, setHeritageDish] = useState<Dish | null>(null);
   const canBook = isChefBookable(chef);
+  const ratingSummary = getChefRatingSummary(chef, reviews);
+  const displayReviews = formatChefDisplayReviews(chef, reviews);
 
   const handleShare = () => {
     const url = window.location.href;
@@ -84,9 +89,10 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
             <div className="flex-1 mb-2">
               <div className="flex items-center gap-3 mb-3">
                  <span className="bg-black text-white text-[9px] font-black px-3 py-1 rounded-lg uppercase tracking-widest border border-white/20">Chef Verificato</span>
-                 <div className="flex items-center gap-1 bg-yellow-400 text-black px-2 py-0.5 rounded-lg text-[10px] font-black">
-                    <Star className="w-3 h-3 fill-current" />
-                    {chef.rating}
+                 <div className="flex items-center gap-1 bg-yellow-400 text-black px-2.5 py-0.5 rounded-lg text-[10px] font-black">
+                    <Star className="w-3 h-3 fill-current shrink-0" />
+                    <span>{ratingSummary.average.toFixed(1)}</span>
+                    <span className="text-black/75">({ratingSummary.count})</span>
                  </div>
               </div>
               <h1 className="text-4xl md:text-6xl font-black italic text-orange-600 tracking-tighter leading-[0.9] mb-4">
@@ -177,6 +183,22 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({ chef, onAddD
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Ultime Recensioni Verificate */}
+            <div className="pt-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg sm:text-xl font-black italic tracking-tight border-l-8 border-orange-600 pl-4 text-orange-600">
+                  Ultime Recensioni ({ratingSummary.count})
+                </h3>
+                <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-3 py-1 rounded-full text-xs font-black">
+                  <Star className="w-3.5 h-3.5 fill-current text-amber-500 shrink-0" />
+                  {ratingSummary.average.toFixed(1)}
+                </span>
+              </div>
+              <div className="bg-gray-50 rounded-[2rem] p-5 sm:p-6 border border-gray-100">
+                <ReviewList reviews={displayReviews.slice(0, 5)} />
+              </div>
             </div>
           </div>
 

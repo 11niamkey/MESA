@@ -1,12 +1,13 @@
 
 import React from 'react';
-import { Chef, Dish } from '../types';
+import { Chef, Dish, OrderReview } from '../types';
 import { ChefCard } from './ChefCard';
 import { ArrowRight, Globe } from 'lucide-react';
 
 interface ChefGroupSectionProps {
   title: string;
   chefs: Chef[];
+  reviews?: OrderReview[];
   onAddDish: (dish: Dish) => void;
   onViewProfile: (chef: Chef) => void;
   favorites: string[];
@@ -14,7 +15,7 @@ interface ChefGroupSectionProps {
 }
 
 export const ChefGroupSection: React.FC<ChefGroupSectionProps> = ({ 
-  title, chefs, onAddDish, onViewProfile, favorites, onToggleFavorite 
+  title, chefs, reviews = [], onAddDish, onViewProfile, favorites, onToggleFavorite 
 }) => {
   if (chefs.length === 0) return null;
 
@@ -37,6 +38,7 @@ export const ChefGroupSection: React.FC<ChefGroupSectionProps> = ({
           <ChefCard 
             key={chef.id} 
             chef={chef} 
+            reviews={reviews}
             onAddDish={onAddDish} 
             onViewProfile={onViewProfile} 
             favorites={favorites} 

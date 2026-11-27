@@ -6,9 +6,9 @@ import {
   ArrowDownRight, Sparkles, Loader2, RefreshCw, Rocket, Globe, Activity,
   CheckCircle2, AlertTriangle, FileText, PieChart, ExternalLink, Share2, Globe2,
   Trash2, ShieldAlert, Check, Ban, KeyRound, Clock, Eye, X, MessageSquare, UserCheck, AlertOctagon,
-  CalendarDays, UtensilsCrossed, Plus, Pencil, Landmark
+  CalendarDays, UtensilsCrossed, Plus, Pencil, Landmark, Star, EyeOff
 } from 'lucide-react';
-import { Chef, Dish, Order, OrderStatus, ORDER_STATUS_LABELS, AppUser, ChefApplication, ChefDocument, Continent } from '../types';
+import { Chef, Dish, Order, OrderReview, OrderStatus, ORDER_STATUS_LABELS, AppUser, ChefApplication, ChefDocument, Continent } from '../types';
 import { ShareModal } from './ShareModal';
 import { COUNTRY_FLAG_PRESETS, getCountryNameByFlag } from './FilterBar';
 import { CountryFlag } from './CountryFlag';
@@ -23,6 +23,9 @@ import { isConcludedOrder, OrderDeleteResult } from '../utils/orderUtils';
 interface AdminDashboardProps {
   chefs: Chef[];
   orders: Order[];
+  reviews?: OrderReview[];
+  onToggleReviewVisibility?: (reviewId: string, isHidden: boolean) => Promise<void> | void;
+  onDeleteReview?: (reviewId: string) => Promise<void> | void;
   registeredUsers: AppUser[];
   chefApplications?: ChefApplication[];
   onVerifyAddress: (userId: string, addressId: string, isVerified: boolean) => void;
@@ -42,6 +45,9 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
   chefs, 
   orders, 
+  reviews = [],
+  onToggleReviewVisibility,
+  onDeleteReview,
   registeredUsers,
   chefApplications = [],
   onVerifyAddress,
@@ -57,7 +63,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDeleteApplication,
   onUpdateApplication
 }) => {
-  const [adminTab, setAdminTab] = useState<'orders' | 'accounting' | 'dishes' | 'applications' | 'users' | 'chefs' | 'cockpit'>('orders');
+  const [adminTab, setAdminTab] = useState<'orders' | 'accounting' | 'dishes' | 'reviews' | 'applications' | 'users' | 'chefs' | 'cockpit'>('orders');
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'client' | 'chef' | 'admin'>('all');
   const [orderSearch, setOrderSearch] = useState('');
@@ -337,6 +343,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
+          onClick={() => setAdminTab('reviews')}
+          className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
+            adminTab === 'reviews' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Star className="w-4 h-4 shrink-0" /> Recensioni ({reviews.length})
+        </button>
+
+        <button
           onClick={() => setAdminTab('applications')}
           className={`py-4 px-5 text-xs font-black uppercase tracking-widest flex items-center gap-2 border-b-4 transition-colors shrink-0 ${
             adminTab === 'applications' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -598,6 +613,122 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           title="Gestione Piatti, Foto & Descrizioni"
           subtitle="Tocca qualsiasi piatto per cambiarne foto (da file o URL), nome, descrizione, ingredienti e prezzo. Le modifiche vengono sincronizzate subito nel catalogo."
         />
+      )}
+
+      {/* TAB 0C: MODERAZIONE RECENSIONI VERIFICATE */}
+      {adminTab === 'reviews' && (
+        <div className="animate-fade-in space-y-6 bg-white rounded-[3rem] p-6 sm:p-10 border border-gray-100 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-orange-600">
+                Moderazione Recensioni Verificate
+              </h3>
+              <p className="text-black text-sm mt-1 leading-relaxed font-medium">
+                Monitora le valutazioni inviate dai clienti sugli ordini completati. Puoi nascondere o rimuovere contenuti inappropriati in tempo reale.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <span className="px-3.5 py-2 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-black">
+                ★ {reviews.filter(r => !r.isHidden).length > 0
+                  ? (reviews.filter(r => !r.isHidden).reduce((a, r) => a + r.ratingOverall, 0) / reviews.filter(r => !r.isHidden).length).toFixed(1)
+                  : '5.0'} media pubblica
+              </span>
+              <span className="px-3.5 py-2 rounded-2xl bg-gray-100 border border-gray-200 text-gray-800 text-xs font-black">
+                Nascoste: {reviews.filter(r => r.isHidden).length}
+              </span>
+            </div>
+          </div>
+
+          {reviews.length === 0 ? (
+            <div className="py-16 bg-gray-50 rounded-3xl text-center border-2 border-dashed border-gray-200 px-6">
+              <Star className="w-10 h-10 text-gray-300 mx-auto mb-3 shrink-0" />
+              <p className="font-bold text-gray-500 text-sm">Nessuna recensione verificata ancora registrata.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {[...reviews]
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .map((rev) => {
+                  const chefName = chefs.find(c => c.id === rev.chefId)?.name || rev.chefId;
+                  return (
+                    <div
+                      key={rev.id}
+                      className={`p-5 rounded-3xl border transition-all flex flex-col sm:flex-row justify-between gap-4 ${
+                        rev.isHidden ? 'bg-gray-100 border-gray-300 opacity-75' : 'bg-gray-50/70 border-gray-200'
+                      }`}
+                    >
+                      <div className="space-y-2 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-lg bg-black text-white text-[10px] font-black uppercase tracking-wider">
+                            Ordine #{rev.orderId.split('-')[0]}
+                          </span>
+                          <span className="text-sm font-black text-gray-900">{rev.customerName}</span>
+                          <span className="text-xs font-bold text-gray-400">→</span>
+                          <span className="text-sm font-black text-orange-600">{chefName}</span>
+                          <span className="text-[11px] font-bold text-gray-400">
+                            {new Date(rev.createdAt).toLocaleDateString('it-IT')}
+                          </span>
+                          {rev.isHidden && (
+                            <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[9px] font-black uppercase tracking-wider">
+                              Nascosta
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-gray-700">
+                          <span className="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-900 font-black">
+                            ★ {rev.ratingOverall.toFixed(1)}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-lg bg-white border border-gray-200 text-[11px]">
+                            Piatti: {rev.ratingDishes}/5
+                          </span>
+                          <span className="px-2 py-0.5 rounded-lg bg-white border border-gray-200 text-[11px]">
+                            Servizio: {rev.ratingService}/5
+                          </span>
+                          <span className="px-2 py-0.5 rounded-lg bg-white border border-gray-200 text-[11px]">
+                            Packaging: {rev.ratingPackaging}/5
+                          </span>
+                        </div>
+
+                        {rev.comment && (
+                          <p className="text-xs sm:text-sm text-gray-800 italic bg-white p-3 rounded-2xl border border-gray-100">
+                            &quot;{rev.comment}&quot;
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex sm:flex-col items-center sm:items-end justify-end gap-2 shrink-0">
+                        {onToggleReviewVisibility && (
+                          <button
+                            type="button"
+                            onClick={() => void onToggleReviewVisibility(rev.id, !rev.isHidden)}
+                            className={`px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 border transition-all shrink-0 ${
+                              rev.isHidden
+                                ? 'bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border-emerald-200'
+                                : 'bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border-amber-200'
+                            }`}
+                          >
+                            {rev.isHidden ? <Eye className="w-3.5 h-3.5 shrink-0" /> : <EyeOff className="w-3.5 h-3.5 shrink-0" />}
+                            <span>{rev.isHidden ? 'Mostra' : 'Nascondi'}</span>
+                          </button>
+                        )}
+                        {onDeleteReview && (
+                          <button
+                            type="button"
+                            onClick={() => void onDeleteReview(rev.id)}
+                            className="px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shrink-0"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                            <span>Rimuovi</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* TAB 1: CANDIDATURE & VERIFICHE CUOCHI (MAIN FEATURE) */}
