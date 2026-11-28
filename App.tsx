@@ -209,6 +209,11 @@ const DEFAULT_USERS: AppUser[] = [
 // ---------------------------------------------------------------------------
 const MOCK_CHEF_BY_ID = new Map(MOCK_CHEFS.map(c => [c.id, c]));
 
+const VALID_CHEF_PORTRAIT_FALLBACK =
+  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80';
+const VALID_DISH_IMAGE_FALLBACK =
+  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
+
 const normalizeChef = (chef: Chef): Chef => {
   const cleanName = chef.name.toLowerCase().replace(/[^a-z0-9]/g, '');
   const mappedCountry = nationalityNames[chef.nationality]?.[0];
@@ -221,17 +226,32 @@ const normalizeChef = (chef: Chef): Chef => {
     ? chef.location
     : (mockMatch?.location || 'Pordenone (PN), Centro');
 
+  const hadBrokenAvatar = typeof chef.avatar === 'string' && chef.avatar.includes('1583336137348');
+  const resolvedAvatar = hadBrokenAvatar
+    ? (mockMatch?.avatar && !mockMatch.avatar.includes('1583336137348') ? mockMatch.avatar : VALID_CHEF_PORTRAIT_FALLBACK)
+    : chef.avatar;
+
   const hadOldCityText = /\b(Milano|Napoli|Genova|Prato|Trastevere)\b/i.test(`${chef.bio || ''} ${chef.fullBio || ''}`);
   const normalizedDishes = Array.isArray(chef.dishes)
     ? chef.dishes.map(dish => {
-        if (dish.allergens !== undefined) return dish;
         const mockDish = mockMatch?.dishes.find(md => md.id === dish.id);
-        return mockDish?.allergens !== undefined ? { ...dish, allergens: mockDish.allergens } : dish;
+        const hadBrokenDishImage = typeof dish.image === 'string' && dish.image.includes('1583336137348');
+        const nextImage = hadBrokenDishImage
+          ? (mockDish?.image && !mockDish.image.includes('1583336137348') ? mockDish.image : VALID_DISH_IMAGE_FALLBACK)
+          : dish.image;
+        const nextAllergens = dish.allergens !== undefined ? dish.allergens : mockDish?.allergens;
+        if (!hadBrokenDishImage && nextAllergens === dish.allergens) return dish;
+        return {
+          ...dish,
+          ...(hadBrokenDishImage ? { image: nextImage } : {}),
+          ...(nextAllergens !== undefined ? { allergens: nextAllergens } : {})
+        };
       })
     : [];
 
   return {
     ...chef,
+    avatar: resolvedAvatar,
     dishes: normalizedDishes,
     email: chef.email || `chef.${cleanName}@mesa.com`,
     password: chef.password || 'demo123',
@@ -302,15 +322,17 @@ const seedFirestoreDefaults = async () => {
       }
     });
 
-    // Enforce Provincia di Pordenone competence area and backfill allergens on existing Firestore chef docs
+    // Enforce Provincia di Pordenone competence area, clean broken photo URLs, and backfill allergens on existing Firestore chef docs
     chefsSnap.docs.forEach(docSnap => {
       const data = docSnap.data() as Chef;
       const normalized = normalizeChef(data);
       const dishesChanged = JSON.stringify(normalized.dishes) !== JSON.stringify(data.dishes || []);
+      const avatarChanged = normalized.avatar !== data.avatar;
       if (
         normalized.location !== data.location ||
         normalized.bio !== data.bio ||
         normalized.fullBio !== data.fullBio ||
+        avatarChanged ||
         dishesChanged
       ) {
         writes.push(
@@ -318,6 +340,7 @@ const seedFirestoreDefaults = async () => {
             doc(db, 'chefs', docSnap.id),
             {
               location: normalized.location,
+              ...(avatarChanged ? { avatar: normalized.avatar } : {}),
               ...(normalized.bio !== data.bio ? { bio: normalized.bio } : {}),
               ...(normalized.fullBio !== data.fullBio ? { fullBio: normalized.fullBio } : {}),
               ...(dishesChanged ? { dishes: normalized.dishes } : {})

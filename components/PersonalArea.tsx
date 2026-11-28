@@ -1572,7 +1572,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         {/* TAB 5: CHEF ORDERS */}
         {activeTab === 'chef-orders' && currentUser.role === 'chef' && (
           <div className="space-y-6 animate-fade-in relative text-left">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col gap-3.5">
               <div>
                 <h3 className="text-xl sm:text-2xl font-black italic tracking-tight text-emerald-700">
                   Ordini in Arrivo {matchingChef ? `— ${matchingChef.name}` : ''}
@@ -1581,7 +1581,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                   Conferma o rifiuta le prenotazioni ricevute in tempo reale. Lo stato si aggiorna subito anche per il cliente e nell'Area Admin.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2">
                 {onToggleSoundAlerts && (
                   <button
                     type="button"
@@ -1653,9 +1653,9 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
 
             {/* Stato servizio notifiche email & audio cuoco */}
             <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-              <div className="flex items-center gap-2 min-w-0">
-                <Mail className="w-4 h-4 text-emerald-700 shrink-0" />
-                <span className="font-bold text-emerald-950 truncate">
+              <div className="flex items-start sm:items-center gap-2 min-w-0 max-w-full">
+                <Mail className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5 sm:mt-0" />
+                <span className="font-bold text-emerald-950 break-all sm:break-words">
                   Email attiva su: {(chefNotificationEmail || chefEmail || currentUser.email).trim()}
                 </span>
               </div>
