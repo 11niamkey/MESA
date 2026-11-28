@@ -235,6 +235,16 @@ service cloud.firestore {
       );
     }
 
+    // Order notification email queue: authenticated customer/Admin can enqueue; Admin-only read/manage
+    match /emailNotifications/{docId} {
+      allow create: if isAdmin() || (
+        isSignedIn() &&
+        request.resource.data.customerId == request.auth.uid &&
+        request.resource.data.to is string
+      );
+      allow read, update, delete: if isAdmin();
+    }
+
     // Catalog tombstone settings: readable only for signed-in users, writable only by Admin
     match /settings/{docId} {
       allow read: if isSignedIn();

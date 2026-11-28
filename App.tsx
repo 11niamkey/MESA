@@ -46,6 +46,7 @@ import { AllergensRow } from './components/Allergens';
 import { ConfirmDeleteOrdersModal } from './components/ConfirmDeleteOrdersModal';
 import { isPordenoneLocation, normalizeLocationToPordenone, resolvePordenoneZip, findPordenoneComune } from './components/italianTerritoryData';
 import { playNewOrderChime, unlockAudioContext } from './utils/soundAlert';
+import { dispatchChefOrderEmail } from './utils/orderNotificationEmail';
 import {
   isConcludedOrder,
   canClientCancelOrder,
@@ -509,6 +510,17 @@ function App() {
     return saved === null ? true : saved === 'true';
   });
   const [audioAutoplayBlocked, setAudioAutoplayBlocked] = useState(false);
+  const [wakeLockEnabled, setWakeLockEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('mesa_chef_wake_lock') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [wakeLockActive, setWakeLockActive] = useState(false);
+  const wakeLockSupported = typeof navigator !== 'undefined' && 'wakeLock' in navigator;
+  const wakeLockSentinelRef = useRef<WakeLockSentinel | null>(null);
+  const [silencedAlertOrderIds, setSilencedAlertOrderIds] = useState<string[]>([]);
 
   const prevOrderStatusesRef = useRef<Record<string, OrderStatus>>({});
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
@@ -557,20 +569,94 @@ function App() {
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'chef' || !chefSoundEnabled) return;
-    const handleUserGesture = () => {
+    const handleUnlockAttempt = () => {
       void unlockAudioContext().then((unlocked) => {
         if (unlocked) {
           setAudioAutoplayBlocked(false);
         }
       });
     };
-    window.addEventListener('pointerdown', handleUserGesture, { passive: true });
-    window.addEventListener('keydown', handleUserGesture, { passive: true });
+    const handleVisibilityResume = () => {
+      if (document.visibilityState === 'visible') {
+        handleUnlockAttempt();
+      }
+    };
+    window.addEventListener('pointerdown', handleUnlockAttempt, { passive: true });
+    window.addEventListener('touchstart', handleUnlockAttempt, { passive: true });
+    window.addEventListener('keydown', handleUnlockAttempt, { passive: true });
+    window.addEventListener('focus', handleUnlockAttempt);
+    document.addEventListener('visibilitychange', handleVisibilityResume);
     return () => {
-      window.removeEventListener('pointerdown', handleUserGesture);
-      window.removeEventListener('keydown', handleUserGesture);
+      window.removeEventListener('pointerdown', handleUnlockAttempt);
+      window.removeEventListener('touchstart', handleUnlockAttempt);
+      window.removeEventListener('keydown', handleUnlockAttempt);
+      window.removeEventListener('focus', handleUnlockAttempt);
+      document.removeEventListener('visibilitychange', handleVisibilityResume);
     };
   }, [currentUser?.id, currentUser?.role, chefSoundEnabled]);
+
+  // Screen Wake Lock management while Chef shift mode ("Turno attivo / Schermo acceso") is enabled
+  useEffect(() => {
+    try {
+      localStorage.setItem('mesa_chef_wake_lock', String(wakeLockEnabled));
+    } catch {}
+
+    const releaseCurrentLock = async () => {
+      const sentinel = wakeLockSentinelRef.current;
+      wakeLockSentinelRef.current = null;
+      if (sentinel) {
+        try {
+          await sentinel.release();
+        } catch {}
+      }
+      setWakeLockActive(false);
+    };
+
+    if (!currentUser || currentUser.role !== 'chef' || !wakeLockEnabled || !wakeLockSupported) {
+      void releaseCurrentLock();
+      return;
+    }
+
+    let cancelled = false;
+    const requestLock = async () => {
+      if (cancelled || document.visibilityState !== 'visible') return;
+      try {
+        const navWithWakeLock = navigator as Navigator & {
+          wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinel> };
+        };
+        if (!navWithWakeLock.wakeLock) return;
+        const sentinel = await navWithWakeLock.wakeLock.request('screen');
+        if (cancelled) {
+          await sentinel.release().catch(() => {});
+          return;
+        }
+        wakeLockSentinelRef.current = sentinel;
+        setWakeLockActive(true);
+        sentinel.addEventListener?.('release', () => {
+          if (wakeLockSentinelRef.current === sentinel) {
+            wakeLockSentinelRef.current = null;
+            setWakeLockActive(false);
+          }
+        });
+      } catch {
+        setWakeLockActive(false);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void requestLock();
+      }
+    };
+
+    void requestLock();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      void releaseCurrentLock();
+    };
+  }, [currentUser?.id, currentUser?.role, wakeLockEnabled, wakeLockSupported]);
 
   useEffect(() => {
     if (!isFirebaseConfigured) return;
@@ -2012,16 +2098,56 @@ function App() {
   };
 
   const handleUnlockChefAudio = async (): Promise<boolean> => {
+    setChefSoundEnabled(true);
     const unlocked = await unlockAudioContext();
     setAudioAutoplayBlocked(!unlocked);
     if (unlocked) {
       await playNewOrderChime();
-      showNotification('Avvisi sonori attivi per i nuovi ordini!', {
-        title: 'Audio Attivato',
+      showNotification('Avvisi sonori e servizio ordini attivi!', {
+        title: 'Audio & Servizio Attivi',
         variant: 'success',
+      });
+    } else {
+      showNotification('Tocca lo schermo o alza il volume per completare lo sblocco audio.', {
+        title: 'Sblocco Audio',
+        variant: 'warning',
       });
     }
     return unlocked;
+  };
+
+  const handleTestChefSound = async (): Promise<boolean> => {
+    const unlocked = await unlockAudioContext();
+    const played = unlocked ? await playNewOrderChime() : false;
+    setAudioAutoplayBlocked(!played);
+    showNotification(
+      played
+        ? 'Campanello ordini riprodotto con successo! Controlla il volume del dispositivo.'
+        : 'Audio bloccato dal browser: riprova con un tocco o verifica la modalità silenziosa.',
+      {
+        title: played ? 'Test Suono OK' : 'Audio Bloccato',
+        variant: played ? 'success' : 'warning',
+      }
+    );
+    return played;
+  };
+
+  const handleToggleWakeLock = async (): Promise<void> => {
+    setWakeLockEnabled((prev) => {
+      const next = !prev;
+      showNotification(
+        next
+          ? wakeLockSupported
+            ? 'Turno attivo: lo schermo resterà acceso finché l’app è aperta.'
+            : 'Turno attivo registrato (Wake Lock non supportato da questo browser).'
+          : 'Blocco schermo disattivato.',
+        {
+          title: next ? 'Turno Attivo' : 'Schermo Standard',
+          variant: next ? 'success' : 'info',
+        }
+      );
+      return next;
+    });
   };
 
   const handleToggleFavorite = (dishId: string) => {
@@ -2274,6 +2400,9 @@ function App() {
     knownOrderIdsRef.current.add(newOrder.id);
     setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrder.id)]);
     await firestoreWrite('orders', newOrder.id, newOrder);
+    void dispatchChefOrderEmail(newOrder, targetChef, registeredUsers, async (docId, mailPayload) => {
+      await firestoreWrite('emailNotifications', docId, mailPayload, true);
+    });
 
     setBookingDish(null);
     setRecentlyPlacedOrderId(newOrder.id);
@@ -2402,6 +2531,9 @@ function App() {
     knownOrderIdsRef.current.add(newOrder.id);
     setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrder.id)]);
     await firestoreWrite('orders', newOrder.id, newOrder);
+    void dispatchChefOrderEmail(newOrder, targetChef, registeredUsers, async (docId, mailPayload) => {
+      await firestoreWrite('emailNotifications', docId, mailPayload, true);
+    });
     setCart([]);
     setIsCartOpen(false);
     setRecentlyPlacedOrderId(newOrder.id);
@@ -2821,10 +2953,46 @@ function App() {
     return activeIds.size;
   }, [currentUser, visibleClientOrders, unreadOrderAlertIds]);
 
-  const chefPendingBadgeCount = useMemo(() => {
+    const chefPendingBadgeCount = useMemo(() => {
     if (!currentUser || currentUser.role !== 'chef') return 0;
     return visibleClientOrders.filter(o => isPendingOrderStatus(o.status)).length;
   }, [currentUser, visibleClientOrders]);
+
+  const activeAlertPendingOrders = useMemo(() => {
+    if (!currentUser || currentUser.role !== 'chef') return [];
+    return visibleClientOrders.filter(
+      (o) => isPendingOrderStatus(o.status) && !silencedAlertOrderIds.includes(o.id)
+    );
+  }, [currentUser, visibleClientOrders, silencedAlertOrderIds]);
+
+  // Prune silenced IDs once those orders leave PENDING_CONFIRMATION
+  useEffect(() => {
+    if (silencedAlertOrderIds.length === 0) return;
+    const activePendingIdSet = new Set(
+      orders.filter((o) => isPendingOrderStatus(o.status)).map((o) => o.id)
+    );
+    setSilencedAlertOrderIds((prev) => {
+      const next = prev.filter((id) => activePendingIdSet.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [orders, silencedAlertOrderIds.length]);
+
+  // Repeat audible chime every 4.5s while chef has unacknowledged pending orders
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'chef' || !chefSoundEnabled) return;
+    if (activeAlertPendingOrders.length === 0) return;
+
+    const triggerChime = () => {
+      if (document.visibilityState !== 'visible') return;
+      void playNewOrderChime().then((played) => {
+        setAudioAutoplayBlocked(!played);
+      });
+    };
+
+    triggerChime();
+    const timer = window.setInterval(triggerChime, 4500);
+    return () => window.clearInterval(timer);
+  }, [currentUser?.id, currentUser?.role, chefSoundEnabled, activeAlertPendingOrders.length]);
 
   const hasUnreadOrderAlerts = unreadOrderAlertIds.length > 0;
 
@@ -2956,6 +3124,58 @@ function App() {
       />
       
       {currentView === ViewState.HOME && <FilterBar filters={filters} onFilterChange={setFilters} chefs={chefs} />}
+
+      {currentUser?.role === 'chef' && activeAlertPendingOrders.length > 0 && (() => {
+        const newestPending = activeAlertPendingOrders[0];
+        const firstDishTitle = newestPending.items[0]?.name || 'Nuovo piatto';
+        const orderCode = formatOrderCode(newestPending.id);
+        return (
+          <div className="bg-emerald-700 text-white border-b-2 border-emerald-400 shadow-lg sticky top-16 md:top-20 z-40">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-amber-400 text-black flex items-center justify-center shrink-0">
+                  <BellRing className="w-4 h-4 animate-bounce shrink-0" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-black leading-tight truncate">
+                    Nuovo ordine ricevuto! {orderCode} • {firstDishTitle} (€{newestPending.total.toFixed(2)})
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-emerald-100 font-semibold">
+                    {activeAlertPendingOrders.length === 1
+                      ? 'Conferma o gestisci l’ordine per fermare l’avviso acustico.'
+                      : `${activeAlertPendingOrders.length} ordini in attesa di conferma.`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSilencedAlertOrderIds((prev) =>
+                      Array.from(new Set([...prev, ...activeAlertPendingOrders.map((o) => o.id)]))
+                    )
+                  }
+                  className="px-3 py-1.5 rounded-xl bg-black/30 hover:bg-black/50 text-white text-[10px] sm:text-xs font-black uppercase tracking-wider transition-colors"
+                >
+                  Silenzia
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUnreadOrderAlertIds((prev) => prev.filter((id) => id !== newestPending.id));
+                    setSelectedOrder(newestPending);
+                    setCurrentView(ViewState.ORDERS);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-[10px] sm:text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
+                >
+                  Visualizza ordine
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-grow w-full mb-10 pb-4">
         {currentView === ViewState.HOME && (
@@ -3477,6 +3697,11 @@ function App() {
             onToggleSoundAlerts={handleToggleChefSoundAlerts}
             audioAutoplayBlocked={audioAutoplayBlocked}
             onUnlockAudio={handleUnlockChefAudio}
+            onTestSound={handleTestChefSound}
+            wakeLockEnabled={wakeLockEnabled}
+            wakeLockActive={wakeLockActive}
+            wakeLockSupported={wakeLockSupported}
+            onToggleWakeLock={handleToggleWakeLock}
             registeredUsers={registeredUsers}
             chefApplications={chefApplications}
             onOpenOnboarding={() => setIsOnboardingOpen(true)}

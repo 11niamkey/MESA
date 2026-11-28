@@ -50,6 +50,11 @@ interface PersonalAreaProps {
   onToggleSoundAlerts?: () => void;
   audioAutoplayBlocked?: boolean;
   onUnlockAudio?: () => Promise<boolean> | void;
+  onTestSound?: () => Promise<boolean> | void;
+  wakeLockEnabled?: boolean;
+  wakeLockActive?: boolean;
+  wakeLockSupported?: boolean;
+  onToggleWakeLock?: () => Promise<void> | void;
   registeredUsers?: AppUser[];
   chefApplications?: ChefApplication[];
   onOpenOnboarding?: () => void;
@@ -81,6 +86,11 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   onToggleSoundAlerts,
   audioAutoplayBlocked = false,
   onUnlockAudio,
+  onTestSound,
+  wakeLockEnabled = false,
+  wakeLockActive = false,
+  wakeLockSupported = false,
+  onToggleWakeLock,
   registeredUsers = [],
   chefApplications = [],
   onOpenOnboarding,
@@ -149,6 +159,9 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   const [chefNationality, setChefNationality] = useState(matchingChef?.nationality || matchingApplication?.nationality || '🇮🇹');
   const [chefCountryName, setChefCountryName] = useState(matchingChef?.countryName || matchingApplication?.countryName || 'Italia');
   const [chefEmail, setChefEmail] = useState(matchingChef?.email || currentUser.email);
+  const [chefNotificationEmail, setChefNotificationEmail] = useState(
+    matchingChef?.notificationEmail || currentUser.notificationEmail || matchingChef?.email || currentUser.email
+  );
   const [chefPassword, setChefPassword] = useState(matchingChef?.password || currentUser.password || 'demo123');
   const [chefSpecialties, setChefSpecialties] = useState(matchingChef?.specialties.join(', ') || matchingApplication?.specialties?.join(', ') || 'Cucina Tradizionale');
   const [chefBio, setChefBio] = useState(matchingChef?.bio || matchingApplication?.bio || 'Passione per la cucina casalinga preparata con ingredienti freschi.');
@@ -426,6 +439,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
     const last = nameParts.slice(1).join(' ');
     const resolvedAvatar = chefAvatar.trim() || matchingChef?.avatar || currentUser.avatarUrl;
 
+    const resolvedNotificationEmail = (chefNotificationEmail || chefEmail).trim().toLowerCase();
     const updatedUser: AppUser = {
       ...currentUser,
       name: sanitizeText(first, TEXT_LIMITS.USER_NAME),
@@ -433,6 +447,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
       phone: cleanChefPhone,
       brandName: cleanChefName,
       email: chefEmail.trim().toLowerCase(),
+      notificationEmail: resolvedNotificationEmail,
       password: chefPassword.trim(),
       ...(resolvedAvatar ? { avatarUrl: resolvedAvatar } : { avatarUrl: undefined })
     };
@@ -447,6 +462,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
         nationality: chefNationality.trim(),
         countryName: sanitizeText(chefCountryName, TEXT_LIMITS.ADDRESS_CITY),
         email: chefEmail.trim().toLowerCase(),
+        notificationEmail: resolvedNotificationEmail,
         location: cleanChefLocation,
         phone: cleanChefPhone,
         specialties: chefSpecialties.split(',').map(s => sanitizeText(s, 40)).filter(Boolean),
@@ -1385,6 +1401,23 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                 </div>
               </div>
 
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                  Email Notifiche Nuovi Ordini
+                </label>
+                <input
+                  type="email"
+                  value={chefNotificationEmail}
+                  onChange={(e) => setChefNotificationEmail(e.target.value)}
+                  className="w-full p-4 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-gray-50 text-sm font-bold"
+                  placeholder="Email per ricevere gli avvisi automatici dei nuovi ordini"
+                />
+                <p className="text-[11px] font-semibold text-emerald-700 mt-1.5 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 shrink-0" />
+                  <span>Email attiva su: {(chefNotificationEmail || chefEmail || currentUser.email).trim()}</span>
+                </p>
+              </div>
+
               <h4 className="text-sm font-black text-gray-800 uppercase tracking-wider mt-6 mb-2 italic">3. Informazioni Culinarie</h4>
               <div className="space-y-6">
                 <div>
@@ -1553,15 +1586,47 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                   <button
                     type="button"
                     onClick={onToggleSoundAlerts}
-                    className={`px-3.5 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
+                    className={`px-3.5 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shrink-0 ${
                       soundAlertsEnabled
-                        ? 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100'
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
                         : 'bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200'
                     }`}
                     title="Attiva o disattiva il segnale acustico per i nuovi ordini"
                   >
-                    {soundAlertsEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                    {soundAlertsEnabled ? <Volume2 className="w-3.5 h-3.5 shrink-0" /> : <VolumeX className="w-3.5 h-3.5 shrink-0" />}
                     <span>{soundAlertsEnabled ? 'Suono Attivo' : 'Suono Disattivo'}</span>
+                  </button>
+                )}
+                {onTestSound && (
+                  <button
+                    type="button"
+                    onClick={() => void onTestSound()}
+                    className="px-3.5 py-2 rounded-2xl border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shrink-0"
+                    title="Riproduci ora il campanello per verificare il volume del telefono"
+                  >
+                    <BellRing className="w-3.5 h-3.5 shrink-0" />
+                    <span>Testa Suono</span>
+                  </button>
+                )}
+                {onToggleWakeLock && (
+                  <button
+                    type="button"
+                    onClick={() => void onToggleWakeLock()}
+                    className={`px-3.5 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shrink-0 ${
+                      wakeLockEnabled
+                        ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title={wakeLockSupported ? 'Mantieni lo schermo acceso durante il turno in cucina' : 'Schermo sempre acceso (fallback browser se non supportato)'}
+                  >
+                    <Smartphone className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      {wakeLockEnabled
+                        ? wakeLockActive
+                          ? 'Schermo acceso: ON'
+                          : 'Turno attivo'
+                        : 'Turno attivo / Schermo acceso'}
+                    </span>
                   </button>
                 )}
                 <span className="px-3.5 py-2 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-black uppercase tracking-widest">
@@ -1583,6 +1648,36 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                     <span>Pulisci ordini conclusi ({concludedUserOrders.length})</span>
                   </button>
                 )}
+              </div>
+            </div>
+
+            {/* Stato servizio notifiche email & audio cuoco */}
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <Mail className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span className="font-bold text-emerald-950 truncate">
+                  Email attiva su: {(chefNotificationEmail || chefEmail || currentUser.email).trim()}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0 text-[10px] font-black uppercase tracking-wider">
+                <span className={`px-2.5 py-1 rounded-full border ${
+                  soundAlertsEnabled && !audioAutoplayBlocked
+                    ? 'bg-white text-emerald-700 border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                }`}>
+                  {soundAlertsEnabled
+                    ? audioAutoplayBlocked
+                      ? 'Audio da sbloccare'
+                      : 'Servizio Audio Attivo'
+                    : 'Audio Silenziato'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('kitchen')}
+                  className="text-emerald-700 hover:underline font-black"
+                >
+                  Cambia email
+                </button>
               </div>
             </div>
 
@@ -1609,8 +1704,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                     onClick={() => void onUnlockAudio()}
                     className="px-4 py-2.5 bg-black hover:bg-gray-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shrink-0 shadow-md"
                   >
-                    <Volume2 className="w-3.5 h-3.5" />
-                    <span>Attiva Audio</span>
+                    <Volume2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Attiva Audio / Servizio</span>
                   </button>
                 )}
               </div>
@@ -1626,8 +1721,8 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                   onClick={() => void onUnlockAudio()}
                   className="px-3.5 py-2 bg-amber-900 hover:bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shrink-0"
                 >
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span>Attiva Audio</span>
+                  <Volume2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Attiva Audio / Servizio</span>
                 </button>
               </div>
             )}

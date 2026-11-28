@@ -114,6 +114,7 @@ export interface Chef {
   dishes: Dish[];
   phone?: string;
   email?: string;
+  notificationEmail?: string;
   password?: string;
   verificationStatus?: 'pending' | 'approved' | 'rejected';
   documents?: ChefDocument[];
@@ -240,6 +241,7 @@ export interface AppUser {
   name: string;
   lastName: string;
   email: string;
+  notificationEmail?: string;
   phone?: string;
   brandName?: string;
   avatarUrl?: string;

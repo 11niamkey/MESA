@@ -1,0 +1,259 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function authUserPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        (request.auth.token.email != null && request.auth.token.email == 'mesadmin@gmail.com') ||
+        (exists(authUserPath()) && get(authUserPath()).data.role == 'admin')
+      );
+    }
+
+    function isOwnerUser(userId) {
+      return isSignedIn() && (
+        request.auth.uid == userId ||
+        (resource != null && resource.data.authUid == request.auth.uid) ||
+        (request.auth.token.email != null && resource != null && resource.data.email == request.auth.token.email)
+      );
+    }
+
+    function isOrderCustomer(orderData) {
+      return isSignedIn() && (
+        orderData.customerId == request.auth.uid ||
+        orderData.authUid == request.auth.uid ||
+        orderData.userId == request.auth.uid
+      );
+    }
+
+    function isOrderChef(orderData) {
+      return isSignedIn() && (
+        orderData.chefId == request.auth.uid ||
+        orderData.chefAuthUid == request.auth.uid ||
+        orderData.chefId == ('chef-' + request.auth.uid) ||
+        (
+          exists(/databases/$(database)/documents/chefs/$(orderData.chefId)) &&
+          (
+            get(/databases/$(database)/documents/chefs/$(orderData.chefId)).data.authUid == request.auth.uid ||
+            get(/databases/$(database)/documents/chefs/$(orderData.chefId)).data.userId == request.auth.uid
+          )
+        )
+      );
+    }
+
+    // Users collection: self-read/update/delete only (sensitive role/verification fields Admin-only)
+    match /users/{userId} {
+      allow read: if isOwnerUser(userId) || isAdmin();
+
+      allow create: if isAdmin() || (
+        isSignedIn() &&
+        (
+          request.auth.uid == userId ||
+          request.resource.data.authUid == request.auth.uid ||
+          (request.auth.token.email != null && request.resource.data.email == request.auth.token.email)
+        ) &&
+        (!('role' in request.resource.data) || request.resource.data.role in ['client', 'chef']) &&
+        !('isVerifiedChef' in request.resource.data && request.resource.data.isVerifiedChef == true) &&
+        !('verificationStatus' in request.resource.data && request.resource.data.verificationStatus == 'approved') &&
+        !('commissionRate' in request.resource.data)
+      );
+
+      allow update: if isAdmin() || (
+        isOwnerUser(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'role',
+          'isVerifiedChef',
+          'commissionRate',
+          'verificationStatus'
+        ])
+      );
+
+      allow delete: if isOwnerUser(userId) || isAdmin();
+    }
+
+    // Orders collection: scoped strictly to Client (customerId), assigned Chef (chefId), or Admin
+    match /orders/{orderId} {
+      allow read: if isAdmin() || isOrderCustomer(resource.data) || isOrderChef(resource.data);
+
+      allow create: if isAdmin() || (
+        isSignedIn() &&
+        request.resource.data.customerId == request.auth.uid &&
+        request.resource.data.status in ['PENDING_CONFIRMATION', 'PENDING', 'PLACED'] &&
+        request.resource.data.total is number &&
+        request.resource.data.total >= 0
+      );
+
+      allow update: if isAdmin() || (
+        isOrderChef(resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'timeline',
+          'messages',
+          'estimatedTime'
+        ])
+      ) || (
+        isOrderCustomer(resource.data) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['messages']) ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'timeline']) &&
+            resource.data.status in ['PENDING_CONFIRMATION', 'PENDING'] &&
+            request.resource.data.status == 'CANCELLED'
+          ) ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hasReview', 'isReviewed', 'reviewRating']) &&
+            resource.data.status == 'COMPLETED'
+          )
+        )
+      );
+
+      allow delete: if isAdmin() || (
+        (isOrderCustomer(resource.data) || isOrderChef(resource.data)) &&
+        resource.data.status in ['COMPLETED', 'CANCELLED', 'REJECTED']
+      );
+    }
+
+    // Verified Reviews collection: public read; 1 per completed customer order; Admin moderation/delete
+    match /reviews/{reviewId} {
+      allow read: if true;
+
+      allow create: if isSignedIn() &&
+        request.resource.data.customerId == request.auth.uid &&
+        request.resource.data.orderId is string &&
+        reviewId == request.resource.data.orderId &&
+        !exists(/databases/$(database)/documents/reviews/$(request.resource.data.orderId)) &&
+        exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId)) &&
+        get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.customerId == request.auth.uid &&
+        get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.status == 'COMPLETED' &&
+        request.resource.data.ratingDishes is number &&
+        request.resource.data.ratingDishes >= 1 && request.resource.data.ratingDishes <= 5 &&
+        request.resource.data.ratingService is number &&
+        request.resource.data.ratingService >= 1 && request.resource.data.ratingService <= 5 &&
+        request.resource.data.ratingPackaging is number &&
+        request.resource.data.ratingPackaging >= 1 && request.resource.data.ratingPackaging <= 5 &&
+        request.resource.data.ratingOverall is number &&
+        request.resource.data.ratingOverall >= 1 && request.resource.data.ratingOverall <= 5 &&
+        (
+          !('comment' in request.resource.data) ||
+          (request.resource.data.comment is string && request.resource.data.comment.size() <= 250)
+        );
+
+      allow update, delete: if isAdmin();
+    }
+
+    // Public dishes collection: guest-readable catalog; only owning Chef or Admin can mutate
+    match /dishes/{dishId} {
+      allow read: if true;
+
+      allow create: if isAdmin() || (
+        isSignedIn() &&
+        request.resource.data.chefId == request.auth.uid
+      );
+
+      allow update, delete: if isAdmin() || (
+        isSignedIn() &&
+        resource.data.chefId == request.auth.uid
+      );
+    }
+
+    // Public chefs catalog: guest-readable before login; mutations restricted to Chef owner or Admin
+    match /chefs/{chefId} {
+      allow read: if true;
+
+      allow create: if isAdmin() || (
+        isSignedIn() &&
+        (
+          chefId == request.auth.uid ||
+          chefId == ('chef-' + request.auth.uid) ||
+          request.resource.data.authUid == request.auth.uid ||
+          request.resource.data.userId == request.auth.uid
+        ) &&
+        !('verificationStatus' in request.resource.data && request.resource.data.verificationStatus == 'approved') &&
+        !('commissionRate' in request.resource.data) &&
+        !('password' in request.resource.data)
+      );
+
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        (
+          chefId == request.auth.uid ||
+          chefId == ('chef-' + request.auth.uid) ||
+          resource.data.authUid == request.auth.uid ||
+          resource.data.userId == request.auth.uid
+        ) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'verificationStatus',
+          'commissionRate',
+          'isVerifiedChef'
+        ]) &&
+        !('password' in request.resource.data)
+      );
+
+      allow delete: if isAdmin() || (
+        isSignedIn() &&
+        (
+          chefId == request.auth.uid ||
+          chefId == ('chef-' + request.auth.uid) ||
+          resource.data.authUid == request.auth.uid ||
+          resource.data.userId == request.auth.uid
+        )
+      );
+    }
+
+    // Chef applications (contain private HACCP documents and kitchen info): owner or Admin only
+    match /chefApplications/{appId} {
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          resource.data.authUid == request.auth.uid ||
+          (request.auth.token.email != null && resource.data.email == request.auth.token.email)
+        )
+      );
+
+      allow create: if isAdmin() || (
+        isSignedIn() &&
+        (request.resource.data.userId == request.auth.uid || request.resource.data.authUid == request.auth.uid) &&
+        (!('status' in request.resource.data) || request.resource.data.status == 'pending')
+      );
+
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        (resource.data.userId == request.auth.uid || resource.data.authUid == request.auth.uid) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'reviewedAt', 'adminNotes'])
+      );
+
+      allow delete: if isAdmin() || (
+        isSignedIn() &&
+        (resource.data.userId == request.auth.uid || resource.data.authUid == request.auth.uid)
+      );
+    }
+
+    // Order notification email queue: authenticated customer/Admin can enqueue; Admin-only read/manage
+    match /emailNotifications/{docId} {
+      allow create: if isAdmin() || (
+        isSignedIn() &&
+        request.resource.data.customerId == request.auth.uid &&
+        request.resource.data.to is string
+      );
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Catalog tombstone settings: readable only for signed-in users, writable only by Admin
+    match /settings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Explicit default deny for any other path
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

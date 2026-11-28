@@ -255,6 +255,81 @@ app.post('/api/gemini/heritage-story', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/orders/notify-chef-email - Reliable order email dispatch for Chef notifications
+app.post('/api/orders/notify-chef-email', async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const recipientEmail = cleanText(body.recipientEmail, 140).toLowerCase();
+    const orderCode = cleanText(body.orderCode, 40) || '#MESA';
+    const subject = cleanText(body.subject, 180) || `[MESA] Nuovo ordine ${orderCode}`;
+    const textBody = cleanText(body.textBody, 3000);
+
+    if (!recipientEmail || !recipientEmail.includes('@') || !textBody) {
+      res.status(400).json({ error: 'Destinatario email o contenuto ordine mancanti.' });
+      return;
+    }
+
+    const resendKey = process.env.RESEND_API_KEY;
+    const webhookUrl = process.env.ORDER_EMAIL_WEBHOOK_URL;
+    const fromEmail = process.env.MESA_FROM_EMAIL || 'MESA Ordini <ordini@mesa.app>';
+
+    if (resendKey) {
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: [recipientEmail],
+          subject,
+          text: textBody,
+        }),
+      });
+      if (!resendRes.ok) {
+        const detail = await resendRes.text().catch(() => '');
+        console.error('Resend order email error:', resendRes.status, detail);
+        res.status(502).json({ error: 'Invio email tramite provider fallito.' });
+        return;
+      }
+      res.json({ ok: true, delivered: true, channel: 'resend', recipient: recipientEmail });
+      return;
+    }
+
+    if (webhookUrl) {
+      const hookRes = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: recipientEmail,
+          orderCode,
+          subject,
+          text: textBody,
+          chefName: cleanText(body.chefName, 80),
+          customerName: cleanText(body.customerName, 120),
+          deliveryModeLabel: cleanText(body.deliveryModeLabel, 120),
+          estimatedTime: cleanText(body.estimatedTime, 80),
+          total: Number(body.total) || 0,
+        }),
+      });
+      if (!hookRes.ok) {
+        console.error('Webhook order email error:', hookRes.status);
+        res.status(502).json({ error: 'Invio email tramite webhook fallito.' });
+        return;
+      }
+      res.json({ ok: true, delivered: true, channel: 'webhook', recipient: recipientEmail });
+      return;
+    }
+
+    console.info(`[MESA EMAIL DISPATCH] To=${recipientEmail} Subject="${subject}"\n${textBody}`);
+    res.json({ ok: true, delivered: false, channel: 'server_log', recipient: recipientEmail });
+  } catch (error) {
+    console.error('Error in /api/orders/notify-chef-email:', error);
+    res.status(500).json({ error: 'Errore invio notifica email ordine.' });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');

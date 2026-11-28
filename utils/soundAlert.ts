@@ -1,4 +1,5 @@
 let sharedAudioCtx: AudioContext | null = null;
+let hasUnlockedSilentBuffer = false;
 
 const getOrCreateAudioContext = (): AudioContext | null => {
   if (typeof window === 'undefined') return null;
@@ -6,10 +7,25 @@ const getOrCreateAudioContext = (): AudioContext | null => {
     window.AudioContext ||
     (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioCtx) return null;
-  if (!sharedAudioCtx) {
+  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
     sharedAudioCtx = new AudioCtx();
+    hasUnlockedSilentBuffer = false;
   }
   return sharedAudioCtx;
+};
+
+const primeSilentBuffer = (ctx: AudioContext): void => {
+  if (hasUnlockedSilentBuffer) return;
+  try {
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+    hasUnlockedSilentBuffer = true;
+  } catch {
+    // Ignore hardware prime failure
+  }
 };
 
 export const isAudioUnlocked = (): boolean =>
@@ -19,9 +35,11 @@ export const unlockAudioContext = async (): Promise<boolean> => {
   try {
     const ctx = getOrCreateAudioContext();
     if (!ctx) return false;
-    if (ctx.state === 'suspended') {
+    const stateStr = ctx.state as string;
+    if (stateStr === 'suspended' || stateStr === 'interrupted') {
       await ctx.resume();
     }
+    primeSilentBuffer(ctx);
     return ctx.state === 'running';
   } catch {
     return false;
@@ -34,7 +52,8 @@ export const playNewOrderChime = async (): Promise<boolean> => {
     const ctx = getOrCreateAudioContext();
     if (!ctx) return false;
 
-    if (ctx.state === 'suspended') {
+    const stateStr = ctx.state as string;
+    if (stateStr === 'suspended' || stateStr === 'interrupted') {
       try {
         await ctx.resume();
       } catch {
@@ -49,7 +68,8 @@ export const playNewOrderChime = async (): Promise<boolean> => {
     const now = ctx.currentTime;
     const notes = [
       { freq: 880, start: 0, duration: 0.14 },
-      { freq: 1174.66, start: 0.13, duration: 0.22 },
+      { freq: 1174.66, start: 0.13, duration: 0.16 },
+      { freq: 1567.98, start: 0.27, duration: 0.24 },
     ];
 
     notes.forEach(({ freq, start, duration }) => {
@@ -59,13 +79,13 @@ export const playNewOrderChime = async (): Promise<boolean> => {
       osc.frequency.setValueAtTime(freq, now + start);
 
       gain.gain.setValueAtTime(0.001, now + start);
-      gain.gain.exponentialRampToValueAtTime(0.14, now + start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.22, now + start + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(now + start);
-      osc.stop(now + start + duration + 0.02);
+      osc.stop(now + start + duration + 0.03);
     });
     return true;
   } catch {
