@@ -22,6 +22,7 @@ import {
 } from '../utils/orderUtils';
 import { formatChefDisplayReviews, getChefRatingSummary, isOrderEligibleForReview } from '../utils/reviewUtils';
 import { sanitizeInputLive, sanitizeText, TEXT_LIMITS } from '../utils/sanitize';
+import { PersistedPersonalTab, resolvePersonalTab } from '../utils/navPersistence';
 
 const formatChefDisplayName = (name?: string) => {
   const trimmed = (name || 'MESA').trim();
@@ -53,6 +54,8 @@ interface PersonalAreaProps {
   chefApplications?: ChefApplication[];
   onOpenOnboarding?: () => void;
   onDeleteOwnProfile?: () => Promise<ProfileDeleteResult>;
+  initialTab?: PersistedPersonalTab;
+  onTabChange?: (tab: PersistedPersonalTab) => void;
 }
 
 const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
@@ -81,10 +84,12 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   registeredUsers = [],
   chefApplications = [],
   onOpenOnboarding,
-  onDeleteOwnProfile
+  onDeleteOwnProfile,
+  initialTab,
+  onTabChange
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'orders' | 'kitchen' | 'chef-orders' | 'chef-menu' | 'chef-reviews' | 'chef-wallet' | 'client-payments'>(
-    currentUser.role === 'chef' ? 'chef-orders' : 'profile'
+  const [activeTab, setActiveTab] = useState<PersistedPersonalTab>(
+    () => resolvePersonalTab(currentUser.role, initialTab)
   );
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -93,12 +98,12 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   const [orderDeleteError, setOrderDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (currentUser.role === 'chef') {
-      setActiveTab('chef-orders');
-    } else if (activeTab === 'chef-orders' || activeTab === 'kitchen' || activeTab === 'chef-menu' || activeTab === 'chef-reviews' || activeTab === 'chef-wallet') {
-      setActiveTab('profile');
-    }
+    setActiveTab(prev => resolvePersonalTab(currentUser.role, prev));
   }, [currentUser.id, currentUser.role]);
+
+  useEffect(() => {
+    onTabChange?.(activeTab);
+  }, [activeTab, onTabChange]);
   
   // States for adding/deleting addresses
   const [street, setStreet] = useState('');

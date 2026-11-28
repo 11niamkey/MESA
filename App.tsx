@@ -59,6 +59,13 @@ import {
 import { isChefBookable, validateBetaOrderSubmission, BetaOrderValidationResult } from './utils/chefUtils';
 import { clampRating, computeOverallRating, getChefRatingSummary, isOrderEligibleForReview, MAX_REVIEW_COMMENT_LENGTH } from './utils/reviewUtils';
 import { sanitizeText, stripSensitiveChefFields, TEXT_LIMITS } from './utils/sanitize';
+import {
+  MESA_NAV_STATE_KEY,
+  PersistedPersonalTab,
+  resolveInitialNavState,
+  resolvePersonalTab,
+  saveNavStateToStorage,
+} from './utils/navPersistence';
 import { MOCK_CHEFS } from './constants';
 import { CartItem, Dish, ViewState, FilterState, Chef, Message, Order, OrderReview, OrderStatus, OrderTimelineEntry, ORDER_STATUS_LABELS, Continent, AppUser, UserAddress, ChefApplication } from './types';
 import { SearchX, ShoppingBag, X, Heart, Star, MapPin, Clock, Volume2, VolumeX, Trash2, BellRing, XCircle } from 'lucide-react';
@@ -427,8 +434,36 @@ const isOrderForChefUser = (order: Order, user: AppUser | null, chefsList: Chef[
 };
 
 function App() {
-  // Always start on the welcome/landing screen on every open or page refresh (in-memory session state only)
-  const [currentView, setCurrentView] = useState<ViewState>(ViewState.LANDING);
+  const initialStoredUser = useMemo<AppUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('mesa_current_user');
+      return saved ? (JSON.parse(saved) as AppUser) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const initialNavState = useMemo(
+    () =>
+      resolveInitialNavState(
+        typeof window !== 'undefined' ? localStorage.getItem(MESA_NAV_STATE_KEY) : null,
+        initialStoredUser,
+        typeof window !== 'undefined' ? isAdminAccessPath() : false
+      ),
+    [initialStoredUser]
+  );
+
+  // Restore active view, role context, chef/order selection cleanly across reload/PWA resume
+  const [currentView, setCurrentView] = useState<ViewState>(() => initialNavState.view);
+  const [personalTab, setPersonalTab] = useState<PersistedPersonalTab>(
+    () => initialNavState.personalTab || (initialStoredUser ? resolvePersonalTab(initialStoredUser.role) : 'profile')
+  );
+  const [pendingRestoreOrderId, setPendingRestoreOrderId] = useState<string | null>(
+    () => initialNavState.selectedOrderId || null
+  );
+  const [pendingRestoreChefId, setPendingRestoreChefId] = useState<string | null>(
+    () => initialNavState.selectedChefId || null
+  );
   const [verifiedAddress, setVerifiedAddress] = useState<string>(() => {
     const saved = localStorage.getItem('mesa_verified_address');
     if (saved && isPordenoneLocation(saved)) return saved;
@@ -437,7 +472,6 @@ function App() {
     return fallback;
   });
   const [isAddressGateOpen, setIsAddressGateOpen] = useState(false);
-  const [selectedChef, setSelectedChef] = useState<Chef | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCartBarDismissed, setIsCartBarDismissed] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -445,12 +479,13 @@ function App() {
 
   // Stateful copy of chefs (seeded from MOCK_CHEFS, then synced from Firestore)
   const [chefs, setChefs] = useState<Chef[]>(() => MOCK_CHEFS.map(normalizeChef));
+  const [selectedChef, setSelectedChef] = useState<Chef | null>(() => {
+    if (!initialNavState.selectedChefId) return null;
+    return MOCK_CHEFS.map(normalizeChef).find(c => c.id === initialNavState.selectedChefId) || null;
+  });
 
   // Synchronized registered users & current user session
-  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
-    const saved = localStorage.getItem('mesa_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => initialStoredUser);
 
   const [registeredUsers, setRegisteredUsers] = useState<AppUser[]>(DEFAULT_USERS);
 
@@ -1521,6 +1556,7 @@ function App() {
     localStorage.removeItem('mesa_current_user');
     localStorage.removeItem('mesa_verified_address');
     localStorage.removeItem('mesa_guest_order_ids');
+    localStorage.removeItem(MESA_NAV_STATE_KEY);
 
     try {
       for (const app of matchingApps) {
@@ -1584,6 +1620,9 @@ function App() {
     setFavorites([]);
     setSelectedChef(null);
     setSelectedOrder(null);
+    setPendingRestoreOrderId(null);
+    setPendingRestoreChefId(null);
+    setPersonalTab('profile');
     setReviewOrder(null);
     setBookingDish(null);
     setUnreadOrderAlertIds([]);
@@ -1605,6 +1644,94 @@ function App() {
   const [reviews, setReviews] = useState<OrderReview[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
+
+  // Persist navigation state & active order/chef selection cleanly across page reload
+  useEffect(() => {
+    saveNavStateToStorage({
+      view: currentView,
+      activeRole: currentUser?.role || 'guest',
+      personalTab: currentUser ? resolvePersonalTab(currentUser.role, personalTab) : undefined,
+      selectedOrderId:
+        currentView === ViewState.ORDERS ? selectedOrder?.id || pendingRestoreOrderId || null : null,
+      selectedChefId:
+        currentView === ViewState.CHEF_PROFILE || currentView === ViewState.PUBLIC_STOREFRONT
+          ? selectedChef?.id || pendingRestoreChefId || null
+          : null,
+    });
+  }, [
+    currentView,
+    currentUser?.id,
+    currentUser?.role,
+    personalTab,
+    selectedOrder?.id,
+    pendingRestoreOrderId,
+    selectedChef?.id,
+    pendingRestoreChefId,
+  ]);
+
+  // Restore selectedOrder once Firestore orders finish loading
+  useEffect(() => {
+    if (!pendingRestoreOrderId) return;
+    if (orders.length === 0) return;
+    const matchedOrder = orders.find(o => o.id === pendingRestoreOrderId);
+    if (matchedOrder) {
+      setSelectedOrder(matchedOrder);
+      setPendingRestoreOrderId(null);
+    }
+  }, [orders, pendingRestoreOrderId]);
+
+  // Restore selectedChef once Firestore chefs finish loading
+  useEffect(() => {
+    if (!pendingRestoreChefId) return;
+    const matchedChef = chefs.find(c => c.id === pendingRestoreChefId);
+    if (matchedChef) {
+      setSelectedChef(matchedChef);
+      setPendingRestoreChefId(null);
+    }
+  }, [chefs, pendingRestoreChefId]);
+
+  // Prevent unintended native browser pull-to-refresh gesture on mobile while preserving inner scrollables
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let startY = 0;
+    let startX = 0;
+
+    const hasScrolledAncestor = (target: EventTarget | null): boolean => {
+      let el = target instanceof HTMLElement ? target : null;
+      while (el && el !== document.body && el !== document.documentElement) {
+        const style = window.getComputedStyle(el);
+        const isScrollableY = style.overflowY === 'auto' || style.overflowY === 'scroll';
+        if (isScrollableY && el.scrollTop > 0) {
+          return true;
+        }
+        el = el.parentElement;
+      }
+      return false;
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      startY = e.touches[0].clientY;
+      startX = e.touches[0].clientX;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || !e.cancelable) return;
+      const deltaY = e.touches[0].clientY - startY;
+      const deltaX = Math.abs(e.touches[0].clientX - startX);
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+      if (scrollTop <= 0 && deltaY > 0 && deltaY > deltaX && !hasScrolledAncestor(e.target)) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, []);
 
   const [bookingDish, setBookingDish] = useState<Dish | null>(null);
   const [pendingBookingDish, setPendingBookingDish] = useState<Dish | null>(null);
@@ -3116,6 +3243,7 @@ function App() {
                 onRateOrder={currentUser.role === 'client' ? setReviewOrder : undefined}
                 onBack={() => {
                   setSelectedOrder(null);
+                  setPendingRestoreOrderId(null);
                   setRecentlyPlacedOrderId(null);
                 }} 
                 chefs={chefs} 
@@ -3315,7 +3443,11 @@ function App() {
             onLogout={() => {
               if (auth) signOut(auth).catch(() => {});
               setCurrentUser(null);
+              setSelectedChef(null);
               setSelectedOrder(null);
+              setPendingRestoreOrderId(null);
+              setPendingRestoreChefId(null);
+              setPersonalTab('profile');
               setBookingDish(null);
               setUnreadOrderAlertIds([]);
               setRecentlyPlacedOrderId(null);
@@ -3323,6 +3455,7 @@ function App() {
               setPendingBookingPayload(null);
               setPendingPostAuthView(null);
               setPendingCheckoutTotal(null);
+              localStorage.removeItem(MESA_NAV_STATE_KEY);
               navigateTo(ViewState.LANDING);
               showNotification("Sconnesso dall'Area Personale MESA. A presto! 👋");
             }}
@@ -3348,6 +3481,8 @@ function App() {
             chefApplications={chefApplications}
             onOpenOnboarding={() => setIsOnboardingOpen(true)}
             onDeleteOwnProfile={currentUser.role !== 'admin' ? handleDeleteOwnProfile : undefined}
+            initialTab={personalTab}
+            onTabChange={setPersonalTab}
           />
         )}
 

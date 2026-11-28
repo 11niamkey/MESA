@@ -32,6 +32,8 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -39,6 +41,19 @@ body {
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
   overflow-x: clip;
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  min-height: 100dvh;
+}
+
+#root {
+  min-height: 100dvh;
+  overscroll-behavior-y: none;
+}
+
+.custom-scrollbar,
+.overflow-y-auto {
+  overscroll-behavior-y: contain;
 }
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }
