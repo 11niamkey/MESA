@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   User, MapPin, ShieldCheck, ShieldAlert, Trash2, 
   Plus, LogOut, ChefHat, Calendar, ClipboardList, 
-  Clock, CheckCircle, Smartphone, Mail, Globe, Check, XCircle, Sparkles, AlertCircle, Volume2, VolumeX, BellRing 
+  Clock, CheckCircle, Smartphone, Mail, Globe, Check, XCircle, Sparkles, AlertCircle, Volume2, VolumeX, BellRing, ChevronDown, ChevronUp, Copy 
 } from 'lucide-react';
 import { AppUser, UserAddress, Order, OrderStatus, OrderReview, ViewState, Chef, Dish, ChefApplication, ORDER_STATUS_LABELS } from '../types';
 import { CountryFlag } from './CountryFlag';
@@ -110,6 +110,7 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
   const [isDeleteProfileOpen, setIsDeleteProfileOpen] = useState(false);
   const [isDeletingProfile, setIsDeletingProfile] = useState(false);
   const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
+  const [showChefTemplateExample, setShowChefTemplateExample] = useState(false);
 
   // General Profile Edit States
   const [profileName, setProfileName] = useState(currentUser.name);
@@ -1423,48 +1424,90 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
               </button>
             </form>
 
-            {/* Sezione Esempi di Cuochi (Spunti per Registrazione) */}
-            <div className="border-t border-gray-100 pt-10 mt-10">
-              <div className="flex items-center gap-3 mb-4 justify-start">
-                <ChefHat className="w-6 h-6 text-orange-600" />
-                <h4 className="text-xl font-black italic tracking-tight">Modelli di Spunto per la Registrazione</h4>
-              </div>
-              <p className="text-xs font-medium text-gray-500 mb-6 leading-relaxed text-left">
-                Usa i profili dei cuochi esperti di MESA come ispirazione ("spunto"). Puoi copiare direttamente i loro dettagli o caricarli come base per completare rapidamente la tua registrazione o configurare la tua cucina.
-              </p>
+            {/* Sezione Esempio Singolo Richiudibile (Spunto per Registrazione) */}
+            {(() => {
+              const otherChefs = chefs.filter(c => c.id !== matchingChef?.id);
+              const pickedChef =
+                otherChefs.find(c => c.verificationStatus === 'approved') || otherChefs[0];
+              const sampleChef = pickedChef || {
+                id: 'sample-chef',
+                name: 'Cucina Nonna Giulia',
+                nationality: '🇮🇹',
+                countryName: 'Italia',
+                continent: 'Europa' as const,
+                specialties: ['Pasta fresca fatta a mano', 'Ragù tradizionale', 'Tiramisù'],
+                bio: 'Piatti casalinghi preparati al momento con ingredienti locali selezionati e ricette di famiglia.',
+                location: 'Pordenone (PN), Centro',
+                phone: '+393475552026',
+              };
+              const samplePhone = sampleChef.phone || defaultNumbers[sampleChef.id] || '+393475552026';
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
-                {chefs.filter(c => c.id !== matchingChef?.id).map(sampleChef => {
-                  const samplePhone = sampleChef.phone || defaultNumbers[sampleChef.id] || '+393475552026';
-                  return (
-                    <div key={sampleChef.id} className="bg-gray-50 border border-gray-100/55 rounded-2xl p-5 flex flex-col justify-between hover:border-orange-500/10 transition-all text-left">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
+              return (
+                <div className="border-t border-gray-100 pt-6 mt-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                        <ChefHat className="w-4 h-4 shrink-0" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm sm:text-base font-black tracking-tight text-gray-900">
+                          Modello di Spunto per la Registrazione
+                        </h4>
+                        <p className="text-[11px] font-medium text-gray-500">
+                          Un esempio rapido già pronto da copiare o caricare nel tuo profilo.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowChefTemplateExample(prev => !prev)}
+                      aria-expanded={showChefTemplateExample}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider transition-colors shrink-0"
+                    >
+                      <span>{showChefTemplateExample ? 'Nascondi esempio' : 'Mostra esempio'}</span>
+                      {showChefTemplateExample ? (
+                        <ChevronUp className="w-3.5 h-3.5 shrink-0" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                      )}
+                    </button>
+                  </div>
+
+                  {showChefTemplateExample && (
+                    <div className="mt-4 bg-gray-50 border border-gray-200 rounded-2xl p-4 sm:p-5 text-left space-y-3 animate-fade-in">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <CountryFlag flag={sampleChef.nationality} title={sampleChef.countryName} size="sm" />
-                          <p className="text-xs font-black text-gray-900">{sampleChef.name}</p>
-                          <span className="text-[9px] text-gray-400 capitalize ml-auto font-black">{sampleChef.continent}</span>
+                          <p className="text-xs sm:text-sm font-black text-gray-900 truncate">{sampleChef.name}</p>
                         </div>
-                        <p className="text-[10px] text-gray-500 line-clamp-2 italic mb-3">"{sampleChef.bio}"</p>
-                        <div className="space-y-1 text-[10px] text-gray-400 font-bold">
-                          <p><strong>Specialità:</strong> {sampleChef.specialties.join(', ')}</p>
-                          <p><strong>Indirizzo:</strong> {sampleChef.location}</p>
-                          <p><strong>Telefono:</strong> {samplePhone}</p>
-                        </div>
+                        <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
+                          {sampleChef.continent}
+                        </span>
                       </div>
 
-                      <div className="flex gap-2 mt-4 pt-3 border-t border-gray-100/30">
+                      <p className="text-xs text-gray-600 italic line-clamp-2">"{sampleChef.bio}"</p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-gray-600">
+                        <p className="truncate"><strong className="text-gray-800">Specialità:</strong> {sampleChef.specialties.join(', ')}</p>
+                        <p className="truncate"><strong className="text-gray-800">Indirizzo:</strong> {sampleChef.location}</p>
+                        <p className="truncate"><strong className="text-gray-800">Telefono:</strong> {samplePhone}</p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200/70">
                         <button
                           type="button"
                           onClick={() => {
-                            setChefSpecialties(sampleChef.specialties.join(', '));
-                            setChefBio(sampleChef.bio);
-                            setChefLocation(sampleChef.location);
-                            setChefPhone(samplePhone);
+                            setChefSpecialties(sanitizeText(sampleChef.specialties.join(', '), 200));
+                            setChefBio(sanitizeText(sampleChef.bio, TEXT_LIMITS.CHEF_BIO));
+                            setChefLocation(sanitizeText(sampleChef.location, TEXT_LIMITS.ADDRESS_STREET));
+                            setChefPhone(sanitizeText(samplePhone, TEXT_LIMITS.PHONE));
                             setFeedbackMsg({ type: 'success', text: 'Modello di spunto caricato! Modifica i campi e salva la configurazione.' });
                           }}
-                          className="px-3 py-1.5 bg-black text-white hover:text-black hover:bg-orange-600 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-1"
+                          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-colors inline-flex items-center gap-1.5 shrink-0"
                         >
-                          Carica Base
+                          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                          <span>Carica Base</span>
                         </button>
                         <button
                           type="button"
@@ -1473,16 +1516,17 @@ export const PersonalArea: React.FC<PersonalAreaProps> = ({
                             navigator.clipboard?.writeText(templateText).catch(() => {});
                             setFeedbackMsg({ type: 'success', text: `Dati modello di ${sampleChef.name} copiati negli appunti.` });
                           }}
-                          className="px-3 py-1.5 bg-white text-gray-600 border border-gray-150 text-[9px] font-black uppercase tracking-widest rounded-lg hover:bg-gray-50 transition-all"
+                          className="px-3.5 py-2 bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 text-[10px] font-black uppercase tracking-wider rounded-xl transition-colors inline-flex items-center gap-1.5 shrink-0"
                         >
-                          Copia Spunto
+                          <Copy className="w-3.5 h-3.5 shrink-0" />
+                          <span>Copia Spunto</span>
                         </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           );
         })()}
